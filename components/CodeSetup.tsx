@@ -40,7 +40,7 @@ const CodeSetup: React.FC<CodeSetupProps> = ({ onCodeSet }) => {
         maxLength={4}
         value={code}
         onChangeText={setCode}
-        secureTextEntry // Mask input
+        secureTextEntry
       />
       <TextInput
         style={styles.input}
@@ -49,7 +49,7 @@ const CodeSetup: React.FC<CodeSetupProps> = ({ onCodeSet }) => {
         maxLength={4}
         value={confirmCode}
         onChangeText={setConfirmCode}
-        secureTextEntry // Mask input
+        secureTextEntry
       />
       <Button title="Set Code" onPress={handleSetCode} />
     </View>

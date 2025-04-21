@@ -1,41 +1,52 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, Alert, StyleSheet, TextInput, Modal, Button } from "react-native";
+import {
+  View,
+  Text,
+  Alert,
+  StyleSheet,
+  TextInput,
+  Modal,
+  Button,
+} from "react-native";
 import { Calendar } from "react-native-calendars";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Event, VerificationCode } from "../types";
-import { initDatabase, insertEvent, fetchEvents } from "../db/database";
-import CodeSetup from "./CodeSetup";
-import ChangeCode from "./ChangeCode";
+import { RouteProp } from "@react-navigation/native";
+import { RootStackParamList, Event } from "../types";
+import { insertEvent, fetchEvents, initDatabase } from "../db/database";
 
-const CalendarView: React.FC = () => {
+interface CalendarViewProps {
+  route: RouteProp<RootStackParamList, "Calendar">;
+}
+
+const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
+  const { eventType } = route.params;
   const [events, setEvents] = useState<Event[]>([]);
   const [markedDates, setMarkedDates] = useState<{ [key: string]: any }>({});
-  const [codeState, setCodeState] = useState<VerificationCode>({ isSet: false, code: null });
+  const [code, setCode] = useState<string | null>(null);
   const [verifyModalVisible, setVerifyModalVisible] = useState(false);
-  const [changeCodeModalVisible, setChangeCodeModalVisible] = useState(false);
   const [inputCode, setInputCode] = useState("");
   const [pendingDate, setPendingDate] = useState<string | null>(null);
 
-  // Initialize app
+  // Load events and code
   useEffect(() => {
     const initialize = async () => {
       try {
-        const isCodeSet = await AsyncStorage.getItem("isCodeSet");
-        const storedCode = await AsyncStorage.getItem("verificationCode");
-        if (isCodeSet === "true" && storedCode) {
-          setCodeState({ isSet: true, code: storedCode });
-        }
+        // Ensure database is initialized
         await initDatabase();
-        const loadedEvents = await fetchEvents();
+        // Load verification code
+        const storedCode = await AsyncStorage.getItem("verificationCode");
+        setCode(storedCode);
+        // Load events for the specific event type
+        const loadedEvents = await fetchEvents(eventType);
         setEvents(loadedEvents);
         updateMarkedDates(loadedEvents);
       } catch (error) {
         console.error("Initialization error:", error);
-        Alert.alert("Error", "Failed to initialize app.");
+        Alert.alert("Error", "Failed to initialize calendar.");
       }
     };
     initialize();
-  }, []);
+  }, [eventType]);
 
   const updateMarkedDates = (events: Event[]) => {
     const marked: { [key: string]: any } = {};
@@ -45,21 +56,6 @@ const CalendarView: React.FC = () => {
     setMarkedDates(marked);
   };
 
-  const handleCodeSet = () => {
-    setCodeState((prev) => ({ ...prev, isSet: true }));
-  };
-
-  const handleCodeChanged = async () => {
-    try {
-      const newCode = await AsyncStorage.getItem("verificationCode");
-      setCodeState((prev) => ({ ...prev, code: newCode }));
-      setChangeCodeModalVisible(false);
-    } catch (error) {
-      console.error("Error updating code state:", error);
-      Alert.alert("Error", "Failed to update code state.");
-    }
-  };
-
   const handleDayPress = (day: { dateString: string }) => {
     const date = day.dateString;
     const existingEvent = events.find((event) => event.date === date);
@@ -67,7 +63,9 @@ const CalendarView: React.FC = () => {
     if (existingEvent) {
       Alert.alert(
         "Event Details",
-        `Date: ${existingEvent.date}\nMarked At: ${new Date(existingEvent.markedAt).toLocaleString()}`
+        `Date: ${existingEvent.date}\nMarked At: ${new Date(
+          existingEvent.markedAt
+        ).toLocaleString()}`
       );
     } else {
       setPendingDate(date);
@@ -76,15 +74,16 @@ const CalendarView: React.FC = () => {
   };
 
   const handleVerifyCode = async () => {
-    if (inputCode === codeState.code) {
+    if (inputCode === code) {
       try {
         const markedAt = new Date().toISOString();
         if (pendingDate) {
-          const insertedId = await insertEvent(pendingDate, markedAt);
+          const insertedId = await insertEvent(pendingDate, markedAt, eventType);
           const newEvent: Event = {
             id: insertedId,
             date: pendingDate,
             markedAt,
+            eventType,
           };
           const updatedEvents = [...events, newEvent];
           setEvents(updatedEvents);
@@ -103,14 +102,9 @@ const CalendarView: React.FC = () => {
     }
   };
 
-  if (!codeState.isSet) {
-    return <CodeSetup onCodeSet={handleCodeSet} />;
-  }
-
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Event Marker</Text>
-      <Button title="Change Verification Code" onPress={() => setChangeCodeModalVisible(true)} />
+      <Text style={styles.title}>{eventType} Events</Text>
       <Calendar
         onDayPress={handleDayPress}
         markedDates={markedDates}
@@ -120,7 +114,6 @@ const CalendarView: React.FC = () => {
           arrowColor: "#007AFF",
         }}
       />
-      {/* Verification Modal */}
       <Modal
         visible={verifyModalVisible}
         transparent
@@ -137,28 +130,13 @@ const CalendarView: React.FC = () => {
               maxLength={4}
               value={inputCode}
               onChangeText={setInputCode}
-              secureTextEntry // Mask input
+              secureTextEntry
             />
             <View style={styles.buttonContainer}>
               <Button title="Cancel" onPress={() => setVerifyModalVisible(false)} />
               <Button title="Verify" onPress={handleVerifyCode} />
             </View>
           </View>
-        </View>
-      </Modal>
-      {/* Change Code Modal */}
-      <Modal
-        visible={changeCodeModalVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setChangeCodeModalVisible(false)}
-      >
-        <View style={styles.modalContainer}>
-          <ChangeCode
-            currentCode={codeState.code || ""}
-            onCodeChanged={handleCodeChanged}
-            onCancel={() => setChangeCodeModalVisible(false)}
-          />
         </View>
       </Modal>
     </View>
