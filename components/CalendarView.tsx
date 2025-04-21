@@ -7,6 +7,7 @@ import {
   TextInput,
   Modal,
   Button,
+  TouchableOpacity,
 } from "react-native";
 import { Calendar } from "react-native-calendars";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -30,6 +31,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
   const [icon, setIcon] = useState<string>("event");
   const [iconColor, setIconColor] = useState<string>("#000000");
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
   // Load events, code, icon, and color
   useEffect(() => {
@@ -69,13 +71,14 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
 
   const handleDayPress = (day: { dateString: string }) => {
     const date = day.dateString;
+    setSelectedDate(date);
     const existingEvent = events.find((event) => event.date === date);
+    setSelectedEvent(existingEvent || null);
+  };
 
-    if (existingEvent) {
-      setSelectedEvent(existingEvent);
-    } else {
-      setSelectedEvent(null);
-      setPendingDate(date);
+  const handleMarkEvent = () => {
+    if (selectedDate) {
+      setPendingDate(selectedDate);
       setVerifyModalVisible(true);
     }
   };
@@ -94,6 +97,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
           };
           const updatedEvents = [...events, newEvent];
           setEvents(updatedEvents);
+          setSelectedEvent(newEvent);
           updateMarkedDates(updatedEvents, iconColor);
         }
         setVerifyModalVisible(false);
@@ -134,7 +138,19 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
             </Text>
           </>
         ) : (
-          <Text style={styles.noEventText}>No event selected</Text>
+          <>
+            <Text style={styles.noEventText}>
+              {selectedDate ? `No event on ${selectedDate}` : "No date selected"}
+            </Text>
+            {selectedDate && (
+              <TouchableOpacity
+                style={styles.markButton}
+                onPress={handleMarkEvent}
+              >
+                <Text style={styles.markButtonText}>Mark Event</Text>
+              </TouchableOpacity>
+            )}
+          </>
         )}
       </View>
       <Modal
@@ -154,6 +170,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
               value={inputCode}
               onChangeText={setInputCode}
               secureTextEntry
+              autoFocus
             />
             <View style={styles.buttonContainer}>
               <Button title="Cancel" onPress={() => setVerifyModalVisible(false)} />
@@ -238,6 +255,18 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#666",
     textAlign: "center",
+    marginBottom: 10,
+  },
+  markButton: {
+    backgroundColor: "#007AFF",
+    padding: 10,
+    borderRadius: 5,
+    alignItems: "center",
+  },
+  markButtonText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "bold",
   },
 });
 

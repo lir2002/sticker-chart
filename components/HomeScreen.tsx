@@ -158,10 +158,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     <View style={styles.container}>
       <Text style={styles.title}>Event Marker</Text>
       <Button
-        title="Change Verification Code"
-        onPress={() => setChangeCodeModalVisible(true)}
-      />      
-      <Button
         title="View All Events"
         onPress={() => navigation.navigate("CalendarViewAll")}
       />
@@ -175,6 +171,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       <Button
         title="Add Event Type"
         onPress={() => setAddTypeModalVisible(true)}
+      />      
+      <Button
+        title="Change Verification Code"
+        onPress={() => setChangeCodeModalVisible(true)}
       />
       {/* Modal for adding new event type */}
       <Modal
