@@ -27,9 +27,10 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
   const [verifyModalVisible, setVerifyModalVisible] = useState(false);
   const [inputCode, setInputCode] = useState("");
   const [pendingDate, setPendingDate] = useState<string | null>(null);
-  const [icon, setIcon] = useState<string>("event"); // Default icon
+  const [icon, setIcon] = useState<string>("event");
+  const [iconColor, setIconColor] = useState<string>("#000000");
 
-  // Load events, code, and icon
+  // Load events, code, icon, and color
   useEffect(() => {
     const initialize = async () => {
       try {
@@ -38,13 +39,17 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
         setCode(storedCode);
         const loadedEvents = await fetchEvents(eventType);
         setEvents(loadedEvents);
-        updateMarkedDates(loadedEvents);
-        // Fetch icon for the event type
+        // Fetch icon and color for the event type
         const eventTypes = await getEventTypes();
         const type = eventTypes.find((t) => t.name === eventType);
         if (type?.icon) {
           setIcon(type.icon);
         }
+        if (type?.iconColor) {
+          setIconColor(type.iconColor);
+        }
+        // Update marked dates with iconColor
+        updateMarkedDates(loadedEvents, type?.iconColor || "#000000");
       } catch (error) {
         console.error("Initialization error:", error);
         Alert.alert("Error", "Failed to initialize calendar.");
@@ -53,10 +58,10 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
     initialize();
   }, [eventType]);
 
-  const updateMarkedDates = (events: Event[]) => {
+  const updateMarkedDates = (events: Event[], dotColor: string) => {
     const marked: { [key: string]: any } = {};
     events.forEach((event) => {
-      marked[event.date] = { marked: true, dotColor: "red" };
+      marked[event.date] = { marked: true, dotColor };
     });
     setMarkedDates(marked);
   };
@@ -92,7 +97,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
           };
           const updatedEvents = [...events, newEvent];
           setEvents(updatedEvents);
-          updateMarkedDates(updatedEvents);
+          updateMarkedDates(updatedEvents, iconColor);
         }
         setVerifyModalVisible(false);
         setInputCode("");
@@ -110,7 +115,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
   return (
     <View style={styles.container}>
       <View style={styles.titleContainer}>
-        <MaterialIcons name={icon} size={24} style={styles.icon} />
+        <MaterialIcons name={icon} size={24} color={iconColor} style={styles.icon} />
         <Text style={styles.title}>{eventType}</Text>
       </View>
       <Calendar
