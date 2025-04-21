@@ -7,6 +7,8 @@ export interface Event {
   
 export interface EventType {
     name: string; // Max 20 characters
+    icon: string; // Icon name from MaterialIcons (e.g., "event")
+    iconColor?: string; // Icon color (e.g., "#FF0000")
   }
   
 export interface VerificationCode {

@@ -16,10 +16,13 @@ export const initDatabase = async (): Promise<void> => {
       );
     `);
 
-    // Initialize default event type if not exists
+    // Initialize default event type with icon and color
     const eventTypes = await AsyncStorage.getItem("eventTypes");
     if (!eventTypes) {
-      await AsyncStorage.setItem("eventTypes", JSON.stringify([{ name: "Default" }]));
+      await AsyncStorage.setItem(
+        "eventTypes",
+        JSON.stringify([{ name: "Default", icon: "event", iconColor: "#000000" }])
+      );
     }
   } catch (error) {
     console.error("Error initializing database:", error);
@@ -70,16 +73,27 @@ export const getEventTypes = async (): Promise<EventType[]> => {
   }
 };
 
-export const addEventType = async (name: string): Promise<void> => {
+export const addEventType = async (name: string, icon: string, iconColor?: string): Promise<void> => {
   try {
-    if (!name || name.length > 20 || !name.match(/^[a-zA-Z0-9\s]+$/)) {
-      throw new Error("Event type name must be 1-20 alphanumeric characters.");
+    const trimmedName = name.trim();
+    if (!trimmedName) {
+      throw new Error("Event type name cannot be empty.");
+    }
+    if (trimmedName.length > 20) {
+      throw new Error("Event type name must be 20 characters or fewer.");
+    }
+    if (!icon) {
+      throw new Error("Icon must be selected.");
     }
     const eventTypes = await getEventTypes();
-    if (eventTypes.some((type) => type.name === name)) {
+    if (eventTypes.some((type) => type.name === trimmedName)) {
       throw new Error("Event type already exists.");
     }
-    const updatedTypes = [...eventTypes, { name }];
+    const newType: EventType = { name: trimmedName, icon };
+    if (iconColor) {
+      newType.iconColor = iconColor;
+    }
+    const updatedTypes = [...eventTypes, newType];
     await AsyncStorage.setItem("eventTypes", JSON.stringify(updatedTypes));
   } catch (error) {
     console.error("Error adding event type:", error);

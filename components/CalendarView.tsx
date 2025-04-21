@@ -11,8 +11,9 @@ import {
 import { Calendar } from "react-native-calendars";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { RouteProp } from "@react-navigation/native";
+import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 import { RootStackParamList, Event } from "../types";
-import { insertEvent, fetchEvents, initDatabase } from "../db/database";
+import { insertEvent, fetchEvents, initDatabase, getEventTypes } from "../db/database";
 
 interface CalendarViewProps {
   route: RouteProp<RootStackParamList, "Calendar">;
@@ -26,20 +27,24 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
   const [verifyModalVisible, setVerifyModalVisible] = useState(false);
   const [inputCode, setInputCode] = useState("");
   const [pendingDate, setPendingDate] = useState<string | null>(null);
+  const [icon, setIcon] = useState<string>("event"); // Default icon
 
-  // Load events and code
+  // Load events, code, and icon
   useEffect(() => {
     const initialize = async () => {
       try {
-        // Ensure database is initialized
         await initDatabase();
-        // Load verification code
         const storedCode = await AsyncStorage.getItem("verificationCode");
         setCode(storedCode);
-        // Load events for the specific event type
         const loadedEvents = await fetchEvents(eventType);
         setEvents(loadedEvents);
         updateMarkedDates(loadedEvents);
+        // Fetch icon for the event type
+        const eventTypes = await getEventTypes();
+        const type = eventTypes.find((t) => t.name === eventType);
+        if (type?.icon) {
+          setIcon(type.icon);
+        }
       } catch (error) {
         console.error("Initialization error:", error);
         Alert.alert("Error", "Failed to initialize calendar.");
@@ -104,7 +109,10 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>{eventType} Events</Text>
+      <View style={styles.titleContainer}>
+        <MaterialIcons name={icon} size={24} style={styles.icon} />
+        <Text style={styles.title}>{eventType}</Text>
+      </View>
       <Calendar
         onDayPress={handleDayPress}
         markedDates={markedDates}
@@ -149,11 +157,18 @@ const styles = StyleSheet.create({
     padding: 20,
     backgroundColor: "#fff",
   },
+  titleContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 20,
+  },
   title: {
     fontSize: 24,
     fontWeight: "bold",
-    textAlign: "center",
-    marginBottom: 20,
+  },
+  icon: {
+    marginRight: 10,
   },
   modalContainer: {
     flex: 1,

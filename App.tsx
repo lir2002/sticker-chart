@@ -16,7 +16,7 @@ export default function App() {
         <Stack.Screen
           name="Calendar"
           component={CalendarView}
-          options={({ route }) => ({ title: `${route.params.eventType} Events` })}
+          options={({ route }) => ({ title: `${route.params.eventType}` })}
         />
       </Stack.Navigator>
       <StatusBar style="auto" />
@@ -24,11 +24,3 @@ export default function App() {
   );
 }
 
-// const styles = StyleSheet.create({
-//   container: {
-//     flex: 1,
-//     backgroundColor: '#fff',
-//     alignItems: 'center',
-//     justifyContent: 'center',
-//   },
-// });
