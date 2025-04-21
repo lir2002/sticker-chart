@@ -29,6 +29,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
   const [pendingDate, setPendingDate] = useState<string | null>(null);
   const [icon, setIcon] = useState<string>("event");
   const [iconColor, setIconColor] = useState<string>("#000000");
+  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
 
   // Load events, code, icon, and color
   useEffect(() => {
@@ -71,13 +72,9 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
     const existingEvent = events.find((event) => event.date === date);
 
     if (existingEvent) {
-      Alert.alert(
-        "Event Details",
-        `Date: ${existingEvent.date}\nMarked At: ${new Date(
-          existingEvent.markedAt
-        ).toLocaleString()}`
-      );
+      setSelectedEvent(existingEvent);
     } else {
+      setSelectedEvent(null);
       setPendingDate(date);
       setVerifyModalVisible(true);
     }
@@ -127,6 +124,19 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
           arrowColor: "#007AFF",
         }}
       />
+      <View style={styles.eventDisplay}>
+        {selectedEvent ? (
+          <>
+            <Text style={styles.eventTitle}>Event Details</Text>
+            <Text style={styles.eventText}>Date: {selectedEvent.date}</Text>
+            <Text style={styles.eventText}>
+              Marked At: {new Date(selectedEvent.markedAt).toLocaleString()}
+            </Text>
+          </>
+        ) : (
+          <Text style={styles.noEventText}>No event selected</Text>
+        )}
+      </View>
       <Modal
         visible={verifyModalVisible}
         transparent
@@ -206,6 +216,28 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     width: "100%",
+  },
+  eventDisplay: {
+    marginTop: 20,
+    padding: 15,
+    backgroundColor: "#f9f9f9",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#ccc",
+  },
+  eventTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    marginBottom: 10,
+  },
+  eventText: {
+    fontSize: 14,
+    marginBottom: 5,
+  },
+  noEventText: {
+    fontSize: 14,
+    color: "#666",
+    textAlign: "center",
   },
 });
 
