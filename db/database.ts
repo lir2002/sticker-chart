@@ -21,7 +21,9 @@ export const initDatabase = async (): Promise<void> => {
     if (!eventTypes) {
       await AsyncStorage.setItem(
         "eventTypes",
-        JSON.stringify([{ name: "Default", icon: "event", iconColor: "#000000" }])
+        JSON.stringify([
+          { name: "Default", icon: "event", iconColor: "#000000" },
+        ])
       );
     }
   } catch (error) {
@@ -30,9 +32,18 @@ export const initDatabase = async (): Promise<void> => {
   }
 };
 
-export const insertEvent = async (date: string, markedAt: string, eventType: string): Promise<number> => {
+export const insertEvent = async (
+  date: string,
+  markedAt: string,
+  eventType: string
+): Promise<number> => {
   try {
-    if (!date || !markedAt || !date.match(/^\d{4}-\d{2}-\d{2}$/) || !markedAt.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z$/)) {
+    if (
+      !date ||
+      !markedAt ||
+      !date.match(/^\d{4}-\d{2}-\d{2}$/) ||
+      !markedAt.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z$/)
+    ) {
       throw new Error("Invalid date or markedAt format");
     }
     if (!eventType || eventType.length > 20) {
@@ -63,6 +74,16 @@ export const fetchEvents = async (eventType: string): Promise<Event[]> => {
   }
 };
 
+export const fetchAllEvents = async (): Promise<Event[]> => {
+  try {
+    const result = await db.getAllAsync<Event>(`SELECT * FROM events;`);
+    return result;
+  } catch (error) {
+    console.error("Error fetching all events:", error);
+    throw error;
+  }
+};
+
 export const getEventTypes = async (): Promise<EventType[]> => {
   try {
     const eventTypes = await AsyncStorage.getItem("eventTypes");
@@ -73,7 +94,11 @@ export const getEventTypes = async (): Promise<EventType[]> => {
   }
 };
 
-export const addEventType = async (name: string, icon: string, iconColor?: string): Promise<void> => {
+export const addEventType = async (
+  name: string,
+  icon: string,
+  iconColor?: string
+): Promise<void> => {
   try {
     const trimmedName = name.trim();
     if (!trimmedName) {

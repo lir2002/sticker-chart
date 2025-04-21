@@ -160,6 +160,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       <Button
         title="Change Verification Code"
         onPress={() => setChangeCodeModalVisible(true)}
+      />      
+      <Button
+        title="View All Events"
+        onPress={() => navigation.navigate("CalendarViewAll")}
       />
       <Text style={styles.subtitle}>Event Types</Text>
       <FlatList

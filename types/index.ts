@@ -20,4 +20,5 @@ export interface VerificationCode {
 export type RootStackParamList = {
     Home: undefined;
     Calendar: { eventType: string };
+    CalendarViewAll: undefined;
   };
