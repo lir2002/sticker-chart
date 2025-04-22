@@ -28,6 +28,7 @@ import Animated, {
 import { RootStackParamList, Event } from "../types";
 import { insertEvent, fetchEvents, initDatabase, getEventTypes, updateEventType } from "../db/database";
 import { useLanguage } from "../LanguageContext"; // Import LanguageContext
+import { availableColors, availableIcons } from "../icons";
 
 interface CalendarViewProps {
   route: RouteProp<RootStackParamList, "Calendar">;
@@ -36,30 +37,6 @@ interface CalendarViewProps {
 const MAX_NOTE_LENGTH = 200;
 const MAX_PHOTO_SIZE = 1_048_576;
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
-
-const availableIcons = [
-  "event",
-  "star",
-  "favorite",
-  "work",
-  "home",
-  "school",
-  "celebration",
-  "sports",
-  "flight",
-  "restaurant",
-  "music-note",
-  "movie",
-];
-const availableColors = [
-  "#000000",
-  "#FF0000",
-  "#00FF00",
-  "#0000FF",
-  "#FFA500",
-  "#800080",
-  "#FFC0CB",
-];
 
 const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
   const { eventType } = route.params;

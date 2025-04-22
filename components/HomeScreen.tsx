@@ -21,6 +21,7 @@ import ChangeCode from "./ChangeCode";
 import CodeSetup from "./CodeSetup";
 import { useLanguage } from "../LanguageContext"; // Import LanguageContext
 import { LocaleConfig } from "react-native-calendars";
+import { availableColors, availableIcons } from "../icons";
 
 type HomeScreenNavigationProp = NativeStackNavigationProp<
   RootStackParamList,
@@ -30,31 +31,6 @@ type HomeScreenNavigationProp = NativeStackNavigationProp<
 interface HomeScreenProps {
   navigation: HomeScreenNavigationProp;
 }
-
-const availableIcons = [
-  "event",
-  "star",
-  "favorite",
-  "work",
-  "home",
-  "school",
-  "celebration",
-  "sports",
-  "flight",
-  "restaurant",
-  "music-note",
-  "movie",
-];
-
-const availableColors = [
-  "#000000",
-  "#FF0000",
-  "#00FF00",
-  "#0000FF",
-  "#FFA500",
-  "#800080",
-  "#FFC0CB",
-];
 
 const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const { language, setLanguage, t } = useLanguage(); // Use LanguageContext
