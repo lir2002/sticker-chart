@@ -223,7 +223,7 @@ const CalendarViewAll: React.FC = () => {
       <View style={styles.eventDisplay}>
         {selectedDateEvents.length > 0 ? (
           <ScrollView style={styles.eventScrollView}>
-            <Text style={styles.eventTitle}>Events on {selectedDate}</Text>
+            <Text style={styles.eventTitle}>Achievements on {selectedDate}</Text>
             {selectedDateEvents.map((event) => {
               const type = eventTypes.find((t) => t.name === event.eventType);
               return (
@@ -238,9 +238,9 @@ const CalendarViewAll: React.FC = () => {
                     <Text style={styles.eventText}>Type: {event.eventType}</Text>
                     <Text style={styles.eventText}>Date: {event.date}</Text>
                     <Text style={styles.eventText}>
-                      Marked At: {new Date(event.markedAt).toLocaleString()}
+                      Got At: {new Date(event.markedAt).toLocaleString()}
                     </Text>
-                    {event.note && <Text style={styles.eventText}>Note: {event.note}</Text>}
+                    {event.note && <Text style={styles.eventText}>For: {event.note}</Text>}
                     {event.photoPath && (
                       <TouchableOpacity onPress={() => openPhotoModal(event.photoPath)}>
                         <Image source={{ uri: event.photoPath }} style={styles.eventPhoto} />

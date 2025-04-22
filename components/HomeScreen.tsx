@@ -176,12 +176,12 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Event Marker</Text>
+      <Text style={styles.title}>Sticker Chart</Text>
       <CustomButton
-        title="View All Events"
+        title="View All Stickers"
         onPress={() => navigation.navigate("CalendarViewAll")}
       />
-      <Text style={styles.subtitle}>Event Types</Text>
+      <Text style={styles.subtitle}>Achievements</Text>
       <FlatList
         data={eventTypes}
         renderItem={renderEventType}
@@ -189,7 +189,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         ListEmptyComponent={<Text>No event types yet.</Text>}
       />
       <CustomButton
-        title="Add Event Type"
+        title="New Achievement Type"
         onPress={() => setAddTypeModalVisible(true)}
       />
       <CustomButton

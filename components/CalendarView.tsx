@@ -238,7 +238,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
         setPendingDate(null);
       } catch (error: any) {
         console.error("Error marking event:", error);
-        Alert.alert("Error", `Failed to mark event: ${error.message}`);
+        Alert.alert("Error", `Failed to Give a Sticker: ${error.message}`);
       }
     } else {
       Alert.alert("Error", "Incorrect verification code.");
@@ -356,16 +356,16 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
       <View style={styles.eventDisplay}>
         {selectedDateEvents.length > 0 ? (
           <ScrollView style={styles.eventScrollView}>
-            <Text style={styles.eventTitle}>Event Details</Text>
+            <Text style={styles.eventTitle}>Achievement Details</Text>
             {selectedDateEvents.map((event, index) => (
               <View key={event.id || index} style={styles.eventItem}>
-                <Text style={styles.eventText}>Event {index + 1}</Text>
+                <Text style={styles.eventText}>Achievement {index + 1}</Text>
                 <Text style={styles.eventText}>Date: {event.date}</Text>
                 <Text style={styles.eventText}>
-                  Marked At: {new Date(event.markedAt).toLocaleString()}
+                  Got At: {new Date(event.markedAt).toLocaleString()}
                 </Text>
                 {event.note && (
-                  <Text style={styles.eventText}>Note: {event.note}</Text>
+                  <Text style={styles.eventText}>For: {event.note}</Text>
                 )}
                 {event.photoPath && (
                   <TouchableOpacity onPress={() => openPhotoModal(event.photoPath)}>
@@ -377,12 +377,12 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
           </ScrollView>
         ) : (
           <Text style={styles.noEventText}>
-            {selectedDate ? `No event on ${selectedDate}` : "No date selected"}
+            {selectedDate ? `No achievement on ${selectedDate}` : "No date selected"}
           </Text>
         )}
         {showMarkEventButton && (
           <TouchableOpacity style={styles.markButton} onPress={handleMarkEvent}>
-            <Text style={styles.markButtonText}>Mark Event</Text>
+            <Text style={styles.markButtonText}>Give a Sticker</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -394,13 +394,13 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
       >
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Mark Event</Text>
+            <Text style={styles.modalTitle}>Give a Sticker</Text>
             <TextInput
               style={styles.input}
               placeholder="4-digit code"
               keyboardType="numeric"
               maxLength={4}
-              value={inputCode}
+              value={inputCode}x
               onChangeText={setInputCode}
               secureTextEntry
               autoFocus

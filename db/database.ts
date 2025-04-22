@@ -2,7 +2,7 @@ import * as SQLite from "expo-sqlite";
 import { EventType } from "../types";
 
 export const initDatabase = async () => {
-  const db = await SQLite.openDatabaseAsync("eventmarker.db");
+  const db = await SQLite.openDatabaseAsync("eventmarker.db", {useNewConnection: true});
   try {
     await db.execAsync(`
       PRAGMA journal_mode = WAL;
@@ -86,29 +86,16 @@ export const fetchAllEvents = async () => {
     const events = await db.getAllAsync<Event>("SELECT * FROM events;");
     return events;
   } catch (error) {
-    throw new Error(`Failed to fetch all events: ${error}`);
+    throw new Error(`Failed to fetch all stickers: ${error}`);
   } finally {
     await db.closeAsync();
   }
 };
 
 export const getEventTypes = async () => {
-  const db = await SQLite.openDatabaseAsync("eventmarker.db");
+  const db = await SQLite.openDatabaseAsync("eventmarker.db", {useNewConnection: true});
   try {
     let types = await db.getAllAsync<EventType>("SELECT * FROM event_types;");
-    // if (!types.find((t) => t.name === "Default")) {
-    //   const defaultType: EventType = {
-    //     name: "Default",
-    //     icon: "event",
-    //     iconColor: "#000000",
-    //     availability: 0,
-    //   };
-    //   await db.runAsync(
-    //     "INSERT INTO event_types (name, icon, iconColor, availability) VALUES (?, ?, ?, ?);",
-    //     [defaultType.name, defaultType.icon, defaultType.iconColor, defaultType.availability]
-    //   );
-    //   types = [...types, defaultType];
-    // }
     return types;
   } catch (error) {
     throw new Error(`Failed to get event types: ${error}`);
