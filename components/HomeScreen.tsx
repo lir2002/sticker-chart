@@ -15,7 +15,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 import { RootStackParamList, EventType, VerificationCode } from "../types";
-import { getEventTypes, addEventType, initDatabase } from "../db/database";
+import { getEventTypes, insertEventType, initDatabase } from "../db/database";
 import ChangeCode from "./ChangeCode";
 import CodeSetup from "./CodeSetup";
 
@@ -83,7 +83,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
   const handleAddEventType = async () => {
     try {
-      await addEventType(newTypeName, selectedIcon, selectedColor);
+      await insertEventType(newTypeName, selectedIcon, selectedColor);
       const updatedTypes = await getEventTypes();
       setEventTypes(updatedTypes);
       setNewTypeName("");

@@ -3,12 +3,14 @@ export interface Event {
     date: string;
     markedAt: string;
     eventType: string; // Name of the event type
+    note?: string; // Optional note, up to 200 characters
+    photoPath?: string; // Optional path to stored photo
   }
   
 export interface EventType {
     name: string; // Max 20 characters
     icon: string; // Icon name from MaterialIcons (e.g., "event")
-    iconColor?: string; // Icon color (e.g., "#FF0000")
+    iconColor: string; // Icon color (e.g., "#FF0000")
   }
   
 export interface VerificationCode {

@@ -8,11 +8,21 @@ import {
   Modal,
   Button,
   Alert,
+  Image,
+  Dimensions, // Added for screen dimensions
 } from "react-native";
 import { Calendar } from "react-native-calendars";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
+import { Gesture, GestureDetector } from "react-native-gesture-handler"; // Added for gestures
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+} from "react-native-reanimated"; // Added for animations
 import { Event, EventType } from "../types";
 import { fetchAllEvents, getEventTypes } from "../db/database";
+
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window"); // Added for full-screen modal
 
 const CalendarViewAll: React.FC = () => {
   const [events, setEvents] = useState<Event[]>([]);
@@ -24,6 +34,16 @@ const CalendarViewAll: React.FC = () => {
   const [markedDates, setMarkedDates] = useState<{ [key: string]: any }>({});
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedDateEvents, setSelectedDateEvents] = useState<Event[]>([]);
+  const [photoModalVisible, setPhotoModalVisible] = useState(false); // Added for photo modal
+  const [selectedPhotoUri, setSelectedPhotoUri] = useState<string | null>(null); // Added for photo modal
+
+  // Zoom and pan state for photo modal
+  const scale = useSharedValue(1);
+  const savedScale = useSharedValue(1);
+  const translateX = useSharedValue(0);
+  const translateY = useSharedValue(0);
+  const savedTranslateX = useSharedValue(0);
+  const savedTranslateY = useSharedValue(0);
 
   // Load events and event types
   useEffect(() => {
@@ -125,6 +145,55 @@ const CalendarViewAll: React.FC = () => {
     return selectedFilters.join(", ") || "None";
   };
 
+  // Open photo modal
+  const openPhotoModal = (uri: string) => {
+    setSelectedPhotoUri(uri);
+    setPhotoModalVisible(true);
+    // Reset zoom and pan
+    scale.value = 1;
+    savedScale.value = 1;
+    translateX.value = 0;
+    translateY.value = 0;
+    savedTranslateX.value = 0;
+    savedTranslateY.value = 0;
+  };
+
+  // Pinch gesture for zooming
+  const pinchGesture = Gesture.Pinch()
+    .onUpdate((event) => {
+      scale.value = savedScale.value * event.scale;
+      if (scale.value < 1) scale.value = 1; // Minimum scale
+      if (scale.value > 3) scale.value = 3; // Maximum scale
+    })
+    .onEnd(() => {
+      savedScale.value = scale.value;
+    });
+
+  // Pan gesture for moving
+  const panGesture = Gesture.Pan()
+    .onUpdate((event) => {
+      if (scale.value > 1) {
+        translateX.value = savedTranslateX.value + event.translationX / scale.value;
+        translateY.value = savedTranslateY.value + event.translationY / scale.value;
+      }
+    })
+    .onEnd(() => {
+      savedTranslateX.value = translateX.value;
+      savedTranslateY.value = translateY.value;
+    });
+
+  // Combine gestures
+  const composedGestures = Gesture.Simultaneous(pinchGesture, panGesture);
+
+  // Animated style for image
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [
+      { scale: withSpring(scale.value) },
+      { translateX: translateX.value },
+      { translateY: translateY.value },
+    ],
+  }));
+
   return (
     <View style={styles.container}>
       <View style={styles.filterHeader}>
@@ -170,6 +239,12 @@ const CalendarViewAll: React.FC = () => {
                     <Text style={styles.eventText}>
                       Marked At: {new Date(event.markedAt).toLocaleString()}
                     </Text>
+                    {event.note && <Text style={styles.eventText}>Note: {event.note}</Text>}
+                    {event.photoPath && (
+                      <TouchableOpacity onPress={() => openPhotoModal(event.photoPath)}>
+                        <Image source={{ uri: event.photoPath }} style={styles.eventPhoto} />
+                      </TouchableOpacity>
+                    )}
                   </View>
                 </View>
               );
@@ -204,6 +279,28 @@ const CalendarViewAll: React.FC = () => {
               <Button title="Done" onPress={applyFilters} />
             </View>
           </View>
+        </View>
+      </Modal>
+      <Modal
+        visible={photoModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPhotoModalVisible(false)}
+      >
+        <View style={styles.photoModalContainer}>
+          <GestureDetector gesture={composedGestures}>
+            <Animated.Image
+              source={{ uri: selectedPhotoUri || "" }}
+              style={[styles.fullScreenPhoto, animatedStyle]}
+              resizeMode="contain"
+            />
+          </GestureDetector>
+          <TouchableOpacity
+            style={styles.closeButton}
+            onPress={() => setPhotoModalVisible(false)}
+          >
+            <MaterialIcons name="close" size={30} color="#fff" />
+          </TouchableOpacity>
         </View>
       </Modal>
     </View>
@@ -300,10 +397,29 @@ const styles = StyleSheet.create({
   eventText: {
     fontSize: 14,
   },
-  noEventText: {
-    fontSize: 14,
-    color: "#666",
-    textAlign: "center",
+  eventPhoto: {
+    width: 100,
+    height: 100,
+    borderRadius: 5,
+    marginTop: 10,
+  },
+  photoModalContainer: { // Added for photo modal
+    flex: 1,
+    backgroundColor: "black",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  fullScreenPhoto: { // Added for photo modal
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT,
+  },
+  closeButton: { // Added for photo modal
+    position: "absolute",
+    top: 40,
+    right: 20,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    borderRadius: 20,
+    padding: 5,
   },
 });
 

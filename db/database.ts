@@ -1,127 +1,116 @@
 import * as SQLite from "expo-sqlite";
-import { Event, EventType } from "../types";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { EventType } from "../types";
 
-const db = SQLite.openDatabaseSync("eventMarker.db");
-
-export const initDatabase = async (): Promise<void> => {
+export const initDatabase = async () => {
+  const db = await SQLite.openDatabaseAsync("eventmarker.db");
   try {
     await db.execAsync(`
+      PRAGMA journal_mode = WAL;
+      CREATE TABLE IF NOT EXISTS event_types (
+        name TEXT PRIMARY KEY,
+        icon TEXT NOT NULL,
+        iconColor TEXT NOT NULL
+      );
       CREATE TABLE IF NOT EXISTS events (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         date TEXT NOT NULL,
         markedAt TEXT NOT NULL,
         eventType TEXT NOT NULL,
-        UNIQUE(date, eventType)
+        note TEXT,
+        photoPath TEXT,
+        FOREIGN KEY (eventType) REFERENCES event_types(name)
       );
     `);
-
-    // Initialize default event type with icon and color
-    const eventTypes = await AsyncStorage.getItem("eventTypes");
-    if (!eventTypes) {
-      await AsyncStorage.setItem(
-        "eventTypes",
-        JSON.stringify([
-          { name: "Default", icon: "event", iconColor: "#000000" },
-        ])
-      );
-    }
   } catch (error) {
-    console.error("Error initializing database:", error);
-    throw error;
+    throw new Error(`Failed to initialize database: ${error}`);
+  } finally {
+    await db.closeAsync();
+  }
+};
+
+export const insertEventType = async (name: string, icon: string, iconColor: string) => {
+  const db = await SQLite.openDatabaseAsync("eventmarker.db");
+  try {
+    const result = await db.runAsync(
+      "INSERT INTO event_types (name, icon, iconColor) VALUES (?, ?, ?);",
+      [name, icon, iconColor]
+    );
+    return result.lastInsertRowId || 0;
+  } catch (error) {
+    throw new Error(`Failed to insert event type: ${error}`);
+  } finally {
+    await db.closeAsync();
   }
 };
 
 export const insertEvent = async (
   date: string,
   markedAt: string,
-  eventType: string
-): Promise<number> => {
+  eventType: string,
+  note?: string,
+  photoPath?: string
+) => {
+  const db = await SQLite.openDatabaseAsync("eventmarker.db");
   try {
-    if (
-      !date ||
-      !markedAt ||
-      !date.match(/^\d{4}-\d{2}-\d{2}$/) ||
-      !markedAt.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z$/)
-    ) {
-      throw new Error("Invalid date or markedAt format");
-    }
-    if (!eventType || eventType.length > 20) {
-      throw new Error("Invalid event type");
-    }
-
     const result = await db.runAsync(
-      `INSERT INTO events (date, markedAt, eventType) VALUES (?, ?, ?);`,
-      [date, markedAt, eventType]
+      "INSERT INTO events (date, markedAt, eventType, note, photoPath) VALUES (?, ?, ?, ?, ?);",
+      [date, markedAt, eventType, note || null, photoPath || null]
     );
-    return result.lastInsertRowId;
+    return result.lastInsertRowId || 0;
   } catch (error) {
-    console.error("Error inserting event:", error);
-    throw error;
+    throw new Error(`Failed to insert event: ${error}`);
+  } finally {
+    await db.closeAsync();
   }
 };
 
-export const fetchEvents = async (eventType: string): Promise<Event[]> => {
+export const fetchEvents = async (eventType: string) => {
+  const db = await SQLite.openDatabaseAsync("eventmarker.db");
   try {
-    const result = await db.getAllAsync<Event>(
-      `SELECT * FROM events WHERE eventType = ?;`,
+    const events = await db.getAllAsync<Event>(
+      "SELECT * FROM events WHERE eventType = ?;",
       [eventType]
     );
-    return result;
+    return events;
   } catch (error) {
-    console.error("Error fetching events:", error);
-    throw error;
+    throw new Error(`Failed to fetch events: ${error}`);
+  } finally {
+    await db.closeAsync();
   }
 };
 
-export const fetchAllEvents = async (): Promise<Event[]> => {
+export const fetchAllEvents = async () => {
+  const db = await SQLite.openDatabaseAsync("eventmarker.db");
   try {
-    const result = await db.getAllAsync<Event>(`SELECT * FROM events;`);
-    return result;
+    const events = await db.getAllAsync<Event>("SELECT * FROM events;");
+    return events;
   } catch (error) {
-    console.error("Error fetching all events:", error);
-    throw error;
+    throw new Error(`Failed to fetch all events: ${error}`);
+  } finally {
+    await db.closeAsync();
   }
 };
 
-export const getEventTypes = async (): Promise<EventType[]> => {
+export const getEventTypes = async () => {
+  const db = await SQLite.openDatabaseAsync("eventmarker.db");
   try {
-    const eventTypes = await AsyncStorage.getItem("eventTypes");
-    return eventTypes ? JSON.parse(eventTypes) : [];
+    let types = await db.getAllAsync<EventType>("SELECT * FROM event_types;");
+    if (!types.find((t) => t.name === "Default")) {
+      const defaultType: EventType = {
+        name: "Default",
+        icon: "event",
+        iconColor: "#000000",
+      };
+      await db.runAsync(
+        "INSERT INTO event_types (name, icon, iconColor) VALUES (?, ?, ?);",
+        [defaultType.name, defaultType.icon, defaultType.iconColor]
+      );
+      types = [...types, defaultType];
+    }
+    return types;
   } catch (error) {
-    console.error("Error fetching event types:", error);
-    return [];
-  }
-};
-
-export const addEventType = async (
-  name: string,
-  icon: string,
-  iconColor?: string
-): Promise<void> => {
-  try {
-    const trimmedName = name.trim();
-    if (!trimmedName) {
-      throw new Error("Event type name cannot be empty.");
-    }
-    if (trimmedName.length > 20) {
-      throw new Error("Event type name must be 20 characters or fewer.");
-    }
-    if (!icon) {
-      throw new Error("Icon must be selected.");
-    }
-    const eventTypes = await getEventTypes();
-    if (eventTypes.some((type) => type.name === trimmedName)) {
-      throw new Error("Event type already exists.");
-    }
-    const newType: EventType = { name: trimmedName, icon };
-    if (iconColor) {
-      newType.iconColor = iconColor;
-    }
-    const updatedTypes = [...eventTypes, newType];
-    await AsyncStorage.setItem("eventTypes", JSON.stringify(updatedTypes));
-  } catch (error) {
-    console.error("Error adding event type:", error);
-    throw error;
+    throw new Error(`Failed to get event types: ${error}`);
+  } finally {
+    await db.closeAsync();
   }
 };
