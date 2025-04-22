@@ -9,20 +9,21 @@ import {
   Button,
   Alert,
   Image,
-  Dimensions, // Added for screen dimensions
+  Dimensions,
+  ScrollView, // Added for scrolling
 } from "react-native";
 import { Calendar } from "react-native-calendars";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
-import { Gesture, GestureDetector } from "react-native-gesture-handler"; // Added for gestures
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withSpring,
-} from "react-native-reanimated"; // Added for animations
+} from "react-native-reanimated";
 import { Event, EventType } from "../types";
 import { fetchAllEvents, getEventTypes } from "../db/database";
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window"); // Added for full-screen modal
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 const CalendarViewAll: React.FC = () => {
   const [events, setEvents] = useState<Event[]>([]);
@@ -34,8 +35,8 @@ const CalendarViewAll: React.FC = () => {
   const [markedDates, setMarkedDates] = useState<{ [key: string]: any }>({});
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedDateEvents, setSelectedDateEvents] = useState<Event[]>([]);
-  const [photoModalVisible, setPhotoModalVisible] = useState(false); // Added for photo modal
-  const [selectedPhotoUri, setSelectedPhotoUri] = useState<string | null>(null); // Added for photo modal
+  const [photoModalVisible, setPhotoModalVisible] = useState(false);
+  const [selectedPhotoUri, setSelectedPhotoUri] = useState<string | null>(null);
 
   // Zoom and pan state for photo modal
   const scale = useSharedValue(1);
@@ -162,8 +163,8 @@ const CalendarViewAll: React.FC = () => {
   const pinchGesture = Gesture.Pinch()
     .onUpdate((event) => {
       scale.value = savedScale.value * event.scale;
-      if (scale.value < 1) scale.value = 1; // Minimum scale
-      if (scale.value > 3) scale.value = 3; // Maximum scale
+      if (scale.value < 1) scale.value = 1;
+      if (scale.value > 3) scale.value = 3;
     })
     .onEnd(() => {
       savedScale.value = scale.value;
@@ -221,7 +222,7 @@ const CalendarViewAll: React.FC = () => {
       />
       <View style={styles.eventDisplay}>
         {selectedDateEvents.length > 0 ? (
-          <>
+          <ScrollView style={styles.eventScrollView}>
             <Text style={styles.eventTitle}>Events on {selectedDate}</Text>
             {selectedDateEvents.map((event) => {
               const type = eventTypes.find((t) => t.name === event.eventType);
@@ -249,7 +250,7 @@ const CalendarViewAll: React.FC = () => {
                 </View>
               );
             })}
-          </>
+          </ScrollView>
         ) : (
           <Text style={styles.noEventText}>
             {selectedDate ? `No events for ${selectedDate}` : "No date selected"}
@@ -379,7 +380,10 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     borderWidth: 1,
     borderColor: "#ccc",
-    flex: 1,
+    flex: 1, // Ensure eventDisplay takes available space
+  },
+  eventScrollView: { // Added for ScrollView
+    flexGrow: 1,
   },
   eventTitle: {
     fontSize: 16,
@@ -403,17 +407,22 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     marginTop: 10,
   },
-  photoModalContainer: { // Added for photo modal
+  noEventText: {
+    fontSize: 14,
+    color: "#666",
+    textAlign: "center",
+  },
+  photoModalContainer: {
     flex: 1,
     backgroundColor: "black",
     justifyContent: "center",
     alignItems: "center",
   },
-  fullScreenPhoto: { // Added for photo modal
+  fullScreenPhoto: {
     width: SCREEN_WIDTH,
     height: SCREEN_HEIGHT,
   },
-  closeButton: { // Added for photo modal
+  closeButton: {
     position: "absolute",
     top: 40,
     right: 20,

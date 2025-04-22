@@ -10,6 +10,7 @@ import {
   Image,
   Alert,
   Dimensions,
+  ScrollView, // Already imported, used for scrolling
 } from "react-native";
 import { Calendar } from "react-native-calendars";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -281,7 +282,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
       />
       <View style={styles.eventDisplay}>
         {selectedEvent ? (
-          <>
+          <ScrollView style={styles.eventScrollView}>
             <Text style={styles.eventTitle}>Event Details</Text>
             <Text style={styles.eventText}>Date: {selectedEvent.date}</Text>
             <Text style={styles.eventText}>
@@ -295,7 +296,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
                 <Image source={{ uri: selectedEvent.photoPath }} style={styles.eventPhoto} />
               </TouchableOpacity>
             )}
-          </>
+          </ScrollView>
         ) : (
           <>
             <Text style={styles.noEventText}>
@@ -467,6 +468,10 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     borderWidth: 1,
     borderColor: "#ccc",
+    flex: 1, // Preserve flex for layout
+  },
+  eventScrollView: { // Added for ScrollView
+    flexGrow: 1,
   },
   eventTitle: {
     fontSize: 16,
