@@ -26,7 +26,6 @@ interface HomeScreenProps {
   navigation: HomeScreenNavigationProp;
 }
 
-// Predefined list of MaterialIcons for selection
 const availableIcons = [
   "event",
   "star",
@@ -42,15 +41,14 @@ const availableIcons = [
   "movie",
 ];
 
-// Predefined list of colors for selection
 const availableColors = [
-  "#000000", // Black
-  "#FF0000", // Red
-  "#00FF00", // Green
-  "#0000FF", // Blue
-  "#FFA500", // Orange
-  "#800080", // Purple
-  "#FFC0CB", // Pink
+  "#000000",
+  "#FF0000",
+  "#00FF00",
+  "#0000FF",
+  "#FFA500",
+  "#800080",
+  "#FFC0CB",
 ];
 
 const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
@@ -63,9 +61,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const [changeCodeModalVisible, setChangeCodeModalVisible] = useState(false);
   const [addTypeModalVisible, setAddTypeModalVisible] = useState(false);
 
-  // Initialize database, event types, and code state
+  // Load event types and code state
   useEffect(() => {
-    const initialize = async () => {
+    const loadData = async () => {
       try {
         await initDatabase();
         const types = await getEventTypes();
@@ -80,8 +78,15 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         Alert.alert("Error", "Failed to initialize app.");
       }
     };
-    initialize();
-  }, []);
+
+    loadData();
+
+    // Add focus listener to reload event types
+    const unsubscribe = navigation.addListener("focus", loadData);
+
+    // Cleanup listener on unmount
+    return unsubscribe;
+  }, [navigation]); // Added navigation dependency
 
   const handleAddEventType = async () => {
     try {
@@ -179,7 +184,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         title="Change Verification Code"
         onPress={() => setChangeCodeModalVisible(true)}
       />
-      {/* Modal for adding new event type */}
       <Modal
         visible={addTypeModalVisible}
         transparent
@@ -235,7 +239,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           </View>
         </View>
       </Modal>
-      {/* Modal for changing verification code */}
       <Modal
         visible={changeCodeModalVisible}
         transparent

@@ -96,22 +96,36 @@ export const getEventTypes = async () => {
   const db = await SQLite.openDatabaseAsync("eventmarker.db");
   try {
     let types = await db.getAllAsync<EventType>("SELECT * FROM event_types;");
-    if (!types.find((t) => t.name === "Default")) {
-      const defaultType: EventType = {
-        name: "Default",
-        icon: "event",
-        iconColor: "#000000",
-        availability: 0,
-      };
-      await db.runAsync(
-        "INSERT INTO event_types (name, icon, iconColor, availability) VALUES (?, ?, ?, ?);",
-        [defaultType.name, defaultType.icon, defaultType.iconColor, defaultType.availability]
-      );
-      types = [...types, defaultType];
-    }
+    // if (!types.find((t) => t.name === "Default")) {
+    //   const defaultType: EventType = {
+    //     name: "Default",
+    //     icon: "event",
+    //     iconColor: "#000000",
+    //     availability: 0,
+    //   };
+    //   await db.runAsync(
+    //     "INSERT INTO event_types (name, icon, iconColor, availability) VALUES (?, ?, ?, ?);",
+    //     [defaultType.name, defaultType.icon, defaultType.iconColor, defaultType.availability]
+    //   );
+    //   types = [...types, defaultType];
+    // }
     return types;
   } catch (error) {
     throw new Error(`Failed to get event types: ${error}`);
+  } finally {
+    await db.closeAsync();
+  }
+};
+
+export const updateEventType = async (name: string, icon: string, iconColor: string) => {
+  const db = await SQLite.openDatabaseAsync("eventmarker.db");
+  try {
+    await db.runAsync(
+      "UPDATE event_types SET icon = ?, iconColor = ? WHERE name = ?;",
+      [icon, iconColor, name]
+    );
+  } catch (error) {
+    throw new Error(`Failed to update event type: ${error}`);
   } finally {
     await db.closeAsync();
   }

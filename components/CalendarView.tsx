@@ -26,15 +26,40 @@ import Animated, {
   withSpring,
 } from "react-native-reanimated";
 import { RootStackParamList, Event } from "../types";
-import { insertEvent, fetchEvents, initDatabase, getEventTypes } from "../db/database";
+import { insertEvent, fetchEvents, initDatabase, getEventTypes, updateEventType } from "../db/database";
 
 interface CalendarViewProps {
   route: RouteProp<RootStackParamList, "Calendar">;
 }
 
 const MAX_NOTE_LENGTH = 200;
-const MAX_PHOTO_SIZE = 1_048_576; // 1MB in bytes
+const MAX_PHOTO_SIZE = 1_048_576;
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
+
+// Reused from HomeScreen.tsx
+const availableIcons = [
+  "event",
+  "star",
+  "favorite",
+  "work",
+  "home",
+  "school",
+  "celebration",
+  "sports",
+  "flight",
+  "restaurant",
+  "music-note",
+  "movie",
+];
+const availableColors = [
+  "#000000",
+  "#FF0000",
+  "#00FF00",
+  "#0000FF",
+  "#FFA500",
+  "#800080",
+  "#FFC0CB",
+];
 
 const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
   const { eventType } = route.params;
@@ -48,13 +73,15 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [icon, setIcon] = useState<string>("event");
   const [iconColor, setIconColor] = useState<string>("#000000");
-  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null); // Unused, kept for minimal change
+  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [photoModalVisible, setPhotoModalVisible] = useState(false);
   const [selectedPhotoUri, setSelectedPhotoUri] = useState<string | null>(null);
-  const [availability, setAvailability] = useState<number>(0); // Added
+  const [availability, setAvailability] = useState<number>(0);
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [newIcon, setNewIcon] = useState<string>("event");
+  const [newIconColor, setNewIconColor] = useState<string>("#000000");
 
-  // Zoom and pan state for photo modal
   const scale = useSharedValue(1);
   const savedScale = useSharedValue(1);
   const translateX = useSharedValue(0);
@@ -62,7 +89,6 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
   const savedTranslateX = useSharedValue(0);
   const savedTranslateY = useSharedValue(0);
 
-  // Load events, code, icon, color, and availability
   useEffect(() => {
     const initialize = async () => {
       try {
@@ -75,7 +101,9 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
         const type = eventTypes.find((t) => t.name === eventType);
         if (type?.icon) setIcon(type.icon);
         if (type?.iconColor) setIconColor(type.iconColor);
-        setAvailability(type?.availability || 0); // Added
+        setAvailability(type?.availability || 0);
+        setNewIcon(type?.icon || "event");
+        setNewIconColor(type?.iconColor || "#000000");
         updateMarkedDates(loadedEvents, type?.iconColor || "#000000");
       } catch (error) {
         console.error("Initialization error:", error);
@@ -96,7 +124,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
   const handleDayPress = (day: { dateString: string }) => {
     const date = day.dateString;
     setSelectedDate(date);
-    setSelectedEvent(null); // Clear, not needed for multi-event display
+    setSelectedEvent(null);
   };
 
   const handleMarkEvent = () => {
@@ -200,7 +228,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
           };
           const updatedEvents = [...events, newEvent];
           setEvents(updatedEvents);
-          setSelectedEvent(newEvent); // Kept for compatibility
+          setSelectedEvent(newEvent);
           updateMarkedDates(updatedEvents, iconColor);
         }
         setVerifyModalVisible(false);
@@ -221,7 +249,6 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
   const openPhotoModal = (uri: string) => {
     setSelectedPhotoUri(uri);
     setPhotoModalVisible(true);
-    // Reset zoom and pan
     scale.value = 1;
     savedScale.value = 1;
     translateX.value = 0;
@@ -230,7 +257,43 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
     savedTranslateY.value = 0;
   };
 
-  // Pinch gesture for zooming
+  const handleUpdateIconAndColor = async () => {
+    try {
+      await updateEventType(eventType, newIcon, newIconColor);
+      setIcon(newIcon);
+      setIconColor(newIconColor);
+      updateMarkedDates(events, newIconColor); // Update dot colors
+      setEditModalVisible(false);
+    } catch (error) {
+      Alert.alert("Error", "Failed to update icon and color.");
+    }
+  };
+
+  const renderIconOption = (icon: string) => (
+    <TouchableOpacity
+      key={icon}
+      style={[
+        styles.iconOption,
+        newIcon === icon && styles.selectedIconOption,
+      ]}
+      onPress={() => setNewIcon(icon)}
+    >
+      <MaterialIcons name={icon} size={24} color={newIconColor} />
+    </TouchableOpacity>
+  );
+
+  const renderColorOption = (color: string) => (
+    <TouchableOpacity
+      key={color}
+      style={[
+        styles.colorOption,
+        { backgroundColor: color },
+        newIconColor === color && styles.selectedColorOption,
+      ]}
+      onPress={() => setNewIconColor(color)}
+    />
+  );
+
   const pinchGesture = Gesture.Pinch()
     .onUpdate((event) => {
       scale.value = savedScale.value * event.scale;
@@ -241,7 +304,6 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
       savedScale.value = scale.value;
     });
 
-  // Pan gesture for moving
   const panGesture = Gesture.Pan()
     .onUpdate((event) => {
       if (scale.value > 1) {
@@ -254,10 +316,8 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
       savedTranslateY.value = translateY.value;
     });
 
-  // Combine gestures
   const composedGestures = Gesture.Simultaneous(pinchGesture, panGesture);
 
-  // Animated style for image
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [
       { scale: withSpring(scale.value) },
@@ -266,22 +326,24 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
     ],
   }));
 
-  // Get events for selected date
   const selectedDateEvents = selectedDate
     ? events.filter((event) => event.date === selectedDate)
     : [];
 
-  // Button display condition
   const showMarkEventButton =
     selectedDate &&
     (availability === 0 || selectedDateEvents.length < availability);
 
   return (
     <View style={styles.container}>
-      <View style={styles.titleContainer}>
+      <TouchableOpacity
+        style={styles.titleContainer}
+        onPress={() => setEditModalVisible(true)}
+      >
         <MaterialIcons name={icon} size={24} color={iconColor} style={styles.icon} />
         <Text style={styles.title}>{eventType}</Text>
-      </View>
+        <Text style={styles.availabilityText}>{availability}</Text>
+      </TouchableOpacity>
       <Calendar
         onDayPress={handleDayPress}
         markedDates={markedDates}
@@ -294,7 +356,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
       <View style={styles.eventDisplay}>
         {selectedDateEvents.length > 0 ? (
           <ScrollView style={styles.eventScrollView}>
-            <Text style={styles.eventTitle}>Event Details [{selectedDateEvents.length}/{availability}]</Text>
+            <Text style={styles.eventTitle}>Event Details</Text>
             {selectedDateEvents.map((event, index) => (
               <View key={event.id || index} style={styles.eventItem}>
                 <Text style={styles.eventText}>Event {index + 1}</Text>
@@ -315,7 +377,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
           </ScrollView>
         ) : (
           <Text style={styles.noEventText}>
-            {selectedDate ? `No event [${availability}] on ${selectedDate}` : "No date selected"}
+            {selectedDate ? `No event on ${selectedDate}` : "No date selected"}
           </Text>
         )}
         {showMarkEventButton && (
@@ -390,6 +452,37 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
           </TouchableOpacity>
         </View>
       </Modal>
+      <Modal
+        visible={editModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setEditModalVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Edit Icon and Color</Text>
+            <Text style={styles.iconLabel}>Select Icon</Text>
+            <ScrollView horizontal style={styles.iconPicker}>
+              {availableIcons.map(renderIconOption)}
+            </ScrollView>
+            <Text style={styles.iconLabel}>Select Icon Color</Text>
+            <ScrollView horizontal style={styles.colorPicker}>
+              {availableColors.map(renderColorOption)}
+            </ScrollView>
+            <View style={styles.buttonContainer}>
+              <Button
+                title="Cancel"
+                onPress={() => {
+                  setNewIcon(icon);
+                  setNewIconColor(iconColor);
+                  setEditModalVisible(false);
+                }}
+              />
+              <Button title="Save" onPress={handleUpdateIconAndColor} />
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -403,7 +496,7 @@ const styles = StyleSheet.create({
   titleContainer: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
+    justifyContent: "space-between", // Changed for availability
     marginBottom: 20,
   },
   title: {
@@ -412,6 +505,11 @@ const styles = StyleSheet.create({
   },
   icon: {
     marginRight: 10,
+  },
+  availabilityText: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#666",
   },
   modalContainer: {
     flex: 1,
@@ -492,7 +590,7 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     marginBottom: 10,
   },
-  eventItem: { // Added
+  eventItem: {
     marginBottom: 15,
     paddingBottom: 10,
     borderBottomWidth: 1,
@@ -542,6 +640,36 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.5)",
     borderRadius: 20,
     padding: 5,
+  },
+  iconLabel: {
+    fontSize: 16,
+    marginVertical: 10,
+    alignSelf: "flex-start",
+  },
+  iconPicker: {
+    flexGrow: 0,
+    marginBottom: 10,
+  },
+  iconOption: {
+    padding: 10,
+  },
+  selectedIconOption: {
+    backgroundColor: "#e0f0ff",
+    borderRadius: 5,
+  },
+  colorPicker: {
+    flexGrow: 0,
+    marginBottom: 10,
+  },
+  colorOption: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    marginHorizontal: 5,
+  },
+  selectedColorOption: {
+    borderWidth: 2,
+    borderColor: "#007AFF",
   },
 });
 
