@@ -11,6 +11,7 @@ export interface EventType {
     name: string; // Max 20 characters
     icon: string; // Icon name from MaterialIcons (e.g., "event")
     iconColor: string; // Icon color (e.g., "#FF0000")
+    availability: number; // Added
   }
   
 export interface VerificationCode {
@@ -23,4 +24,6 @@ export type RootStackParamList = {
     Home: undefined;
     Calendar: { eventType: string };
     CalendarViewAll: undefined;
+    CodeSetup: undefined;
+    ChangeCode: undefined;
   };

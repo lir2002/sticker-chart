@@ -9,7 +9,8 @@ export const initDatabase = async () => {
       CREATE TABLE IF NOT EXISTS event_types (
         name TEXT PRIMARY KEY,
         icon TEXT NOT NULL,
-        iconColor TEXT NOT NULL
+        iconColor TEXT NOT NULL,
+        availability INTEGER NOT NULL DEFAULT 0
       );
       CREATE TABLE IF NOT EXISTS events (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -28,12 +29,12 @@ export const initDatabase = async () => {
   }
 };
 
-export const insertEventType = async (name: string, icon: string, iconColor: string) => {
+export const insertEventType = async (name: string, icon: string, iconColor: string, availability: number) => {
   const db = await SQLite.openDatabaseAsync("eventmarker.db");
   try {
     const result = await db.runAsync(
-      "INSERT INTO event_types (name, icon, iconColor) VALUES (?, ?, ?);",
-      [name, icon, iconColor]
+      "INSERT INTO event_types (name, icon, iconColor, availability) VALUES (?, ?, ?, ?);",
+      [name, icon, iconColor, availability]
     );
     return result.lastInsertRowId || 0;
   } catch (error) {
@@ -100,10 +101,11 @@ export const getEventTypes = async () => {
         name: "Default",
         icon: "event",
         iconColor: "#000000",
+        availability: 0,
       };
       await db.runAsync(
-        "INSERT INTO event_types (name, icon, iconColor) VALUES (?, ?, ?);",
-        [defaultType.name, defaultType.icon, defaultType.iconColor]
+        "INSERT INTO event_types (name, icon, iconColor, availability) VALUES (?, ?, ?, ?);",
+        [defaultType.name, defaultType.icon, defaultType.iconColor, defaultType.availability]
       );
       types = [...types, defaultType];
     }

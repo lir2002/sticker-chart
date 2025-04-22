@@ -10,7 +10,7 @@ import {
   Image,
   Alert,
   Dimensions,
-  ScrollView, // Already imported, used for scrolling
+  ScrollView,
 } from "react-native";
 import { Calendar } from "react-native-calendars";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -48,10 +48,11 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [icon, setIcon] = useState<string>("event");
   const [iconColor, setIconColor] = useState<string>("#000000");
-  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
+  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null); // Unused, kept for minimal change
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [photoModalVisible, setPhotoModalVisible] = useState(false);
   const [selectedPhotoUri, setSelectedPhotoUri] = useState<string | null>(null);
+  const [availability, setAvailability] = useState<number>(0); // Added
 
   // Zoom and pan state for photo modal
   const scale = useSharedValue(1);
@@ -61,7 +62,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
   const savedTranslateX = useSharedValue(0);
   const savedTranslateY = useSharedValue(0);
 
-  // Load events, code, icon, and color
+  // Load events, code, icon, color, and availability
   useEffect(() => {
     const initialize = async () => {
       try {
@@ -74,6 +75,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
         const type = eventTypes.find((t) => t.name === eventType);
         if (type?.icon) setIcon(type.icon);
         if (type?.iconColor) setIconColor(type.iconColor);
+        setAvailability(type?.availability || 0); // Added
         updateMarkedDates(loadedEvents, type?.iconColor || "#000000");
       } catch (error) {
         console.error("Initialization error:", error);
@@ -94,8 +96,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
   const handleDayPress = (day: { dateString: string }) => {
     const date = day.dateString;
     setSelectedDate(date);
-    const existingEvent = events.find((event) => event.date === date);
-    setSelectedEvent(existingEvent || null);
+    setSelectedEvent(null); // Clear, not needed for multi-event display
   };
 
   const handleMarkEvent = () => {
@@ -199,7 +200,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
           };
           const updatedEvents = [...events, newEvent];
           setEvents(updatedEvents);
-          setSelectedEvent(newEvent);
+          setSelectedEvent(newEvent); // Kept for compatibility
           updateMarkedDates(updatedEvents, iconColor);
         }
         setVerifyModalVisible(false);
@@ -233,8 +234,8 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
   const pinchGesture = Gesture.Pinch()
     .onUpdate((event) => {
       scale.value = savedScale.value * event.scale;
-      if (scale.value < 1) scale.value = 1; // Minimum scale
-      if (scale.value > 3) scale.value = 3; // Maximum scale
+      if (scale.value < 1) scale.value = 1;
+      if (scale.value > 3) scale.value = 3;
     })
     .onEnd(() => {
       savedScale.value = scale.value;
@@ -265,6 +266,16 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
     ],
   }));
 
+  // Get events for selected date
+  const selectedDateEvents = selectedDate
+    ? events.filter((event) => event.date === selectedDate)
+    : [];
+
+  // Button display condition
+  const showMarkEventButton =
+    selectedDate &&
+    (availability === 0 || selectedDateEvents.length < availability);
+
   return (
     <View style={styles.container}>
       <View style={styles.titleContainer}>
@@ -281,33 +292,36 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
         }}
       />
       <View style={styles.eventDisplay}>
-        {selectedEvent ? (
+        {selectedDateEvents.length > 0 ? (
           <ScrollView style={styles.eventScrollView}>
-            <Text style={styles.eventTitle}>Event Details</Text>
-            <Text style={styles.eventText}>Date: {selectedEvent.date}</Text>
-            <Text style={styles.eventText}>
-              Marked At: {new Date(selectedEvent.markedAt).toLocaleString()}
-            </Text>
-            {selectedEvent.note && (
-              <Text style={styles.eventText}>Note: {selectedEvent.note}</Text>
-            )}
-            {selectedEvent.photoPath && (
-              <TouchableOpacity onPress={() => openPhotoModal(selectedEvent.photoPath)}>
-                <Image source={{ uri: selectedEvent.photoPath }} style={styles.eventPhoto} />
-              </TouchableOpacity>
-            )}
+            <Text style={styles.eventTitle}>Event Details [{selectedDateEvents.length}/{availability}]</Text>
+            {selectedDateEvents.map((event, index) => (
+              <View key={event.id || index} style={styles.eventItem}>
+                <Text style={styles.eventText}>Event {index + 1}</Text>
+                <Text style={styles.eventText}>Date: {event.date}</Text>
+                <Text style={styles.eventText}>
+                  Marked At: {new Date(event.markedAt).toLocaleString()}
+                </Text>
+                {event.note && (
+                  <Text style={styles.eventText}>Note: {event.note}</Text>
+                )}
+                {event.photoPath && (
+                  <TouchableOpacity onPress={() => openPhotoModal(event.photoPath)}>
+                    <Image source={{ uri: event.photoPath }} style={styles.eventPhoto} />
+                  </TouchableOpacity>
+                )}
+              </View>
+            ))}
           </ScrollView>
         ) : (
-          <>
-            <Text style={styles.noEventText}>
-              {selectedDate ? `No event on ${selectedDate}` : "No date selected"}
-            </Text>
-            {selectedDate && (
-              <TouchableOpacity style={styles.markButton} onPress={handleMarkEvent}>
-                <Text style={styles.markButtonText}>Mark Event</Text>
-              </TouchableOpacity>
-            )}
-          </>
+          <Text style={styles.noEventText}>
+            {selectedDate ? `No event [${availability}] on ${selectedDate}` : "No date selected"}
+          </Text>
+        )}
+        {showMarkEventButton && (
+          <TouchableOpacity style={styles.markButton} onPress={handleMarkEvent}>
+            <Text style={styles.markButtonText}>Mark Event</Text>
+          </TouchableOpacity>
         )}
       </View>
       <Modal
@@ -468,15 +482,21 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     borderWidth: 1,
     borderColor: "#ccc",
-    flex: 1, // Preserve flex for layout
+    flex: 1,
   },
-  eventScrollView: { // Added for ScrollView
+  eventScrollView: {
     flexGrow: 1,
   },
   eventTitle: {
     fontSize: 16,
     fontWeight: "bold",
     marginBottom: 10,
+  },
+  eventItem: { // Added
+    marginBottom: 15,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
   },
   eventText: {
     fontSize: 14,

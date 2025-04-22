@@ -11,6 +11,7 @@ import {
   Modal,
   ScrollView,
 } from "react-native";
+import {Picker} from "@react-native-picker/picker";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
@@ -57,6 +58,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const [newTypeName, setNewTypeName] = useState("");
   const [selectedIcon, setSelectedIcon] = useState<string>("event");
   const [selectedColor, setSelectedColor] = useState<string>("#000000");
+  const [availability, setAvailability] = useState<number>(0);
   const [codeState, setCodeState] = useState<VerificationCode>({ isSet: false, code: null });
   const [changeCodeModalVisible, setChangeCodeModalVisible] = useState(false);
   const [addTypeModalVisible, setAddTypeModalVisible] = useState(false);
@@ -83,12 +85,13 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
   const handleAddEventType = async () => {
     try {
-      await insertEventType(newTypeName, selectedIcon, selectedColor);
+      await insertEventType(newTypeName, selectedIcon, selectedColor, availability);
       const updatedTypes = await getEventTypes();
       setEventTypes(updatedTypes);
       setNewTypeName("");
       setSelectedIcon("event");
       setSelectedColor("#000000");
+      setAvailability(0);
       setAddTypeModalVisible(false);
     } catch (error: any) {
       Alert.alert("Error", error.message);
@@ -202,6 +205,16 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             <ScrollView horizontal style={styles.colorPicker}>
               {availableColors.map(renderColorOption)}
             </ScrollView>
+            <Text style={styles.iconLabel}>Select Availability</Text>
+            <Picker
+              selectedValue={availability}
+              onValueChange={(value) => setAvailability(value)}
+              style={styles.picker}
+            >
+              {Array.from({ length: 101 }, (_, i) => (
+                <Picker.Item key={i} label={`${i}`} value={i} />
+              ))}
+            </Picker>
             <View style={styles.buttonContainer}>
               <Button
                 title="Cancel"
@@ -209,6 +222,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                   setNewTypeName("");
                   setSelectedIcon("event");
                   setSelectedColor("#000000");
+                  setAvailability(0);
                   setAddTypeModalVisible(false);
                 }}
               />
@@ -332,6 +346,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     width: "100%",
+  },
+  picker: {
+    width: "100%",
+    marginBottom: 10,
   },
 });
 
