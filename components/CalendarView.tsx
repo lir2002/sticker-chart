@@ -27,6 +27,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { RootStackParamList, Event } from "../types";
 import { insertEvent, fetchEvents, initDatabase, getEventTypes, updateEventType } from "../db/database";
+import { useLanguage } from "../LanguageContext"; // Import LanguageContext
 
 interface CalendarViewProps {
   route: RouteProp<RootStackParamList, "Calendar">;
@@ -36,7 +37,6 @@ const MAX_NOTE_LENGTH = 200;
 const MAX_PHOTO_SIZE = 1_048_576;
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
-// Reused from HomeScreen.tsx
 const availableIcons = [
   "event",
   "star",
@@ -63,6 +63,7 @@ const availableColors = [
 
 const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
   const { eventType } = route.params;
+  const { t, language } = useLanguage();
   const [events, setEvents] = useState<Event[]>([]);
   const [markedDates, setMarkedDates] = useState<{ [key: string]: any }>({});
   const [code, setCode] = useState<string | null>(null);
@@ -107,11 +108,11 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
         updateMarkedDates(loadedEvents, type?.iconColor || "#000000");
       } catch (error) {
         console.error("Initialization error:", error);
-        Alert.alert("Error", "Failed to initialize calendar.");
+        Alert.alert("Error", t("errorInitCalendar"));
       }
     };
     initialize();
-  }, [eventType]);
+  }, [eventType, t]);
 
   const updateMarkedDates = (events: Event[], dotColor: string) => {
     const marked: { [key: string]: any } = {};
@@ -137,7 +138,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
-      Alert.alert("Permission Denied", "Please grant gallery access to upload photos.");
+      Alert.alert("Permission Denied", t("permissionDeniedGallery"));
       return;
     }
 
@@ -155,7 +156,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
   const captureImage = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== "granted") {
-      Alert.alert("Permission Denied", "Please grant camera access to take photos.");
+      Alert.alert("Permission Denied", t("permissionDeniedCamera"));
       return;
     }
 
@@ -202,7 +203,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
       setPhotoUri(permanentPath);
     } catch (error) {
       console.error("Error processing image:", error);
-      Alert.alert("Error", "Failed to process image.");
+      Alert.alert("Error", t("errorProcessImage"));
     }
   };
 
@@ -238,10 +239,10 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
         setPendingDate(null);
       } catch (error: any) {
         console.error("Error marking event:", error);
-        Alert.alert("Error", `Failed to Give a Sticker: ${error.message}`);
+        Alert.alert("Error", `${t("errorMarkEvent")}: ${error.message}`);
       }
     } else {
-      Alert.alert("Error", "Incorrect verification code.");
+      Alert.alert("Error", t("errorIncorrectCode"));
       setInputCode("");
     }
   };
@@ -262,10 +263,10 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
       await updateEventType(eventType, newIcon, newIconColor);
       setIcon(newIcon);
       setIconColor(newIconColor);
-      updateMarkedDates(events, newIconColor); // Update dot colors
+      updateMarkedDates(events, newIconColor);
       setEditModalVisible(false);
     } catch (error) {
-      Alert.alert("Error", "Failed to update icon and color.");
+      Alert.alert("Error", t("errorUpdateIconColor"));
     }
   };
 
@@ -356,16 +357,16 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
       <View style={styles.eventDisplay}>
         {selectedDateEvents.length > 0 ? (
           <ScrollView style={styles.eventScrollView}>
-            <Text style={styles.eventTitle}>Achievement Details</Text>
+            <Text style={styles.eventTitle}>{t("achievementDetails")}</Text>
             {selectedDateEvents.map((event, index) => (
               <View key={event.id || index} style={styles.eventItem}>
-                <Text style={styles.eventText}>Achievement {index + 1}</Text>
-                <Text style={styles.eventText}>Date: {event.date}</Text>
+                <Text style={styles.eventText}>{t("achievement")} {index + 1}</Text>
+                <Text style={styles.eventText}>{t("date")}: {event.date}</Text>
                 <Text style={styles.eventText}>
-                  Got At: {new Date(event.markedAt).toLocaleString()}
+                  {t("gotAt")}: {new Date(event.markedAt).toLocaleString()}
                 </Text>
                 {event.note && (
-                  <Text style={styles.eventText}>For: {event.note}</Text>
+                  <Text style={styles.eventText}>{t("for")}: {event.note}</Text>
                 )}
                 {event.photoPath && (
                   <TouchableOpacity onPress={() => openPhotoModal(event.photoPath)}>
@@ -377,12 +378,12 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
           </ScrollView>
         ) : (
           <Text style={styles.noEventText}>
-            {selectedDate ? `No achievement on ${selectedDate}` : "No date selected"}
+            {selectedDate ? `${t("noAchievement")} ${selectedDate}` : t("noDateSelected")}
           </Text>
         )}
         {showMarkEventButton && (
           <TouchableOpacity style={styles.markButton} onPress={handleMarkEvent}>
-            <Text style={styles.markButtonText}>Give a Sticker</Text>
+            <Text style={styles.markButtonText}>{t("giveSticker")}</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -394,20 +395,20 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
       >
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Give a Sticker</Text>
+            <Text style={styles.modalTitle}>{t("giveSticker")}</Text>
             <TextInput
               style={styles.input}
-              placeholder="4-digit code"
+              placeholder={t("codePlaceholder")}
               keyboardType="numeric"
               maxLength={4}
-              value={inputCode}x
+              value={inputCode}
               onChangeText={setInputCode}
               secureTextEntry
               autoFocus
             />
             <TextInput
               style={styles.input}
-              placeholder="Add a note (optional)"
+              placeholder={t("notePlaceholder")}
               maxLength={MAX_NOTE_LENGTH}
               value={note}
               onChangeText={setNote}
@@ -416,16 +417,16 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
             <Text style={styles.charCount}>{note.length}/{MAX_NOTE_LENGTH}</Text>
             <View style={styles.photoButtonContainer}>
               <TouchableOpacity style={styles.photoButton} onPress={captureImage}>
-                <Text style={styles.photoButtonText}>Take Photo</Text>
+                <Text style={styles.photoButtonText}>{t("takePhoto")}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.photoButton} onPress={pickImage}>
-                <Text style={styles.photoButtonText}>Upload Photo</Text>
+                <Text style={styles.photoButtonText}>{t("uploadPhoto")}</Text>
               </TouchableOpacity>
             </View>
             {photoUri && <Image source={{ uri: photoUri }} style={styles.photoPreview} />}
             <View style={styles.buttonContainer}>
-              <Button title="Cancel" onPress={() => setVerifyModalVisible(false)} />
-              <Button title="Verify" onPress={handleVerifyCode} />
+              <Button title={t("cancel")} onPress={() => setVerifyModalVisible(false)} />
+              <Button title={t("verify")} onPress={handleVerifyCode} />
             </View>
           </View>
         </View>
@@ -460,25 +461,25 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
       >
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Edit Icon and Color</Text>
-            <Text style={styles.iconLabel}>Select Icon</Text>
+            <Text style={styles.modalTitle}>{t("editIconColor")}</Text>
+            <Text style={styles.iconLabel}>{t("selectIcon")}</Text>
             <ScrollView horizontal style={styles.iconPicker}>
               {availableIcons.map(renderIconOption)}
             </ScrollView>
-            <Text style={styles.iconLabel}>Select Icon Color</Text>
+            <Text style={styles.iconLabel}>{t("selectColor")}</Text>
             <ScrollView horizontal style={styles.colorPicker}>
               {availableColors.map(renderColorOption)}
             </ScrollView>
             <View style={styles.buttonContainer}>
               <Button
-                title="Cancel"
+                title={t("cancel")}
                 onPress={() => {
                   setNewIcon(icon);
                   setNewIconColor(iconColor);
                   setEditModalVisible(false);
                 }}
               />
-              <Button title="Save" onPress={handleUpdateIconAndColor} />
+              <Button title={t("save")} onPress={handleUpdateIconAndColor} />
             </View>
           </View>
         </View>
@@ -496,7 +497,7 @@ const styles = StyleSheet.create({
   titleContainer: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between", // Changed for availability
+    justifyContent: "space-between",
     marginBottom: 20,
   },
   title: {

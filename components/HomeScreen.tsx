@@ -19,8 +19,13 @@ import { RootStackParamList, EventType, VerificationCode } from "../types";
 import { getEventTypes, insertEventType, initDatabase } from "../db/database";
 import ChangeCode from "./ChangeCode";
 import CodeSetup from "./CodeSetup";
+import { useLanguage } from "../LanguageContext"; // Import LanguageContext
+import { LocaleConfig } from "react-native-calendars";
 
-type HomeScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, "Home">;
+type HomeScreenNavigationProp = NativeStackNavigationProp<
+  RootStackParamList,
+  "Home"
+>;
 
 interface HomeScreenProps {
   navigation: HomeScreenNavigationProp;
@@ -52,12 +57,16 @@ const availableColors = [
 ];
 
 const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
+  const { language, setLanguage, t } = useLanguage(); // Use LanguageContext
   const [eventTypes, setEventTypes] = useState<EventType[]>([]);
   const [newTypeName, setNewTypeName] = useState("");
   const [selectedIcon, setSelectedIcon] = useState<string>("event");
   const [selectedColor, setSelectedColor] = useState<string>("#000000");
   const [availability, setAvailability] = useState<number>(0);
-  const [codeState, setCodeState] = useState<VerificationCode>({ isSet: false, code: null });
+  const [codeState, setCodeState] = useState<VerificationCode>({
+    isSet: false,
+    code: null,
+  });
   const [changeCodeModalVisible, setChangeCodeModalVisible] = useState(false);
   const [addTypeModalVisible, setAddTypeModalVisible] = useState(false);
 
@@ -81,16 +90,22 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
     loadData();
 
-    // Add focus listener to reload event types
     const unsubscribe = navigation.addListener("focus", loadData);
-
-    // Cleanup listener on unmount
     return unsubscribe;
   }, [navigation]);
 
+  useEffect(() => {
+    LocaleConfig.defaultLocale = language;
+  }, [language]);
+
   const handleAddEventType = async () => {
     try {
-      await insertEventType(newTypeName, selectedIcon, selectedColor, availability);
+      await insertEventType(
+        newTypeName,
+        selectedIcon,
+        selectedColor,
+        availability
+      );
       const updatedTypes = await getEventTypes();
       setEventTypes(updatedTypes);
       setNewTypeName("");
@@ -138,11 +153,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       ]}
       onPress={() => setSelectedIcon(icon)}
     >
-      <MaterialIcons
-        name={icon}
-        size={24}
-        color={selectedColor}
-      />
+      <MaterialIcons name={icon} size={24} color={selectedColor} />
     </TouchableOpacity>
   );
 
@@ -158,70 +169,84 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     />
   );
 
-  // Custom Button component to apply styles
-  const CustomButton = ({ title, onPress, disabled }: { title: string; onPress: () => void; disabled?: boolean }) => (
+  const CustomButton = ({
+    title,
+    onPress,
+    disabled,
+  }: {
+    title: string;
+    onPress: () => void;
+    disabled?: boolean;
+  }) => (
     <View style={styles.customButtonContainer}>
       <Button
         title={title}
         onPress={onPress}
-        color="#6A5ACD" // Blue-purple background
+        color="#6A5ACD"
         disabled={disabled}
       />
     </View>
   );
 
   if (!codeState.isSet) {
-    return <CodeSetup onCodeSet={() => setCodeState({ isSet: true, code: null })} />;
+    return (
+      <CodeSetup onCodeSet={() => setCodeState({ isSet: true, code: null })} />
+    );
   }
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Sticker Chart</Text>
-      <CustomButton
-        title="View All Stickers"
-        onPress={() => navigation.navigate("CalendarViewAll")}
-      />
-      <Text style={styles.subtitle}>Achievements</Text>
+      <Text style={styles.title}>{t("title")}</Text>
+      <Text style={styles.subtitle}>{t("achievements")}</Text>
       <FlatList
         data={eventTypes}
         renderItem={renderEventType}
         keyExtractor={(item) => item.name}
-        ListEmptyComponent={<Text>No event types yet.</Text>}
+        ListEmptyComponent={<Text>{t("noEventTypes")}</Text>}
       />
       <CustomButton
-        title="New Achievement Type"
+        title={t("viewAllStickers")}
+        onPress={() => navigation.navigate("CalendarViewAll")}
+      />
+      <CustomButton
+        title={t("newAchievementType")}
         onPress={() => setAddTypeModalVisible(true)}
       />
       <CustomButton
-        title="Change Code"
+        title={t("changeCode")}
         onPress={() => setChangeCodeModalVisible(true)}
+      />
+      {/* Language Switcher */}
+      <CustomButton
+        title={language === "en" ? "切换到中文" : "Switch to English"}
+        onPress={() => setLanguage(language === "en" ? "zh" : "en")}
       />
       <Modal
         visible={addTypeModalVisible}
-        extrinsic
+        transparent
         animationType="slide"
         onRequestClose={() => setAddTypeModalVisible(false)}
       >
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Add New Event Type</Text>
+            <Text style={styles.modalTitle}>{t("addNewEventType")}</Text>
             <TextInput
               style={styles.input}
-              placeholder="Name (max 20 chars, any visible)"
+              placeholder={t("namePlaceholder")}
               maxLength={20}
               value={newTypeName}
               onChangeText={setNewTypeName}
               autoFocus
             />
-            <Text style={styles.iconLabel}>Select Icon</Text>
+            <Text style={styles.iconLabel}>{t("selectIcon")}</Text>
             <ScrollView horizontal style={styles.iconPicker}>
               {availableIcons.map(renderIconOption)}
             </ScrollView>
-            <Text style={styles.iconLabel}>Select Icon Color</Text>
+            <Text style={styles.iconLabel}>{t("selectColor")}</Text>
             <ScrollView horizontal style={styles.colorPicker}>
               {availableColors.map(renderColorOption)}
             </ScrollView>
-            <Text style={styles.iconLabel}>Select Availability</Text>
+            <Text style={styles.iconLabel}>{t("selectAvailability")}</Text>
             <Picker
               selectedValue={availability}
               onValueChange={(value) => setAvailability(value)}
@@ -233,7 +258,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             </Picker>
             <View style={styles.buttonContainer}>
               <Button
-                title="Cancel"
+                title={t("cancel")}
                 onPress={() => {
                   setNewTypeName("");
                   setSelectedIcon("event");
@@ -243,7 +268,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                 }}
               />
               <Button
-                title="Add"
+                title={t("add")}
                 onPress={handleAddEventType}
                 disabled={newTypeName.trim() === ""}
               />
@@ -269,6 +294,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   );
 };
 
+// Update styles to include language switcher
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -367,9 +393,9 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   customButtonContainer: {
-    width: "66.67%", // 2/3 of the page
-    alignSelf: "center", // Centered
-    marginVertical: 10, // Optional: Add some spacing
+    width: "66.67%",
+    alignSelf: "center",
+    marginVertical: 10,
   },
 });
 

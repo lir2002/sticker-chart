@@ -10,7 +10,7 @@ import {
   Alert,
   Image,
   Dimensions,
-  ScrollView, // Added for scrolling
+  ScrollView,
 } from "react-native";
 import { Calendar } from "react-native-calendars";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
@@ -22,10 +22,12 @@ import Animated, {
 } from "react-native-reanimated";
 import { Event, EventType } from "../types";
 import { fetchAllEvents, getEventTypes } from "../db/database";
+import { useLanguage } from "../LanguageContext";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 const CalendarViewAll: React.FC = () => {
+  const { t, language } = useLanguage();
   const [events, setEvents] = useState<Event[]>([]);
   const [filteredEvents, setFilteredEvents] = useState<Event[]>([]);
   const [eventTypes, setEventTypes] = useState<EventType[]>([]);
@@ -38,7 +40,6 @@ const CalendarViewAll: React.FC = () => {
   const [photoModalVisible, setPhotoModalVisible] = useState(false);
   const [selectedPhotoUri, setSelectedPhotoUri] = useState<string | null>(null);
 
-  // Zoom and pan state for photo modal
   const scale = useSharedValue(1);
   const savedScale = useSharedValue(1);
   const translateX = useSharedValue(0);
@@ -46,7 +47,6 @@ const CalendarViewAll: React.FC = () => {
   const savedTranslateX = useSharedValue(0);
   const savedTranslateY = useSharedValue(0);
 
-  // Load events and event types
   useEffect(() => {
     const initialize = async () => {
       try {
@@ -58,13 +58,12 @@ const CalendarViewAll: React.FC = () => {
         updateMarkedDates(loadedEvents, types);
       } catch (error) {
         console.error("Initialization error:", error);
-        Alert.alert("Error", "Failed to initialize calendar.");
+        Alert.alert("Error", t("errorInitCalendar"));
       }
     };
     initialize();
-  }, []);
+  }, [t]);
 
-  // Update marked dates with multiple dots for different event types
   const updateMarkedDates = (events: Event[], types: EventType[]) => {
     const marked: { [key: string]: any } = {};
     events.forEach((event) => {
@@ -79,7 +78,6 @@ const CalendarViewAll: React.FC = () => {
     setMarkedDates(marked);
   };
 
-  // Handle filter changes in the modal
   const toggleFilter = (filter: string) => {
     setTempFilters((prev) => {
       if (filter === "All") {
@@ -96,13 +94,11 @@ const CalendarViewAll: React.FC = () => {
     });
   };
 
-  // Apply filters when modal is closed
   const applyFilters = () => {
     setSelectedFilters(tempFilters);
     setFilterModalVisible(false);
   };
 
-  // Update filtered events and marked dates when filters change
   useEffect(() => {
     if (selectedFilters.includes("All")) {
       setFilteredEvents(events);
@@ -111,7 +107,6 @@ const CalendarViewAll: React.FC = () => {
     }
   }, [selectedFilters, events]);
 
-  // Update marked dates and selected date events when filtered events change
   useEffect(() => {
     updateMarkedDates(filteredEvents, eventTypes);
     if (selectedDate) {
@@ -141,16 +136,14 @@ const CalendarViewAll: React.FC = () => {
 
   const getFilterSummary = () => {
     if (selectedFilters.includes("All")) {
-      return "All";
+      return t("all");
     }
-    return selectedFilters.join(", ") || "None";
+    return selectedFilters.join(", ") || t("none");
   };
 
-  // Open photo modal
   const openPhotoModal = (uri: string) => {
     setSelectedPhotoUri(uri);
     setPhotoModalVisible(true);
-    // Reset zoom and pan
     scale.value = 1;
     savedScale.value = 1;
     translateX.value = 0;
@@ -159,7 +152,6 @@ const CalendarViewAll: React.FC = () => {
     savedTranslateY.value = 0;
   };
 
-  // Pinch gesture for zooming
   const pinchGesture = Gesture.Pinch()
     .onUpdate((event) => {
       scale.value = savedScale.value * event.scale;
@@ -170,7 +162,6 @@ const CalendarViewAll: React.FC = () => {
       savedScale.value = scale.value;
     });
 
-  // Pan gesture for moving
   const panGesture = Gesture.Pan()
     .onUpdate((event) => {
       if (scale.value > 1) {
@@ -183,10 +174,8 @@ const CalendarViewAll: React.FC = () => {
       savedTranslateY.value = translateY.value;
     });
 
-  // Combine gestures
   const composedGestures = Gesture.Simultaneous(pinchGesture, panGesture);
 
-  // Animated style for image
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [
       { scale: withSpring(scale.value) },
@@ -198,7 +187,7 @@ const CalendarViewAll: React.FC = () => {
   return (
     <View style={styles.container}>
       <View style={styles.filterHeader}>
-        <Text style={styles.filterSummary}>Filters: {getFilterSummary()}</Text>
+        <Text style={styles.filterSummary}>{t("filters")}: {getFilterSummary()}</Text>
         <TouchableOpacity
           style={styles.filterButton}
           onPress={() => {
@@ -207,13 +196,15 @@ const CalendarViewAll: React.FC = () => {
           }}
         >
           <MaterialIcons name="filter-list" size={24} color="#007AFF" />
-          <Text style={styles.filterButtonText}>Filter Events</Text>
+          <Text style={styles.filterButtonText}>{t("filterEvents")}</Text>
         </TouchableOpacity>
       </View>
       <Calendar
         onDayPress={handleDayPress}
         markedDates={markedDates}
         markingType={"multi-dot"}
+        locale={language} // Set locale dynamically
+        key={language} // Force re-render on language change
         theme={{
           selectedDayBackgroundColor: "#007AFF",
           todayTextColor: "#007AFF",
@@ -223,7 +214,7 @@ const CalendarViewAll: React.FC = () => {
       <View style={styles.eventDisplay}>
         {selectedDateEvents.length > 0 ? (
           <ScrollView style={styles.eventScrollView}>
-            <Text style={styles.eventTitle}>Achievements on {selectedDate}</Text>
+            <Text style={styles.eventTitle}>{t("achievementsOn")} {selectedDate}</Text>
             {selectedDateEvents.map((event) => {
               const type = eventTypes.find((t) => t.name === event.eventType);
               return (
@@ -235,12 +226,12 @@ const CalendarViewAll: React.FC = () => {
                     style={styles.eventIcon}
                   />
                   <View>
-                    <Text style={styles.eventText}>Type: {event.eventType}</Text>
-                    <Text style={styles.eventText}>Date: {event.date}</Text>
+                    <Text style={styles.eventText}>{t("type")}: {event.eventType}</Text>
+                    <Text style={styles.eventText}>{t("date")}: {event.date}</Text>
                     <Text style={styles.eventText}>
-                      Got At: {new Date(event.markedAt).toLocaleString()}
+                      {t("gotAt")}: {new Date(event.markedAt).toLocaleString()}
                     </Text>
-                    {event.note && <Text style={styles.eventText}>For: {event.note}</Text>}
+                    {event.note && <Text style={styles.eventText}>{t("for")}: {event.note}</Text>}
                     {event.photoPath && (
                       <TouchableOpacity onPress={() => openPhotoModal(event.photoPath)}>
                         <Image source={{ uri: event.photoPath }} style={styles.eventPhoto} />
@@ -253,7 +244,7 @@ const CalendarViewAll: React.FC = () => {
           </ScrollView>
         ) : (
           <Text style={styles.noEventText}>
-            {selectedDate ? `No events for ${selectedDate}` : "No date selected"}
+            {selectedDate ? `${t("noEventsFor")} ${selectedDate}` : t("noDateSelected")}
           </Text>
         )}
       </View>
@@ -265,7 +256,7 @@ const CalendarViewAll: React.FC = () => {
       >
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Select Filters</Text>
+            <Text style={styles.modalTitle}>{t("selectFilters")}</Text>
             <FlatList
               data={["All", ...eventTypes.map((type) => type.name)]}
               renderItem={renderFilterItem}
@@ -274,10 +265,10 @@ const CalendarViewAll: React.FC = () => {
             />
             <View style={styles.modalButtonContainer}>
               <Button
-                title="Cancel"
+                title={t("cancel")}
                 onPress={() => setFilterModalVisible(false)}
               />
-              <Button title="Done" onPress={applyFilters} />
+              <Button title={t("done")} onPress={applyFilters} />
             </View>
           </View>
         </View>
@@ -380,9 +371,9 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     borderWidth: 1,
     borderColor: "#ccc",
-    flex: 1, // Ensure eventDisplay takes available space
+    flex: 1,
   },
-  eventScrollView: { // Added for ScrollView
+  eventScrollView: {
     flexGrow: 1,
   },
   eventTitle: {
