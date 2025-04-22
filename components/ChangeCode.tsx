@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { View, Text, TextInput, Button, Alert, StyleSheet } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useLanguage } from "../LanguageContext"; // New import
 
 interface ChangeCodeProps {
   currentCode: string;
@@ -9,40 +10,41 @@ interface ChangeCodeProps {
 }
 
 const ChangeCode: React.FC<ChangeCodeProps> = ({ currentCode, onCodeChanged, onCancel }) => {
+  const { t, language } = useLanguage(); // Use LanguageContext
   const [oldCode, setOldCode] = useState("");
   const [newCode, setNewCode] = useState("");
   const [confirmNewCode, setConfirmNewCode] = useState("");
 
   const handleChangeCode = async () => {
     if (oldCode !== currentCode) {
-      Alert.alert("Error", "Incorrect old code.");
+      Alert.alert(t("error"), t("errorIncorrectOldCode"));
       return;
     }
     if (!newCode.match(/^\d{4}$/)) {
-      Alert.alert("Error", "New code must be 4 digits.");
+      Alert.alert(t("error"), t("errorInvalidNewCode"));
       return;
     }
     if (newCode !== confirmNewCode) {
-      Alert.alert("Error", "New codes do not match.");
+      Alert.alert(t("error"), t("errorCodesDoNotMatch"));
       return;
     }
 
     try {
       await AsyncStorage.setItem("verificationCode", newCode);
-      Alert.alert("Success", "Verification code updated.");
+      Alert.alert(t("success"), t("successUpdateCode"));
       onCodeChanged();
     } catch (error) {
       console.error("Error updating code:", error);
-      Alert.alert("Error", "Failed to update code.");
+      Alert.alert(t("error"), t("errorUpdateCode"));
     }
   };
 
   return (
     <View style={styles.modalContent}>
-      <Text style={styles.modalTitle}>Change Verification Code</Text>
+      <Text style={styles.modalTitle}>{t("changeVerificationCode")}</Text>
       <TextInput
         style={styles.input}
-        placeholder="Enter old 4-digit code"
+        placeholder={t("enterOldCode")}
         keyboardType="numeric"
         maxLength={4}
         value={oldCode}
@@ -51,7 +53,7 @@ const ChangeCode: React.FC<ChangeCodeProps> = ({ currentCode, onCodeChanged, onC
       />
       <TextInput
         style={styles.input}
-        placeholder="Enter new 4-digit code"
+        placeholder={t("enterNewCode")}
         keyboardType="numeric"
         maxLength={4}
         value={newCode}
@@ -60,7 +62,7 @@ const ChangeCode: React.FC<ChangeCodeProps> = ({ currentCode, onCodeChanged, onC
       />
       <TextInput
         style={styles.input}
-        placeholder="Confirm new 4-digit code"
+        placeholder={t("confirmNewCode")}
         keyboardType="numeric"
         maxLength={4}
         value={confirmNewCode}
@@ -68,8 +70,8 @@ const ChangeCode: React.FC<ChangeCodeProps> = ({ currentCode, onCodeChanged, onC
         secureTextEntry
       />
       <View style={styles.buttonContainer}>
-        <Button title="Cancel" onPress={onCancel} />
-        <Button title="Change Code" onPress={handleChangeCode} />
+        <Button title={t("cancel")} onPress={onCancel} />
+        <Button title={t("changeCode")} onPress={handleChangeCode} />
       </View>
     </View>
   );

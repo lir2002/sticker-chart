@@ -58,6 +58,15 @@ const translations: Translations = {
   type: { en: "Type", zh: "类型" },
   achievementsOn: { en: "Achievements on", zh: "成就于" },
   noEventsFor: { en: "No events for", zh: "无事件于" },
+  changeVerificationCode: { en: "Change Verification Code", zh: "更改验证密钥" },
+  enterOldCode: { en: "Enter old 4-digit code", zh: "输入旧的4位密钥" },
+  enterNewCode: { en: "Enter new 4-digit code", zh: "输入新的4位密钥" },
+  confirmNewCode: { en: "Confirm new 4-digit code", zh: "确认新的4位密钥" },
+  errorIncorrectOldCode: { en: "Incorrect old code.", zh: "旧密钥不正确。" },
+  errorInvalidNewCode: { en: "New code must be 4 digits.", zh: "新密钥必须为4位数字。" },
+  errorCodesDoNotMatch: { en: "New codes do not match.", zh: "新密钥不匹配。" },
+  errorUpdateCode: { en: "Failed to update code.", zh: "无法更新密钥。" },
+  successUpdateCode: { en: "Verification code updated.", zh: "验证密钥已更新。" },
 };
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
