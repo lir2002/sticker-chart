@@ -11,7 +11,7 @@ import {
   Modal,
   ScrollView,
 } from "react-native";
-import {Picker} from "@react-native-picker/picker";
+import { Picker } from "@react-native-picker/picker";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
@@ -86,7 +86,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
     // Cleanup listener on unmount
     return unsubscribe;
-  }, [navigation]); // Added navigation dependency
+  }, [navigation]);
 
   const handleAddEventType = async () => {
     try {
@@ -158,6 +158,18 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     />
   );
 
+  // Custom Button component to apply styles
+  const CustomButton = ({ title, onPress, disabled }: { title: string; onPress: () => void; disabled?: boolean }) => (
+    <View style={styles.customButtonContainer}>
+      <Button
+        title={title}
+        onPress={onPress}
+        color="#6A5ACD" // Blue-purple background
+        disabled={disabled}
+      />
+    </View>
+  );
+
   if (!codeState.isSet) {
     return <CodeSetup onCodeSet={() => setCodeState({ isSet: true, code: null })} />;
   }
@@ -165,7 +177,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Event Marker</Text>
-      <Button
+      <CustomButton
         title="View All Events"
         onPress={() => navigation.navigate("CalendarViewAll")}
       />
@@ -176,17 +188,17 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         keyExtractor={(item) => item.name}
         ListEmptyComponent={<Text>No event types yet.</Text>}
       />
-      <Button
+      <CustomButton
         title="Add Event Type"
         onPress={() => setAddTypeModalVisible(true)}
-      />      
-      <Button
-        title="Change Verification Code"
+      />
+      <CustomButton
+        title="Change Code"
         onPress={() => setChangeCodeModalVisible(true)}
       />
       <Modal
         visible={addTypeModalVisible}
-        transparent
+        extrinsic
         animationType="slide"
         onRequestClose={() => setAddTypeModalVisible(false)}
       >
@@ -353,6 +365,11 @@ const styles = StyleSheet.create({
   picker: {
     width: "100%",
     marginBottom: 10,
+  },
+  customButtonContainer: {
+    width: "66.67%", // 2/3 of the page
+    alignSelf: "center", // Centered
+    marginVertical: 10, // Optional: Add some spacing
   },
 });
 
