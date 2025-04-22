@@ -1,6 +1,11 @@
 {
   "name": "stickerchart",
   "version": "1.0.0",
+	"license": "MIT",
+	"author": {
+		"name": "Ethan Li",
+		"email": "lir2002@gmail.com"
+	},
   "main": "index.ts",
   "scripts": {
     "start": "expo start",
