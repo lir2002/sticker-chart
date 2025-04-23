@@ -23,11 +23,13 @@ import Animated, {
 import { Event, EventType } from "../types";
 import { fetchAllEvents, getEventTypes } from "../db/database";
 import { useLanguage } from "../LanguageContext";
+import { useNavigation } from "@react-navigation/native"; 
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 const CalendarViewAll: React.FC = () => {
   const { t, language } = useLanguage();
+  const navigation = useNavigation();
   const [events, setEvents] = useState<Event[]>([]);
   const [filteredEvents, setFilteredEvents] = useState<Event[]>([]);
   const [eventTypes, setEventTypes] = useState<EventType[]>([]);
@@ -47,22 +49,13 @@ const CalendarViewAll: React.FC = () => {
   const savedTranslateX = useSharedValue(0);
   const savedTranslateY = useSharedValue(0);
 
+  // Set navigation title dynamically
   useEffect(() => {
-    const initialize = async () => {
-      try {
-        const loadedEvents = await fetchAllEvents();
-        setEvents(loadedEvents);
-        setFilteredEvents(loadedEvents);
-        const types = await getEventTypes();
-        setEventTypes(types);
-        updateMarkedDates(loadedEvents, types);
-      } catch (error) {
-        console.error("Initialization error:", error);
-        Alert.alert("Error", t("errorInitCalendar"));
-      }
-    };
-    initialize();
-  }, [t]);
+    console.log("CalendarViewAll: Setting navigation title");
+    navigation.setOptions({
+      title: t("calendarViewAll"), // Translated title
+    });
+  }, [t, navigation]);
 
   const updateMarkedDates = (events: Event[], types: EventType[]) => {
     const marked: { [key: string]: any } = {};
@@ -204,7 +197,6 @@ const CalendarViewAll: React.FC = () => {
         markedDates={markedDates}
         markingType={"multi-dot"}
         locale={language} // Set locale dynamically
-        key={language} // Force re-render on language change
         theme={{
           selectedDayBackgroundColor: "#007AFF",
           todayTextColor: "#007AFF",

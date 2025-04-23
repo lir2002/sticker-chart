@@ -120,13 +120,7 @@ export default function App() {
           <Stack.Screen
             name="CalendarViewAll"
             component={CalendarViewAll}
-            options={() => {
-              const { t } = useLanguage();
-              return {
-                // headerShown: false, // Keep commented out as in original
-                title: t("calendarViewAll"), // Add title if header is shown
-              };
-            }}
+            options={{ title: "All Stickers" }}
           />
         </Stack.Navigator>
         <StatusBar style="auto" />
