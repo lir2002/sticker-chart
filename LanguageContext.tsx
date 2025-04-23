@@ -67,6 +67,8 @@ const translations: Translations = {
   errorCodesDoNotMatch: { en: "New codes do not match.", zh: "新密钥不匹配。" },
   errorUpdateCode: { en: "Failed to update code.", zh: "无法更新密钥。" },
   successUpdateCode: { en: "Verification code updated.", zh: "验证密钥已更新。" },
+  enterVerificationCode: { en: "Enter Verification Code", zh: "输入验证码" },
+  errorAddEventType: { en: "Failed to add achievement type", zh: "添加成就类型失败" },
 };
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);

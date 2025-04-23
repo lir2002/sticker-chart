@@ -45,6 +45,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   });
   const [changeCodeModalVisible, setChangeCodeModalVisible] = useState(false);
   const [addTypeModalVisible, setAddTypeModalVisible] = useState(false);
+  const [verifyCodeModalVisible, setVerifyCodeModalVisible] = useState(false);
+  const [inputCode, setInputCode] = useState("");
 
   // Load event types and code state
   useEffect(() => {
@@ -75,22 +77,33 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   }, [language]);
 
   const handleAddEventType = async () => {
-    try {
-      await insertEventType(
-        newTypeName,
-        selectedIcon,
-        selectedColor,
-        availability
-      );
-      const updatedTypes = await getEventTypes();
-      setEventTypes(updatedTypes);
-      setNewTypeName("");
-      setSelectedIcon("event");
-      setSelectedColor("#000000");
-      setAvailability(0);
-      setAddTypeModalVisible(false);
-    } catch (error: any) {
-      Alert.alert("Error", error.message);
+    setVerifyCodeModalVisible(true);
+  };
+
+  const handleVerifyCode = async () => {
+    if (inputCode === codeState.code) {
+      try {
+        await insertEventType(
+          newTypeName,
+          selectedIcon,
+          selectedColor,
+          availability
+        );
+        const updatedTypes = await getEventTypes();
+        setEventTypes(updatedTypes);
+        setNewTypeName("");
+        setSelectedIcon("event");
+        setSelectedColor("#000000");
+        setAvailability(0);
+        setAddTypeModalVisible(false);
+        setVerifyCodeModalVisible(false);
+        setInputCode("");
+      } catch (error: any) {
+        Alert.alert("Error", `${t("errorAddEventType")}: ${error.message}`);
+      }
+    } else {
+      Alert.alert("Error", t("errorIncorrectCode"));
+      setInputCode("");
     }
   };
 
@@ -247,6 +260,40 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                 title={t("add")}
                 onPress={handleAddEventType}
                 disabled={newTypeName.trim() === ""}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
+      <Modal
+        visible={verifyCodeModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setVerifyCodeModalVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>{t("enterVerificationCode")}</Text>
+            <TextInput
+              style={styles.input}
+              placeholder={t("codePlaceholder")}
+              value={inputCode}
+              onChangeText={setInputCode}
+              secureTextEntry
+              autoFocus
+            />
+            <View style={styles.buttonContainer}>
+              <Button
+                title={t("cancel")}
+                onPress={() => {
+                  setVerifyCodeModalVisible(false);
+                  setInputCode("");
+                }}
+              />
+              <Button
+                title={t("verify")}
+                onPress={handleVerifyCode}
+                disabled={inputCode.trim() === ""}
               />
             </View>
           </View>
