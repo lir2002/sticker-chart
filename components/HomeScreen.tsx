@@ -127,7 +127,13 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const renderEventType = ({ item }: { item: EventType }) => (
     <TouchableOpacity
       style={styles.typeItem}
-      onPress={() => navigation.navigate("Calendar", { eventType: item.name })}
+      onPress={() =>
+        navigation.navigate("Calendar", {
+          eventType: item.name,
+          icon: item.icon,
+          iconColor: item.iconColor,
+        })
+      }
     >
       <MaterialIcons
         name={item.icon}

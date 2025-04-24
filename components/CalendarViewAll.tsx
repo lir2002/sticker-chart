@@ -49,13 +49,29 @@ const CalendarViewAll: React.FC = () => {
   const savedTranslateX = useSharedValue(0);
   const savedTranslateY = useSharedValue(0);
 
+  useEffect(() => {
+    const initialize = async () => {
+      try {
+        const loadedEvents = await fetchAllEvents();
+        setEvents(loadedEvents);
+        setFilteredEvents(loadedEvents);
+        const types = await getEventTypes();
+        setEventTypes(types);
+        updateMarkedDates(loadedEvents, types);
+      } catch (error) {
+        console.error("Initialization error:", error);
+        Alert.alert("Error", t("errorInitCalendar"));
+      }
+    };
+    initialize();
+  }, []);
+
   // Set navigation title dynamically
   useEffect(() => {
-    console.log("CalendarViewAll: Setting navigation title");
     navigation.setOptions({
       title: t("calendarViewAll"), // Translated title
     });
-  }, [t, navigation]);
+  }, [navigation]);
 
   const updateMarkedDates = (events: Event[], types: EventType[]) => {
     const marked: { [key: string]: any } = {};

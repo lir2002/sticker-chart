@@ -39,7 +39,9 @@ const MAX_PHOTO_SIZE = 1_048_576;
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
-  const { eventType } = route.params;
+  const { eventType, icon: initialIcon, iconColor: initialIconColor } = route.params;
+  const [icon, setIcon] = useState<string>(initialIcon || "event");
+  const [iconColor, setIconColor] = useState<string>(initialIconColor || "#000000");
   const { t } = useLanguage();
   const [events, setEvents] = useState<Event[]>([]);
   const [markedDates, setMarkedDates] = useState<{ [key: string]: any }>({});
@@ -49,8 +51,6 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
   const [pendingDate, setPendingDate] = useState<string | null>(null);
   const [note, setNote] = useState("");
   const [photoUri, setPhotoUri] = useState<string | null>(null);
-  const [icon, setIcon] = useState<string>("event");
-  const [iconColor, setIconColor] = useState<string>("#000000");
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [photoModalVisible, setPhotoModalVisible] = useState(false);
