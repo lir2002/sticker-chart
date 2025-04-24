@@ -3,7 +3,7 @@ import { View, Text, TextInput, Button, Alert, StyleSheet } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 interface CodeSetupProps {
-  onCodeSet: () => void;
+  onCodeSet: (code: string) => void;
 }
 
 const CodeSetup: React.FC<CodeSetupProps> = ({ onCodeSet }) => {
@@ -23,7 +23,7 @@ const CodeSetup: React.FC<CodeSetupProps> = ({ onCodeSet }) => {
     try {
       await AsyncStorage.setItem("verificationCode", code);
       await AsyncStorage.setItem("isCodeSet", "true");
-      onCodeSet();
+      onCodeSet(code);
     } catch (error) {
       console.error("Error saving code:", error);
       Alert.alert("Error", "Failed to save code.");

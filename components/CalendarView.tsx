@@ -40,7 +40,7 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
   const { eventType } = route.params;
-  const { t, language } = useLanguage();
+  const { t } = useLanguage();
   const [events, setEvents] = useState<Event[]>([]);
   const [markedDates, setMarkedDates] = useState<{ [key: string]: any }>({});
   const [code, setCode] = useState<string | null>(null);
@@ -403,7 +403,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
             {photoUri && <Image source={{ uri: photoUri }} style={styles.photoPreview} />}
             <View style={styles.buttonContainer}>
               <Button title={t("cancel")} onPress={() => setVerifyModalVisible(false)} />
-              <Button title={t("verify")} onPress={handleVerifyCode} />
+              <Button title={t("confirm")} onPress={handleVerifyCode} />
             </View>
           </View>
         </View>

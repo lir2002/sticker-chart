@@ -27,6 +27,7 @@ const translations: Translations = {
   selectColor: { en: "Select Icon Color", zh: "选择图标颜色" },
   selectAvailability: { en: "Select Max Times per Day (0 means no limits)", zh: "选择每日最大次数（0表示不受限制）" },
   cancel: { en: "Cancel", zh: "取消" },
+  confirm: { en: "Confirm", zh: "确认" },
   add: { en: "Add", zh: "添加" },
   calendarViewAll: { en: "All Stickers", zh: "所有贴纸" },
   achievementDetails: { en: "Achievement Details", zh: "成就详情" },

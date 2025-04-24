@@ -118,6 +118,12 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     }
   };
 
+  const handleCodeInputChange = (text: string) => {
+    if (text.match(/^\d*$/)) {
+      setInputCode(text);
+    }
+  };
+
   const renderEventType = ({ item }: { item: EventType }) => (
     <TouchableOpacity
       style={styles.typeItem}
@@ -179,7 +185,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
   if (!codeState.isSet) {
     return (
-      <CodeSetup onCodeSet={() => setCodeState({ isSet: true, code: null })} />
+      <CodeSetup onCodeSet={(newCode: string) => setCodeState({ isSet: true, code: newCode })} />
     );
   }
 
@@ -277,8 +283,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             <TextInput
               style={styles.input}
               placeholder={t("codePlaceholder")}
+              keyboardType="numeric"
+              maxLength={4}
               value={inputCode}
-              onChangeText={setInputCode}
+              onChangeText={handleCodeInputChange}
               secureTextEntry
               autoFocus
             />
