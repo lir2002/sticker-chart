@@ -9,7 +9,7 @@ type Translations = {
 interface LanguageContextType {
   language: Language;
   setLanguage: (lang: Language) => void;
-  t: (key: string) => string;
+  t: (key: string, params?: Record<string, any>) => string;
 }
 
 const translations: Translations = {
@@ -100,8 +100,12 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   };
 
-  const t = (key: string): string => {
-    return translations[key]?.[language] || key;
+  const t = (key: string, params: Record<string, any> = {}): string => {
+    let translation = translations[key]?.[language] || key;
+    Object.keys(params).forEach((param) => {
+      translation = translation.replace(`{${param}}`, params[param]);
+    });
+    return translation;
   };
 
   return (

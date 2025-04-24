@@ -59,6 +59,9 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [newIcon, setNewIcon] = useState<string>("event");
   const [newIconColor, setNewIconColor] = useState<string>("#000000");
+  const [monthlyAchievementCount, setMonthlyAchievementCount] = useState<number>(0);
+  const [currentYear, setCurrentYear] = useState<number>(new Date().getFullYear());
+  const [currentMonth, setCurrentMonth] = useState<number>(new Date().getMonth() + 1);
 
   const scale = useSharedValue(1);
   const savedScale = useSharedValue(1);
@@ -66,6 +69,14 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
   const translateY = useSharedValue(0);
   const savedTranslateX = useSharedValue(0);
   const savedTranslateY = useSharedValue(0);
+
+  const calculateMonthlyAchievements = (events: Event[], year: number, month: number) => {
+    const count = events.filter((event) => {
+      const [eventYear, eventMonth] = event.date.split("-").map(Number);
+      return eventYear === year && eventMonth === month;
+    }).length;
+    setMonthlyAchievementCount(count);
+  };
 
   useEffect(() => {
     const initialize = async () => {
@@ -75,6 +86,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
         setCode(storedCode);
         const loadedEvents = await fetchEvents(eventType);
         setEvents(loadedEvents);
+        calculateMonthlyAchievements(loadedEvents, currentYear, currentMonth);
         const eventTypes = await getEventTypes();
         const type = eventTypes.find((t) => t.name === eventType);
         if (type?.icon) setIcon(type.icon);
@@ -89,7 +101,13 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
       }
     };
     initialize();
-  }, [eventType, t]);
+  }, [eventType, t, currentYear, currentMonth]);
+
+  const handleMonthChange = (month: { year: number; month: number }) => {
+    setCurrentYear(month.year);
+    setCurrentMonth(month.month);
+    calculateMonthlyAchievements(events, month.year, month.month);
+  };
 
   const updateMarkedDates = (events: Event[], dotColor: string) => {
     const marked: { [key: string]: any } = {};
@@ -207,6 +225,8 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
           const updatedEvents = [...events, newEvent];
           setEvents(updatedEvents);
           setSelectedEvent(newEvent);
+          calculateMonthlyAchievements(updatedEvents, currentYear, currentMonth);
+
           updateMarkedDates(updatedEvents, iconColor);
         }
         setVerifyModalVisible(false);
@@ -320,10 +340,11 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
       >
         <MaterialIcons name={icon} size={24} color={iconColor} style={styles.icon} />
         <Text style={styles.title}>{eventType}</Text>
-        <Text style={styles.availabilityText}>{availability}</Text>
+        <Text style={styles.achievementCountText}>{monthlyAchievementCount}</Text>
       </TouchableOpacity>
       <Calendar
         onDayPress={handleDayPress}
+        onMonthChange={handleMonthChange}
         markedDates={markedDates}
         theme={{
           selectedDayBackgroundColor: "#007AFF",
@@ -484,7 +505,7 @@ const styles = StyleSheet.create({
   icon: {
     marginRight: 10,
   },
-  availabilityText: {
+  achievementCountText: {
     fontSize: 18,
     fontWeight: "bold",
     color: "#666",

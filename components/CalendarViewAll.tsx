@@ -41,6 +41,9 @@ const CalendarViewAll: React.FC = () => {
   const [selectedDateEvents, setSelectedDateEvents] = useState<Event[]>([]);
   const [photoModalVisible, setPhotoModalVisible] = useState(false);
   const [selectedPhotoUri, setSelectedPhotoUri] = useState<string | null>(null);
+  const [currentYear, setCurrentYear] = useState<number>(new Date().getFullYear()); // 新增：当前年份
+  const [currentMonth, setCurrentMonth] = useState<number>(new Date().getMonth() + 1); // 新增：当前月份
+  const [monthlyAchievementCount, setMonthlyAchievementCount] = useState<number>(0);
 
   const scale = useSharedValue(1);
   const savedScale = useSharedValue(1);
@@ -48,6 +51,14 @@ const CalendarViewAll: React.FC = () => {
   const translateY = useSharedValue(0);
   const savedTranslateX = useSharedValue(0);
   const savedTranslateY = useSharedValue(0);
+
+  const calculateMonthlyAchievements = (events: Event[], year: number, month: number) => {
+    const count = events.filter((event) => {
+      const [eventYear, eventMonth] = event.date.split("-").map(Number);
+      return eventYear === year && eventMonth === month;
+    }).length;
+    setMonthlyAchievementCount(count);
+  };
 
   useEffect(() => {
     const initialize = async () => {
@@ -72,6 +83,10 @@ const CalendarViewAll: React.FC = () => {
       title: t("calendarViewAll"), // Translated title
     });
   }, [navigation]);
+
+  useEffect(() => {
+    calculateMonthlyAchievements(filteredEvents, currentYear, currentMonth);
+  }, [filteredEvents, currentYear, currentMonth]);
 
   const updateMarkedDates = (events: Event[], types: EventType[]) => {
     const marked: { [key: string]: any } = {};
@@ -129,6 +144,11 @@ const CalendarViewAll: React.FC = () => {
     setSelectedDate(date);
     const dateEvents = filteredEvents.filter((event) => event.date === date);
     setSelectedDateEvents(dateEvents);
+  };
+
+  const handleMonthChange = (month: { year: number; month: number }) => {
+    setCurrentYear(month.year);
+    setCurrentMonth(month.month);
   };
 
   const renderFilterItem = ({ item }: { item: string }) => (
@@ -197,6 +217,7 @@ const CalendarViewAll: React.FC = () => {
     <View style={styles.container}>
       <View style={styles.filterHeader}>
         <Text style={styles.filterSummary}>{t("filters")}: {getFilterSummary()}</Text>
+        <Text style={styles.achievementCountText}>{monthlyAchievementCount}</Text>
         <TouchableOpacity
           style={styles.filterButton}
           onPress={() => {
@@ -210,6 +231,7 @@ const CalendarViewAll: React.FC = () => {
       </View>
       <Calendar
         onDayPress={handleDayPress}
+        onMonthChange={handleMonthChange}
         markedDates={markedDates}
         markingType={"multi-dot"}
         locale={language} // Set locale dynamically
@@ -322,6 +344,13 @@ const styles = StyleSheet.create({
   filterSummary: {
     fontSize: 14,
     color: "#333",
+  },
+  achievementCountText: {
+    fontSize: 14,
+    fontWeight: "bold",
+    color: "#666",
+    flex: 1,
+    textAlign: "center",
   },
   filterButton: {
     flexDirection: "row",
