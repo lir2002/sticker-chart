@@ -1,41 +1,40 @@
 import React, { useState } from "react";
 import { View, Text, TextInput, Button, Alert, StyleSheet } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useLanguage } from "../LanguageContext";
 
 interface CodeSetupProps {
   onCodeSet: (code: string) => void;
 }
 
 const CodeSetup: React.FC<CodeSetupProps> = ({ onCodeSet }) => {
+  const { t } = useLanguage();
   const [code, setCode] = useState("");
   const [confirmCode, setConfirmCode] = useState("");
 
   const handleSetCode = async () => {
     if (!code.match(/^\d{4}$/)) {
-      Alert.alert("Error", "Please enter a 4-digit code.");
+      Alert.alert("Error", t("errorInvalidCode"));
       return;
     }
     if (code !== confirmCode) {
-      Alert.alert("Error", "Codes do not match.");
+      Alert.alert("Error", t("errorCodeMismatch"));
       return;
     }
 
     try {
-      await AsyncStorage.setItem("verificationCode", code);
-      await AsyncStorage.setItem("isCodeSet", "true");
       onCodeSet(code);
     } catch (error) {
       console.error("Error saving code:", error);
-      Alert.alert("Error", "Failed to save code.");
+      Alert.alert("Error", t("errorSetPassword"));
     }
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Set Your 4-Digit Verification Code</Text>
+      <Text style={styles.title}>{t("setAdminPassword")}</Text>
       <TextInput
         style={styles.input}
-        placeholder="Enter 4-digit code"
+        placeholder={t("codePlaceholder")}
         keyboardType="numeric"
         maxLength={4}
         value={code}
@@ -44,14 +43,14 @@ const CodeSetup: React.FC<CodeSetupProps> = ({ onCodeSet }) => {
       />
       <TextInput
         style={styles.input}
-        placeholder="Confirm 4-digit code"
+        placeholder={t("confirmCodePlaceholder")}
         keyboardType="numeric"
         maxLength={4}
         value={confirmCode}
         onChangeText={setConfirmCode}
         secureTextEntry
       />
-      <Button title="Set Code" onPress={handleSetCode} />
+      <Button title={t("setCode")} onPress={handleSetCode} />
     </View>
   );
 };

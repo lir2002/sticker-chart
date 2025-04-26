@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useContext } from "react";
 import {
   View,
   Text,
@@ -13,7 +13,6 @@ import {
   ScrollView,
 } from "react-native";
 import { Calendar } from "react-native-calendars";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { RouteProp } from "@react-navigation/native";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 import * as ImagePicker from "expo-image-picker";
@@ -25,10 +24,21 @@ import Animated, {
   useAnimatedStyle,
   withSpring,
 } from "react-native-reanimated";
-import { RootStackParamList, Event } from "../types";
-import { insertEvent, fetchEvents, initDatabase, getEventTypes, updateEventType } from "../db/database";
-import { useLanguage } from "../LanguageContext"; // Import LanguageContext
+import { RootStackParamList, Event, EventType } from "../types";
+import {
+  insertEvent,
+  fetchEventsWithCreator,
+  initDatabase,
+  getEventTypes,
+  updateEventType,
+  verifyUserCode,
+  deleteEvent,
+  verifyEvent,
+  getUsers,
+} from "../db/database";
+import { useLanguage } from "../LanguageContext";
 import { availableColors, availableIcons } from "../icons";
+import { UserContext } from "../UserContext";
 
 interface CalendarViewProps {
   route: RouteProp<RootStackParamList, "Calendar">;
@@ -39,14 +49,22 @@ const MAX_PHOTO_SIZE = 1_048_576;
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
-  const { eventType, icon: initialIcon, iconColor: initialIconColor } = route.params;
+  const {
+    eventType,
+    icon: initialIcon,
+    iconColor: initialIconColor,
+  } = route.params;
+  const { currentUser } = useContext(UserContext);
   const [icon, setIcon] = useState<string>(initialIcon || "event");
-  const [iconColor, setIconColor] = useState<string>(initialIconColor || "#000000");
+  const [iconColor, setIconColor] = useState<string>(
+    initialIconColor || "#000000"
+  );
   const { t } = useLanguage();
   const [events, setEvents] = useState<Event[]>([]);
   const [markedDates, setMarkedDates] = useState<{ [key: string]: any }>({});
-  const [code, setCode] = useState<string | null>(null);
   const [verifyModalVisible, setVerifyModalVisible] = useState(false);
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [verifyEventModalVisible, setVerifyEventModalVisible] = useState(false);
   const [inputCode, setInputCode] = useState("");
   const [pendingDate, setPendingDate] = useState<string | null>(null);
   const [note, setNote] = useState("");
@@ -59,9 +77,17 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [newIcon, setNewIcon] = useState<string>("event");
   const [newIconColor, setNewIconColor] = useState<string>("#000000");
-  const [monthlyAchievementCount, setMonthlyAchievementCount] = useState<number>(0);
-  const [currentYear, setCurrentYear] = useState<number>(new Date().getFullYear());
-  const [currentMonth, setCurrentMonth] = useState<number>(new Date().getMonth() + 1);
+  const [monthlyAchievementCount, setMonthlyAchievementCount] =
+    useState<number>(0);
+  const [currentYear, setCurrentYear] = useState<number>(
+    new Date().getFullYear()
+  );
+  const [currentMonth, setCurrentMonth] = useState<number>(
+    new Date().getMonth() + 1
+  );
+  const [eventTypeOwnerId, setEventTypeOwnerId] = useState<number | null>(null);
+  const [users, setUsers] = useState<{ id: number; name: string }[]>([]);
+  const [pendingEventId, setPendingEventId] = useState<number | null>(null);
 
   const scale = useSharedValue(1);
   const savedScale = useSharedValue(1);
@@ -70,7 +96,11 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
   const savedTranslateX = useSharedValue(0);
   const savedTranslateY = useSharedValue(0);
 
-  const calculateMonthlyAchievements = (events: Event[], year: number, month: number) => {
+  const calculateMonthlyAchievements = (
+    events: Event[],
+    year: number,
+    month: number
+  ) => {
     const count = events.filter((event) => {
       const [eventYear, eventMonth] = event.date.split("-").map(Number);
       return eventYear === year && eventMonth === month;
@@ -82,16 +112,20 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
     const initialize = async () => {
       try {
         await initDatabase();
-        const storedCode = await AsyncStorage.getItem("verificationCode");
-        setCode(storedCode);
-        const loadedEvents = await fetchEvents(eventType);
+        // Fetch users for creator names
+        const allUsers = await getUsers();
+        setUsers(allUsers.map((u) => ({ id: u.id, name: u.name })));
+        // Fetch events with creator names
+        const loadedEvents = await fetchEventsWithCreator(eventType);
         setEvents(loadedEvents);
         calculateMonthlyAchievements(loadedEvents, currentYear, currentMonth);
+        // Fetch event type details
         const eventTypes = await getEventTypes();
         const type = eventTypes.find((t) => t.name === eventType);
         if (type?.icon) setIcon(type.icon);
         if (type?.iconColor) setIconColor(type.iconColor);
         setAvailability(type?.availability || 0);
+        setEventTypeOwnerId(type?.owner || null);
         setNewIcon(type?.icon || "event");
         setNewIconColor(type?.iconColor || "#000000");
         updateMarkedDates(loadedEvents, type?.iconColor || "#000000");
@@ -123,7 +157,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
     setSelectedEvent(null);
   };
 
-  const handleMarkEvent = () => {
+  const handleAskSticker = () => {
     if (selectedDate) {
       setPendingDate(selectedDate);
       setVerifyModalVisible(true);
@@ -179,7 +213,9 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
         );
         finalUri = manipulatedImage.uri;
 
-        const newFileInfo = await FileSystem.getInfoAsync(finalUri, { size: true });
+        const newFileInfo = await FileSystem.getInfoAsync(finalUri, {
+          size: true,
+        });
         if (newFileInfo.exists && newFileInfo.size > MAX_PHOTO_SIZE) {
           const compressMore = await ImageManipulator.manipulateAsync(
             finalUri,
@@ -190,10 +226,15 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
         }
       }
 
-      const permanentPath = `${FileSystem.documentDirectory}photos/${Date.now()}.jpg`;
-      await FileSystem.makeDirectoryAsync(`${FileSystem.documentDirectory}photos/`, {
-        intermediates: true,
-      });
+      const permanentPath = `${
+        FileSystem.documentDirectory
+      }photos/${Date.now()}.jpg`;
+      await FileSystem.makeDirectoryAsync(
+        `${FileSystem.documentDirectory}photos/`,
+        {
+          intermediates: true,
+        }
+      );
       await FileSystem.moveAsync({ from: finalUri, to: permanentPath });
       setPhotoUri(permanentPath);
     } catch (error) {
@@ -203,30 +244,43 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
   };
 
   const handleVerifyCode = async () => {
-    if (inputCode === code) {
-      try {
+    if (!currentUser) {
+      Alert.alert("Error", t("noCurrentUser"));
+      return;
+    }
+    try {
+      const isValid = await verifyUserCode(currentUser.id, parseInt(inputCode));
+      if (isValid) {
         const markedAt = new Date().toISOString();
         if (pendingDate) {
           const insertedId = await insertEvent(
             pendingDate,
             markedAt,
             eventType,
+            currentUser.id,
             note || undefined,
-            photoUri || undefined
+            photoUri || undefined,
+            false // is_verified = false
           );
           const newEvent: Event = {
             id: insertedId,
             date: pendingDate,
             markedAt,
             eventType,
+            created_by: currentUser.id,
+            is_verified: false,
             note: note || undefined,
             photoPath: photoUri || undefined,
+            creatorName: currentUser.name,
           };
           const updatedEvents = [...events, newEvent];
           setEvents(updatedEvents);
           setSelectedEvent(newEvent);
-          calculateMonthlyAchievements(updatedEvents, currentYear, currentMonth);
-
+          calculateMonthlyAchievements(
+            updatedEvents,
+            currentYear,
+            currentMonth
+          );
           updateMarkedDates(updatedEvents, iconColor);
         }
         setVerifyModalVisible(false);
@@ -234,13 +288,71 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
         setNote("");
         setPhotoUri(null);
         setPendingDate(null);
-      } catch (error: any) {
-        console.error("Error marking event:", error);
-        Alert.alert("Error", `${t("errorMarkEvent")}: ${error.message}`);
+      } else {
+        Alert.alert("Error", t("errorIncorrectCode"));
+        setInputCode("");
       }
-    } else {
-      Alert.alert("Error", t("errorIncorrectCode"));
-      setInputCode("");
+    } catch (error: any) {
+      console.error("Error marking event:", error);
+      Alert.alert("Error", `${t("errorMarkEvent")}: ${error.message}`);
+    }
+  };
+
+  const handleDeleteEvent = async (eventId: number) => {
+    setPendingEventId(eventId);
+    setDeleteModalVisible(true);
+  };
+
+  const handleVerifyDelete = async () => {
+    if (!currentUser || !pendingEventId) return;
+    try {
+      const isValid = await verifyUserCode(currentUser.id, parseInt(inputCode));
+      if (isValid) {
+        await deleteEvent(pendingEventId);
+        const updatedEvents = events.filter((e) => e.id !== pendingEventId);
+        setEvents(updatedEvents);
+        calculateMonthlyAchievements(updatedEvents, currentYear, currentMonth);
+        updateMarkedDates(updatedEvents, iconColor);
+        setDeleteModalVisible(false);
+        setInputCode("");
+        setPendingEventId(null);
+        Alert.alert("Success", t("eventDeleted"));
+      } else {
+        Alert.alert("Error", t("errorIncorrectCode"));
+        setInputCode("");
+      }
+    } catch (error) {
+      console.error("Error deleting event:", error);
+      Alert.alert("Error", t("errorDeleteEvent"));
+    }
+  };
+
+  const handleVerifyEvent = async (eventId: number) => {
+    setPendingEventId(eventId);
+    setVerifyEventModalVisible(true);
+  };
+
+  const handleConfirmVerifyEvent = async () => {
+    if (!currentUser || !pendingEventId) return;
+    try {
+      const isValid = await verifyUserCode(currentUser.id, parseInt(inputCode));
+      if (isValid) {
+        await verifyEvent(pendingEventId);
+        const updatedEvents = events.map((e) =>
+          e.id === pendingEventId ? { ...e, is_verified: true } : e
+        );
+        setEvents(updatedEvents);
+        setVerifyEventModalVisible(false);
+        setInputCode("");
+        setPendingEventId(null);
+        Alert.alert("Success", t("eventVerified"));
+      } else {
+        Alert.alert("Error", t("errorIncorrectCode"));
+        setInputCode("");
+      }
+    } catch (error) {
+      console.error("Error verifying event:", error);
+      Alert.alert("Error", t("errorVerifyEvent"));
     }
   };
 
@@ -257,7 +369,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
 
   const handleUpdateIconAndColor = async () => {
     try {
-      await updateEventType(eventType, newIcon, newIconColor);
+      await updateEventType(eventType, newIcon, newIconColor, eventTypeOwnerId);
       setIcon(newIcon);
       setIconColor(newIconColor);
       updateMarkedDates(events, newIconColor);
@@ -270,10 +382,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
   const renderIconOption = (icon: string) => (
     <TouchableOpacity
       key={icon}
-      style={[
-        styles.iconOption,
-        newIcon === icon && styles.selectedIconOption,
-      ]}
+      style={[styles.iconOption, newIcon === icon && styles.selectedIconOption]}
       onPress={() => setNewIcon(icon)}
     >
       <MaterialIcons name={icon} size={24} color={newIconColor} />
@@ -289,7 +398,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
         newIconColor === color && styles.selectedColorOption,
       ]}
       onPress={() => setNewIconColor(color)}
-    />
+    ></TouchableOpacity>
   );
 
   const pinchGesture = Gesture.Pinch()
@@ -305,8 +414,10 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
   const panGesture = Gesture.Pan()
     .onUpdate((event) => {
       if (scale.value > 1) {
-        translateX.value = savedTranslateX.value + event.translationX / scale.value;
-        translateY.value = savedTranslateY.value + event.translationY / scale.value;
+        translateX.value =
+          savedTranslateX.value + event.translationX / scale.value;
+        translateY.value =
+          savedTranslateY.value + event.translationY / scale.value;
       }
     })
     .onEnd(() => {
@@ -328,9 +439,18 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
     ? events.filter((event) => event.date === selectedDate)
     : [];
 
-  const showMarkEventButton =
+  const showAskStickerButton =
     selectedDate &&
-    (availability === 0 || selectedDateEvents.length < availability);
+    (availability === 0 || selectedDateEvents.length < availability) &&
+    currentUser?.id === eventTypeOwnerId;
+
+  if (!currentUser) {
+    return (
+      <View style={styles.container}>
+        <Text>{t("loading")}</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -338,9 +458,16 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
         style={styles.titleContainer}
         onPress={() => setEditModalVisible(true)}
       >
-        <MaterialIcons name={icon} size={24} color={iconColor} style={styles.icon} />
+        <MaterialIcons
+          name={icon}
+          size={24}
+          color={iconColor}
+          style={styles.icon}
+        />
         <Text style={styles.title}>{eventType}</Text>
-        <Text style={styles.achievementCountText}>{monthlyAchievementCount}</Text>
+        <Text style={styles.achievementCountText}>
+          {monthlyAchievementCount}
+        </Text>
       </TouchableOpacity>
       <Calendar
         onDayPress={handleDayPress}
@@ -358,17 +485,67 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
             <Text style={styles.eventTitle}>{t("achievementDetails")}</Text>
             {selectedDateEvents.map((event, index) => (
               <View key={event.id || index} style={styles.eventItem}>
-                <Text style={styles.eventText}>{t("achievement")} {index + 1}</Text>
-                <Text style={styles.eventText}>{t("date")}: {event.date}</Text>
+                <View style={styles.eventHeader}>
+                  <Text style={styles.eventText}>
+                    {t("achievement")} {index + 1}
+                  </Text>
+                  {event.is_verified ? (
+                    <MaterialIcons
+                      name="check-circle"
+                      size={20}
+                      color="green"
+                    />
+                  ) : (
+                    <View style={styles.actionButtons}>
+                      {currentUser.role_id === 1 && (
+                        <TouchableOpacity
+                          style={styles.actionButton}
+                          onPress={() => handleVerifyEvent(event.id)}
+                        >
+                          <Text style={styles.actionButtonText}>
+                            {t("verify")}
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                      {(currentUser.id === event.created_by ||
+                        currentUser.role_id === 1) && (
+                        <TouchableOpacity
+                          style={styles.actionButton}
+                          onPress={() => handleDeleteEvent(event.id)}
+                        >
+                          <Text style={styles.actionButtonText}>
+                            {t("delete")}
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  )}
+                </View>
+                <Text style={styles.eventText}>
+                  {t("date")}: {String(event.date)}
+                </Text>
                 <Text style={styles.eventText}>
                   {t("gotAt")}: {new Date(event.markedAt).toLocaleString()}
                 </Text>
+                <Text style={styles.eventText}>
+                  {t("createdBy")}: {event.creatorName ?? "Unknown"}
+                </Text>
+                <Text style={styles.eventText}>
+                  {t("verified")}: {event.is_verified ? t("yes") : t("no")}
+                </Text>
                 {event.note && (
-                  <Text style={styles.eventText}>{t("for")}: {event.note}</Text>
+                  <Text style={styles.eventText}>
+                    {t("for")}: {String(event.note)}
+                  </Text>
                 )}
                 {event.photoPath && (
-                  <TouchableOpacity onPress={() => openPhotoModal(event.photoPath)}>
-                    <Image source={{ uri: event.photoPath }} style={styles.eventPhoto} />
+                  <TouchableOpacity
+                    onPress={() => openPhotoModal(event.photoPath)}
+                  >
+                    <Image
+                      source={{ uri: event.photoPath }}
+                      style={styles.eventPhoto}
+                    />
                   </TouchableOpacity>
                 )}
               </View>
@@ -376,15 +553,21 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
           </ScrollView>
         ) : (
           <Text style={styles.noEventText}>
-            {selectedDate ? `${t("noAchievement")} ${selectedDate}` : t("noDateSelected")}
+            {selectedDate
+              ? `${t("noAchievement")} ${selectedDate}`
+              : t("noDateSelected")}
           </Text>
         )}
-        {showMarkEventButton && (
-          <TouchableOpacity style={styles.markButton} onPress={handleMarkEvent}>
-            <Text style={styles.markButtonText}>{t("giveSticker")}</Text>
+        {showAskStickerButton && (
+          <TouchableOpacity
+            style={styles.markButton}
+            onPress={handleAskSticker}
+          >
+            <Text style={styles.markButtonText}>{t("askSticker")}</Text>
           </TouchableOpacity>
         )}
       </View>
+      {/* Ask Sticker Verification Modal */}
       <Modal
         visible={verifyModalVisible}
         transparent
@@ -393,7 +576,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
       >
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>{t("giveSticker")}</Text>
+            <Text style={styles.modalTitle}>{t("askSticker")}</Text>
             <TextInput
               style={styles.input}
               placeholder={t("codePlaceholder")}
@@ -412,23 +595,108 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
               onChangeText={setNote}
               multiline
             />
-            <Text style={styles.charCount}>{note.length}/{MAX_NOTE_LENGTH}</Text>
+            <Text style={styles.charCount}>
+              {note.length}/{MAX_NOTE_LENGTH}
+            </Text>
             <View style={styles.photoButtonContainer}>
-              <TouchableOpacity style={styles.photoButton} onPress={captureImage}>
+              <TouchableOpacity
+                style={styles.photoButton}
+                onPress={captureImage}
+              >
                 <Text style={styles.photoButtonText}>{t("takePhoto")}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.photoButton} onPress={pickImage}>
                 <Text style={styles.photoButtonText}>{t("uploadPhoto")}</Text>
               </TouchableOpacity>
             </View>
-            {photoUri && <Image source={{ uri: photoUri }} style={styles.photoPreview} />}
+            {photoUri && (
+              <Image source={{ uri: photoUri }} style={styles.photoPreview} />
+            )}
             <View style={styles.buttonContainer}>
-              <Button title={t("cancel")} onPress={() => setVerifyModalVisible(false)} />
+              <Button
+                title={t("cancel")}
+                onPress={() => {
+                  setVerifyModalVisible(false);
+                  setInputCode("");
+                  setNote("");
+                  setPhotoUri(null);
+                  setPendingDate(null);
+                }}
+              />
               <Button title={t("confirm")} onPress={handleVerifyCode} />
             </View>
           </View>
         </View>
       </Modal>
+      {/* Delete Event Verification Modal */}
+      <Modal
+        visible={deleteModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setDeleteModalVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>{t("verifyDeleteEvent")}</Text>
+            <TextInput
+              style={styles.input}
+              placeholder={t("codePlaceholder")}
+              keyboardType="numeric"
+              maxLength={4}
+              value={inputCode}
+              onChangeText={setInputCode}
+              secureTextEntry
+              autoFocus
+            />
+            <View style={styles.buttonContainer}>
+              <Button
+                title={t("cancel")}
+                onPress={() => {
+                  setDeleteModalVisible(false);
+                  setInputCode("");
+                  setPendingEventId(null);
+                }}
+              />
+              <Button title={t("confirm")} onPress={handleVerifyDelete} />
+            </View>
+          </View>
+        </View>
+      </Modal>
+      {/* Verify Event Verification Modal */}
+      <Modal
+        visible={verifyEventModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setVerifyEventModalVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>{t("verifyEvent")}</Text>
+            <TextInput
+              style={styles.input}
+              placeholder={t("codePlaceholder")}
+              keyboardType="numeric"
+              maxLength={4}
+              value={inputCode}
+              onChangeText={setInputCode}
+              secureTextEntry
+              autoFocus
+            />
+            <View style={styles.buttonContainer}>
+              <Button
+                title={t("cancel")}
+                onPress={() => {
+                  setVerifyEventModalVisible(false);
+                  setInputCode("");
+                  setPendingEventId(null);
+                }}
+              />
+              <Button title={t("confirm")} onPress={handleConfirmVerifyEvent} />
+            </View>
+          </View>
+        </View>
+      </Modal>
+      {/* Photo Modal */}
       <Modal
         visible={photoModalVisible}
         transparent
@@ -451,6 +719,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
           </TouchableOpacity>
         </View>
       </Modal>
+      {/* Edit Icon/Color Modal */}
       <Modal
         visible={editModalVisible}
         transparent
@@ -595,6 +864,12 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#eee",
   },
+  eventHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 5,
+  },
   eventText: {
     fontSize: 14,
     marginBottom: 5,
@@ -669,6 +944,19 @@ const styles = StyleSheet.create({
   selectedColorOption: {
     borderWidth: 2,
     borderColor: "#007AFF",
+  },
+  actionButtons: {
+    flexDirection: "row",
+  },
+  actionButton: {
+    marginLeft: 10,
+    backgroundColor: "#007AFF",
+    padding: 5,
+    borderRadius: 5,
+  },
+  actionButtonText: {
+    color: "#fff",
+    fontSize: 12,
   },
 });
 

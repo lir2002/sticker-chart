@@ -21,9 +21,9 @@ import Animated, {
   withSpring,
 } from "react-native-reanimated";
 import { Event, EventType } from "../types";
-import { fetchAllEvents, getEventTypes } from "../db/database";
+import { fetchAllEventsWithCreator, getEventTypes, getUsers } from "../db/database";
 import { useLanguage } from "../LanguageContext";
-import { useNavigation } from "@react-navigation/native"; 
+import { useNavigation } from "@react-navigation/native";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -33,16 +33,21 @@ const CalendarViewAll: React.FC = () => {
   const [events, setEvents] = useState<Event[]>([]);
   const [filteredEvents, setFilteredEvents] = useState<Event[]>([]);
   const [eventTypes, setEventTypes] = useState<EventType[]>([]);
+  const [users, setUsers] = useState<{ id: number; name: string }[]>([]);
   const [selectedFilters, setSelectedFilters] = useState<string[]>(["All"]);
   const [tempFilters, setTempFilters] = useState<string[]>(["All"]);
+  const [selectedCreatorFilters, setSelectedCreatorFilters] = useState<string[]>(["All"]);
+  const [tempCreatorFilters, setTempCreatorFilters] = useState<string[]>(["All"]);
+  const [verifiedFilter, setVerifiedFilter] = useState<string>("All");
+  const [tempVerifiedFilter, setTempVerifiedFilter] = useState<string>("All");
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [markedDates, setMarkedDates] = useState<{ [key: string]: any }>({});
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedDateEvents, setSelectedDateEvents] = useState<Event[]>([]);
   const [photoModalVisible, setPhotoModalVisible] = useState(false);
   const [selectedPhotoUri, setSelectedPhotoUri] = useState<string | null>(null);
-  const [currentYear, setCurrentYear] = useState<number>(new Date().getFullYear()); // 新增：当前年份
-  const [currentMonth, setCurrentMonth] = useState<number>(new Date().getMonth() + 1); // 新增：当前月份
+  const [currentYear, setCurrentYear] = useState<number>(new Date().getFullYear());
+  const [currentMonth, setCurrentMonth] = useState<number>(new Date().getMonth() + 1);
   const [monthlyAchievementCount, setMonthlyAchievementCount] = useState<number>(0);
 
   const scale = useSharedValue(1);
@@ -63,11 +68,13 @@ const CalendarViewAll: React.FC = () => {
   useEffect(() => {
     const initialize = async () => {
       try {
-        const loadedEvents = await fetchAllEvents();
+        const loadedEvents = await fetchAllEventsWithCreator();
         setEvents(loadedEvents);
         setFilteredEvents(loadedEvents);
         const types = await getEventTypes();
         setEventTypes(types);
+        const loadedUsers = await getUsers();
+        setUsers(loadedUsers.map((u) => ({ id: u.id, name: u.name })));
         updateMarkedDates(loadedEvents, types);
       } catch (error) {
         console.error("Initialization error:", error);
@@ -77,12 +84,11 @@ const CalendarViewAll: React.FC = () => {
     initialize();
   }, []);
 
-  // Set navigation title dynamically
   useEffect(() => {
     navigation.setOptions({
-      title: t("calendarViewAll"), // Translated title
+      title: t("calendarViewAll"),
     });
-  }, [navigation]);
+  }, [navigation, t]);
 
   useEffect(() => {
     calculateMonthlyAchievements(filteredEvents, currentYear, currentMonth);
@@ -118,26 +124,55 @@ const CalendarViewAll: React.FC = () => {
     });
   };
 
+  const toggleCreatorFilter = (creatorId: string) => {
+    setTempCreatorFilters((prev) => {
+      if (creatorId === "All") {
+        return ["All"];
+      }
+      if (prev.includes("All")) {
+        return [creatorId];
+      }
+      if (prev.includes(creatorId)) {
+        const newFilters = prev.filter((f) => f !== creatorId);
+        return newFilters.length > 0 ? newFilters : ["All"];
+      }
+      return [...prev, creatorId];
+    });
+  };
+
+  const toggleVerifiedFilter = (status: string) => {
+    setTempVerifiedFilter(status);
+  };
+
   const applyFilters = () => {
     setSelectedFilters(tempFilters);
+    setSelectedCreatorFilters(tempCreatorFilters);
+    setVerifiedFilter(tempVerifiedFilter);
     setFilterModalVisible(false);
+
+    let filtered = events;
+    if (!tempFilters.includes("All")) {
+      filtered = filtered.filter((event) => tempFilters.includes(event.eventType));
+    }
+    if (!tempCreatorFilters.includes("All")) {
+      filtered = filtered.filter((event) =>
+        tempCreatorFilters.includes(event.created_by.toString())
+      );
+    }
+    if (tempVerifiedFilter === "Verified") {
+      filtered = filtered.filter((event) => event.is_verified);
+    } else if (tempVerifiedFilter === "Unverified") {
+      filtered = filtered.filter((event) => !event.is_verified);
+    }
+    setFilteredEvents(filtered);
   };
 
   useEffect(() => {
-    if (selectedFilters.includes("All")) {
-      setFilteredEvents(events);
-    } else {
-      setFilteredEvents(events.filter((event) => selectedFilters.includes(event.eventType)));
-    }
-  }, [selectedFilters, events]);
-
-  useEffect(() => {
-    updateMarkedDates(filteredEvents, eventTypes);
     if (selectedDate) {
       const dateEvents = filteredEvents.filter((event) => event.date === selectedDate);
       setSelectedDateEvents(dateEvents);
     }
-  }, [filteredEvents, eventTypes, selectedDate]);
+  }, [filteredEvents, selectedDate]);
 
   const handleDayPress = (day: { dateString: string }) => {
     const date = day.dateString;
@@ -152,10 +187,7 @@ const CalendarViewAll: React.FC = () => {
   };
 
   const renderFilterItem = ({ item }: { item: string }) => (
-    <TouchableOpacity
-      style={styles.filterItem}
-      onPress={() => toggleFilter(item)}
-    >
+    <TouchableOpacity style={styles.filterItem} onPress={() => toggleFilter(item)}>
       <Text style={styles.filterText}>{item}</Text>
       {tempFilters.includes(item) && (
         <MaterialIcons name="check" size={16} color="#007AFF" />
@@ -163,11 +195,47 @@ const CalendarViewAll: React.FC = () => {
     </TouchableOpacity>
   );
 
+  const renderCreatorFilterItem = ({ item }: { item: { id: number; name: string } }) => (
+    <TouchableOpacity
+      style={styles.filterItem}
+      onPress={() => toggleCreatorFilter(item.id.toString())}
+    >
+      <Text style={styles.filterText}>{item.name}</Text>
+      {tempCreatorFilters.includes(item.id.toString()) && (
+        <MaterialIcons name="check" size={16} color="#007AFF" />
+      )}
+    </TouchableOpacity>
+  );
+
+  const renderVerifiedFilterItem = ({ item }: { item: string }) => (
+    <TouchableOpacity
+      style={styles.filterItem}
+      onPress={() => toggleVerifiedFilter(item)}
+    >
+      <Text style={styles.filterText}>{t(item.toLowerCase())}</Text>
+      {tempVerifiedFilter === item && (
+        <MaterialIcons name="check" size={16} color="#007AFF" />
+      )}
+    </TouchableOpacity>
+  );
+
   const getFilterSummary = () => {
+    const parts = [];
     if (selectedFilters.includes("All")) {
-      return t("all");
+      parts.push(t("allTypes"));
+    } else {
+      parts.push(selectedFilters.join(", ") || t("none"));
     }
-    return selectedFilters.join(", ") || t("none");
+    if (selectedCreatorFilters.includes("All")) {
+      parts.push(t("allCreators"));
+    } else {
+      const creatorNames = selectedCreatorFilters
+        .map((id) => users.find((u) => u.id.toString() === id)?.name || id)
+        .join(", ");
+      parts.push(creatorNames || t("none"));
+    }
+    parts.push(t(verifiedFilter.toLowerCase()));
+    return parts.join(" | ");
   };
 
   const openPhotoModal = (uri: string) => {
@@ -222,6 +290,8 @@ const CalendarViewAll: React.FC = () => {
           style={styles.filterButton}
           onPress={() => {
             setTempFilters(selectedFilters);
+            setTempCreatorFilters(selectedCreatorFilters);
+            setTempVerifiedFilter(verifiedFilter);
             setFilterModalVisible(true);
           }}
         >
@@ -234,7 +304,7 @@ const CalendarViewAll: React.FC = () => {
         onMonthChange={handleMonthChange}
         markedDates={markedDates}
         markingType={"multi-dot"}
-        locale={language} // Set locale dynamically
+        locale={language}
         theme={{
           selectedDayBackgroundColor: "#007AFF",
           todayTextColor: "#007AFF",
@@ -260,6 +330,17 @@ const CalendarViewAll: React.FC = () => {
                     <Text style={styles.eventText}>{t("date")}: {event.date}</Text>
                     <Text style={styles.eventText}>
                       {t("gotAt")}: {new Date(event.markedAt).toLocaleString()}
+                    </Text>
+                    <View style={styles.verifiedContainer}>
+                      <Text style={styles.eventText}>
+                        {t("verified")}: {event.is_verified ? t("yes") : t("no")}
+                      </Text>
+                      {event.is_verified && (
+                        <MaterialIcons name="check-circle" size={16} color="green" style={styles.verifiedIcon} />
+                      )}
+                    </View>
+                    <Text style={styles.eventText}>
+                      {t("createdBy")}: {event.creatorName ?? t("unknown")}
                     </Text>
                     {event.note && <Text style={styles.eventText}>{t("for")}: {event.note}</Text>}
                     {event.photoPath && (
@@ -287,9 +368,24 @@ const CalendarViewAll: React.FC = () => {
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>{t("selectFilters")}</Text>
+            <Text style={styles.filterSectionTitle}>{t("eventTypes")}</Text>
             <FlatList
               data={["All", ...eventTypes.map((type) => type.name)]}
               renderItem={renderFilterItem}
+              keyExtractor={(item) => item}
+              style={styles.filterList}
+            />
+            <Text style={styles.filterSectionTitle}>{t("creators")}</Text>
+            <FlatList
+              data={users}
+              renderItem={renderCreatorFilterItem}
+              keyExtractor={(item) => item.id.toString()}
+              style={styles.filterList}
+            />
+            <Text style={styles.filterSectionTitle}>{t("verificationStatus")}</Text>
+            <FlatList
+              data={["All", "Verified", "Unverified"]}
+              renderItem={renderVerifiedFilterItem}
               keyExtractor={(item) => item}
               style={styles.filterList}
             />
@@ -344,6 +440,7 @@ const styles = StyleSheet.create({
   filterSummary: {
     fontSize: 14,
     color: "#333",
+    flex: 1,
   },
   achievementCountText: {
     fontSize: 14,
@@ -365,7 +462,7 @@ const styles = StyleSheet.create({
     marginLeft: 5,
   },
   filterList: {
-    maxHeight: 300,
+    maxHeight: 150,
   },
   filterItem: {
     flexDirection: "row",
@@ -377,6 +474,12 @@ const styles = StyleSheet.create({
   filterText: {
     fontSize: 14,
     flex: 1,
+  },
+  filterSectionTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    marginTop: 10,
+    marginBottom: 5,
   },
   modalContainer: {
     flex: 1,
@@ -428,6 +531,13 @@ const styles = StyleSheet.create({
   },
   eventText: {
     fontSize: 14,
+  },
+  verifiedContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  verifiedIcon: {
+    marginLeft: 5,
   },
   eventPhoto: {
     width: 100,

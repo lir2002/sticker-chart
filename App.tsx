@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { StatusBar } from "expo-status-bar";
 import { NavigationContainer } from "@react-navigation/native";
 import { createStackNavigator } from "@react-navigation/stack";
@@ -8,6 +8,8 @@ import { RootStackParamList } from "./types";
 import CalendarViewAll from "./components/CalendarViewAll";
 import { LanguageProvider, useLanguage } from "./LanguageContext";
 import { LocaleConfig } from "react-native-calendars";
+import { UserProvider } from "./UserContext";
+import { initDatabase } from "./db/database";
 
 // Configure calendar locales for English and Chinese
 LocaleConfig.locales["en"] = {
@@ -100,31 +102,51 @@ LocaleConfig.defaultLocale = "en";
 const Stack = createStackNavigator<RootStackParamList>();
 
 export default function App() {
+  const [isDbInitialized, setIsDbInitialized] = useState(false);
+
+  useEffect(() => {
+    const initializeApp = async () => {
+      try {
+        await initDatabase();
+        setIsDbInitialized(true);
+      } catch (error) {
+        console.error("App initialization error:", error);
+      }
+    };
+    initializeApp();
+  }, []);
+
+  if (!isDbInitialized) {
+    return null;
+  }
+
   return (
     <LanguageProvider>
-      <NavigationContainer>
-        <Stack.Navigator initialRouteName="Home">
-          <Stack.Screen
-            name="Home"
-            component={HomeScreen}
-            options={() => {
-              const { t } = useLanguage(); // Use hook directly in options
-              return { title: t("title") };
-            }}
-          />
-          <Stack.Screen
-            name="Calendar"
-            component={CalendarView}
-            options={({ route }) => ({ title: `${route.params.eventType}` })}
-          />
-          <Stack.Screen
-            name="CalendarViewAll"
-            component={CalendarViewAll}
-            options={{ title: "All Stickers" }}
-          />
-        </Stack.Navigator>
-        <StatusBar style="auto" />
-      </NavigationContainer>
+      <UserProvider>
+        <NavigationContainer>
+          <Stack.Navigator initialRouteName="Home">
+            <Stack.Screen
+              name="Home"
+              component={HomeScreen}
+              options={() => {
+                const { t } = useLanguage(); // Use hook directly in options
+                return { title: t("title") };
+              }}
+            />
+            <Stack.Screen
+              name="Calendar"
+              component={CalendarView}
+              options={({ route }) => ({ title: `${route.params.eventType}` })}
+            />
+            <Stack.Screen
+              name="CalendarViewAll"
+              component={CalendarViewAll}
+              options={{ title: "All Stickers" }}
+            />
+          </Stack.Navigator>
+          <StatusBar style="auto" />
+        </NavigationContainer>
+      </UserProvider>
     </LanguageProvider>
   );
 }
