@@ -8,6 +8,11 @@ export interface Event {
   photoPath?: string; // Optional path to stored photo
   created_by?: number; // User ID of creator, references users(id)
   is_verified: number; // Verification status (0 or 1)
+  creatorName?: string | null;
+  weight: number;
+  verified_at?: string | null; // New field
+  verified_by?: number | null; // New field
+  verifierName?: string | null; // New field
 }
 
 // EventType interface for event_types table

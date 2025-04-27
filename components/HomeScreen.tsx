@@ -71,15 +71,15 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const [newUserName, setNewUserName] = useState("");
   const [newUserRoleId, setNewUserRoleId] = useState<number>(3); // Default to User
   const [isAddingEventType, setIsAddingEventType] = useState(false);
-  const [newUserPassword, setNewUserPassword] = useState<string>('0000');
-
+  const [newUserPassword, setNewUserPassword] = useState<string>("0000");
+  const [newFaceValue, setNewFaceValue] = useState("1"); // Default face value
 
   // Initialize database and user state
   useEffect(() => {
     const initialize = async () => {
       try {
         const needsPasswordSetup = await forceAdminPasswordSetup();
-        console.log("Current user:", currentUser?.name)
+        console.log("Current user:", currentUser?.name);
         if (needsPasswordSetup) {
           // Admin password not set, show CodeSetup
           setCurrentUser(null);
@@ -101,7 +101,16 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     };
 
     initialize();
-
+    const refreshEventType = async () => {
+      try {
+        const types = await getEventTypesWithOwner();
+        setEventTypes(types);
+      } catch (error) {
+        console.error("Failed to refresh Event Types", error);
+      }
+    };
+    const unsubscribe = navigation.addListener("focus", refreshEventType);
+    return unsubscribe;
   }, []);
 
   useEffect(() => {
@@ -131,11 +140,11 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   // Handle submitting event type from AddType Modal
   const handleSubmitEventType = async () => {
     if (!currentUser || !newTypeName.trim()) {
-      Alert.alert('Error', t('errorEmptyEventTypeName'));
+      Alert.alert("Error", t("errorEmptyEventTypeName"));
       return;
     }
     if (!selectedOwnerId) {
-      Alert.alert('Error', t('errorNoOwnerSelected'));
+      Alert.alert("Error", t("errorNoOwnerSelected"));
       return;
     }
     try {
@@ -149,15 +158,15 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       );
       const updatedTypes = await getEventTypesWithOwner();
       setEventTypes(updatedTypes);
-      setNewTypeName('');
-      setSelectedIcon('event');
-      setSelectedColor('#000000');
+      setNewTypeName("");
+      setSelectedIcon("event");
+      setSelectedColor("#000000");
       setAvailability(0);
       setSelectedOwnerId(users.filter((u) => u.role_id === 3)[0]?.id || null);
       setAddTypeModalVisible(false);
-      Alert.alert('Success', t('successAddEventType'));
+      Alert.alert("Success", t("successAddEventType"));
     } catch (error: any) {
-      Alert.alert('Error', `${t('errorAddEventType')}: ${error.message}`);
+      Alert.alert("Error", `${t("errorAddEventType")}: ${error.message}`);
     }
   };
 
@@ -169,15 +178,17 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       if (isAddingEventType) {
         setAddTypeModalVisible(true);
         setIsAddingEventType(false);
+      } else if (pendingEditUser) {
+        await handleVerifyEditUser();
       }
       setVerifyCodeModalVisible(false);
-      setInputCode('');
+      setInputCode("");
     } else {
-      Alert.alert('Error', t('invalidPassword'));
-      setInputCode('');
+      Alert.alert("Error", t("invalidPassword"));
+      setInputCode("");
     }
   };
-  
+
   // Handle code input for verification
   const handleCodeInputChange = (text: string) => {
     if (text.match(/^\d*$/)) {
@@ -247,28 +258,32 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   // Handle creating new user (admin only)
   const handleCreateUser = async () => {
     if (!newUserName.trim()) {
-      Alert.alert('Error', t('errorEmptyUsername'));
+      Alert.alert("Error", t("errorEmptyUsername"));
       return;
     }
     if (!newUserPassword.match(/^\d{4}$/)) {
-      Alert.alert('Error', t('errorInvalidPassword'));
+      Alert.alert("Error", t("errorInvalidPassword"));
       return;
     }
     try {
-      const newUserId = await createUser(newUserName, newUserRoleId, parseInt(newUserPassword));
+      const newUserId = await createUser(
+        newUserName,
+        newUserRoleId,
+        parseInt(newUserPassword)
+      );
       const newUser = await getUsers().then((users) =>
         users.find((u) => u.id === newUserId)
       );
       if (newUser) {
         setUsers([...users, newUser]);
-        setNewUserName('');
+        setNewUserName("");
         setNewUserRoleId(3);
-        setNewUserPassword('0000'); // Reset to default
+        setNewUserPassword("0000"); // Reset to default
         setEditUserModalVisible(false);
-        Alert.alert('Success', t('successCreateUser'));
+        Alert.alert("Success", t("successCreateUser"));
       }
     } catch (error) {
-      Alert.alert('Error', t('errorCreateUser'));
+      Alert.alert("Error", t("errorCreateUser"));
     }
   };
 
@@ -348,8 +363,13 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       }
     >
       <View style={styles.leftContainer}>
-        <MaterialIcons name={item.icon} size={24} color={item.iconColor} style={styles.icon} />
-        <Text style={styles.availabilityText}>{item.availability}</Text>
+        <MaterialIcons
+          name={item.icon}
+          size={24}
+          color={item.iconColor}
+          style={styles.icon}
+        />
+        <Text style={styles.weightText}>{item.weight}</Text>
         <Text style={styles.eventTypeText}>{item.name}</Text>
       </View>
       <Text style={styles.ownerText}>{item.ownerName ?? t("unknown")}</Text>
@@ -421,8 +441,11 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       <CustomButton
         title={t("viewAllStickers")}
         onPress={() => {
-          console.log('Navigating to CalendarViewAll, currentUser:', currentUser?.name);
-          navigation.navigate('CalendarViewAll');
+          console.log(
+            "Navigating to CalendarViewAll, currentUser:",
+            currentUser?.name
+          );
+          navigation.navigate("CalendarViewAll");
         }}
       />
       {currentUser.role_id === 1 && (
@@ -444,16 +467,16 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       >
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>{t('addNewEventType')}</Text>
+            <Text style={styles.modalTitle}>{t("addNewEventType")}</Text>
             <TextInput
               style={styles.input}
-              placeholder={t('namePlaceholder')}
+              placeholder={t("namePlaceholder")}
               maxLength={20}
               value={newTypeName}
               onChangeText={setNewTypeName}
               autoFocus
             />
-            <Text style={styles.iconLabel}>{t('selectIcon')}</Text>
+            <Text style={styles.iconLabel}>{t("selectIcon")}</Text>
             <ScrollView horizontal style={styles.iconPicker}>
               {availableIcons.map((icon) => (
                 <TouchableOpacity
@@ -468,7 +491,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                 </TouchableOpacity>
               ))}
             </ScrollView>
-            <Text style={styles.iconLabel}>{t('selectColor')}</Text>
+            <Text style={styles.iconLabel}>{t("selectColor")}</Text>
             <ScrollView horizontal style={styles.colorPicker}>
               {availableColors.map((color) => (
                 <TouchableOpacity
@@ -482,7 +505,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                 />
               ))}
             </ScrollView>
-            <Text style={styles.iconLabel}>{t('selectAvailability')}</Text>
+            <Text style={styles.iconLabel}>{t("selectAvailability")}</Text>
             <Picker
               selectedValue={availability}
               onValueChange={(value) => setAvailability(value)}
@@ -492,7 +515,21 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                 <Picker.Item key={i} label={`${i}`} value={i} />
               ))}
             </Picker>
-            <Text style={styles.iconLabel}>{t('selectOwner')}</Text>
+            <Text style={styles.faceValueLabel}>{t("faceValue")}</Text>
+            <Picker
+              selectedValue={newFaceValue}
+              onValueChange={(value) => setNewFaceValue(value)}
+              style={styles.picker}
+            >
+              {[1, 2, 3, 4, 5].map((value) => (
+                <Picker.Item
+                  key={value}
+                  label={value.toString()}
+                  value={value.toString()}
+                />
+              ))}
+            </Picker>
+            <Text style={styles.iconLabel}>{t("selectOwner")}</Text>
             <Picker
               selectedValue={selectedOwnerId}
               onValueChange={(value) => setSelectedOwnerId(value)}
@@ -509,23 +546,25 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                   />
                 ))}
               {users.filter((u) => u.role_id === 3).length === 0 && (
-                <Picker.Item label={t('noOrdinaryUsers')} value={null} />
+                <Picker.Item label={t("noOrdinaryUsers")} value={null} />
               )}
             </Picker>
             <View style={styles.buttonContainerOk}>
               <Button
-                title={t('cancel')}
+                title={t("cancel")}
                 onPress={() => {
-                  setNewTypeName('');
-                  setSelectedIcon('event');
-                  setSelectedColor('#000000');
+                  setNewTypeName("");
+                  setSelectedIcon("event");
+                  setSelectedColor("#000000");
                   setAvailability(0);
-                  setSelectedOwnerId(users.filter((u) => u.role_id === 3)[0]?.id || null);
+                  setSelectedOwnerId(
+                    users.filter((u) => u.role_id === 3)[0]?.id || null
+                  );
                   setAddTypeModalVisible(false);
                 }}
               />
               <Button
-                title={t('add')}
+                title={t("add")}
                 onPress={handleSubmitEventType}
                 disabled={!newTypeName.trim() || !selectedOwnerId}
               />
@@ -544,14 +583,14 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>
               {pendingEditUser
-                ? t('verifyAdminForEdit')
+                ? t("verifyAdminForEdit")
                 : isAddingEventType
-                ? t('verifyAdminForAddEventType')
-                : t('enterVerificationCode')}
+                ? t("verifyAdminForAddEventType")
+                : t("enterVerificationCode")}
             </Text>
             <TextInput
               style={styles.input}
-              placeholder={t('codePlaceholder')}
+              placeholder={t("codePlaceholder")}
               keyboardType="numeric"
               maxLength={4}
               value={inputCode}
@@ -561,23 +600,23 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             />
             <View style={styles.buttonContainerOk}>
               <Button
-                title={t('cancel')}
+                title={t("cancel")}
                 onPress={() => {
                   setVerifyCodeModalVisible(false);
-                  setInputCode('');
+                  setInputCode("");
                   setPendingEditUser(null);
                   setSelectedUser(null);
                   setIsAddingEventType(false);
                 }}
               />
               <Button
-                title={t('verify')}
+                title={t("verify")}
                 onPress={
                   switchUserModalVisible && !isEditingUsers
                     ? handleVerifySwitchUser
                     : handleVerifyCode
                 }
-                disabled={inputCode.trim() === ''}
+                disabled={inputCode.trim() === ""}
               />
             </View>
           </View>
@@ -706,7 +745,17 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                       : handleSwitchUser(item)
                   }
                 >
-                  <Text>{item.name}</Text>
+                  <View style={styles.userItemContainer}>
+                    {item.icon ? (
+                      <Image
+                        source={{ uri: item.icon }}
+                        style={styles.userIcon}
+                      />
+                    ) : (
+                      <MaterialIcons name="person" size={24} color="#000" />
+                    )}
+                    <Text style={styles.userNameText}>{item.name}</Text>
+                  </View>
                 </TouchableOpacity>
               )}
               keyExtractor={(item) => item.id.toString()}
@@ -737,7 +786,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               onChangeText={setNewUserName}
               autoFocus
             />
-            <Text style={styles.iconLabel}>{t('selectUserRolePrompt')}</Text>
+            <Text style={styles.iconLabel}>{t("selectUserRolePrompt")}</Text>
             <Picker
               selectedValue={newUserRoleId}
               onValueChange={(value) => setNewUserRoleId(value)}
@@ -746,10 +795,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               <Picker.Item label="User" value={3} />
               <Picker.Item label="Admin" value={1} />
             </Picker>
-            <Text style={styles.iconLabel}>{t('initialPassword')}</Text>
+            <Text style={styles.iconLabel}>{t("initialPassword")}</Text>
             <TextInput
               style={styles.input}
-              placeholder={t('passwordPlaceholder')}
+              placeholder={t("passwordPlaceholder")}
               keyboardType="numeric"
               maxLength={4}
               value={newUserPassword}
@@ -761,9 +810,11 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               secureTextEntry
             />
             <Button
-              title={t('create')}
+              title={t("create")}
               onPress={handleCreateUser}
-              disabled={!newUserName.trim() || !newUserPassword.match(/^\d{4}$/)}
+              disabled={
+                !newUserName.trim() || !newUserPassword.match(/^\d{4}$/)
+              }
             />
           </View>
         </View>
@@ -796,7 +847,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             ) : (
               <MaterialIcons name="person" size={100} color="#000" />
             )}
-            <Button
+            <CustomButton
               title={t("changeIcon")}
               onPress={async () => {
                 const permission =
@@ -830,8 +881,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                 }
               }}
             />
-            <Button title={t("resetPassword")} onPress={handleResetPassword} />
-            <Button title={t("deleteUser")} onPress={handleDeleteUser} />
+            <CustomButton title={t("resetPassword")} onPress={handleResetPassword} />
+            <CustomButton title={t("deleteUser")} onPress={handleDeleteUser} />
           </View>
         </View>
       </Modal>
@@ -938,14 +989,19 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   buttonContainerOk: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
     width: "100%",
     marginTop: 10,
   },
   picker: {
     width: "100%",
     marginBottom: 10,
+  },
+  faceValueLabel: {
+    fontSize: 16,
+    marginBottom: 5,
+    alignSelf: "flex-start",
   },
   userIcon: {
     width: 30,
@@ -978,7 +1034,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
   },
-  availabilityText: {
+  weightText: {
     fontSize: 16,
     fontWeight: "bold",
     color: "#007AFF",
@@ -997,6 +1053,15 @@ const styles = StyleSheet.create({
     color: "#666",
     textAlign: "center",
     marginTop: 20,
+  },
+  userItemContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 5,
+  },
+  userNameText: {
+    fontSize: 16,
+    marginLeft: 10,
   },
 });
 

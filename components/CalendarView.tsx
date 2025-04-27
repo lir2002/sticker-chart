@@ -74,6 +74,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
   const [photoModalVisible, setPhotoModalVisible] = useState(false);
   const [selectedPhotoUri, setSelectedPhotoUri] = useState<string | null>(null);
   const [availability, setAvailability] = useState<number>(0);
+  const [weight, setWeight] = useState<number>(1);
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [newIcon, setNewIcon] = useState<string>("event");
   const [newIconColor, setNewIconColor] = useState<string>("#000000");
@@ -111,7 +112,6 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
   useEffect(() => {
     const initialize = async () => {
       try {
-        await initDatabase();
         // Fetch users for creator names
         const allUsers = await getUsers();
         setUsers(allUsers.map((u) => ({ id: u.id, name: u.name })));
@@ -125,6 +125,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
         if (type?.icon) setIcon(type.icon);
         if (type?.iconColor) setIconColor(type.iconColor);
         setAvailability(type?.availability || 0);
+        setWeight(type?.weight || 1);
         setEventTypeOwnerId(type?.owner || null);
         setNewIcon(type?.icon || "event");
         setNewIconColor(type?.iconColor || "#000000");
@@ -337,10 +338,8 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
     try {
       const isValid = await verifyUserCode(currentUser.id, parseInt(inputCode));
       if (isValid) {
-        await verifyEvent(pendingEventId);
-        const updatedEvents = events.map((e) =>
-          e.id === pendingEventId ? { ...e, is_verified: true } : e
-        );
+        await verifyEvent(pendingEventId, currentUser.id);
+        const updatedEvents = await fetchEventsWithCreator(eventType);
         setEvents(updatedEvents);
         setVerifyEventModalVisible(false);
         setInputCode("");
@@ -442,7 +441,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
   const showAskStickerButton =
     selectedDate &&
     (availability === 0 || selectedDateEvents.length < availability) &&
-    currentUser?.id === eventTypeOwnerId;
+    (currentUser?.id === eventTypeOwnerId || currentUser?.role_id === 1);
 
   if (!currentUser) {
     return (
@@ -456,14 +455,21 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
     <View style={styles.container}>
       <TouchableOpacity
         style={styles.titleContainer}
-        onPress={() => setEditModalVisible(true)}
+        onPress={() => {
+          if (currentUser.role_id === 1) {
+            setEditModalVisible(true);
+          }
+        }}
       >
-        <MaterialIcons
-          name={icon}
-          size={24}
-          color={iconColor}
-          style={styles.icon}
-        />
+        <View style={styles.leftContainer}>
+          <MaterialIcons
+            name={icon}
+            size={24}
+            color={iconColor}
+            style={styles.icon}
+          />
+          <Text style={styles.weightText}>{weight}</Text>
+        </View>
         <Text style={styles.title}>{eventType}</Text>
         <Text style={styles.achievementCountText}>
           {monthlyAchievementCount}
@@ -538,6 +544,17 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
                     {t("for")}: {String(event.note)}
                   </Text>
                 )}
+                {event.is_verified ? (
+                  <>
+                    <Text style={styles.eventText}>
+                      {t("verifiedAt")}:{" "}
+                      {new Date(event.verified_at!).toLocaleString()}
+                    </Text>
+                    <Text style={styles.eventText}>
+                      {t("verifiedBy")}: {event.verifierName ?? t("unknown")}
+                    </Text>
+                  </>
+                ): null}
                 {event.photoPath && (
                   <TouchableOpacity
                     onPress={() => openPhotoModal(event.photoPath)}
@@ -552,18 +569,28 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
             ))}
           </ScrollView>
         ) : (
-          <Text style={styles.noEventText}>
-            {selectedDate
-              ? `${t("noAchievement")} ${selectedDate}`
-              : t("noDateSelected")}
-          </Text>
+          <>
+            <Text style={styles.noEventText}>
+              {selectedDate
+                ? `${t("noAchievement")} ${selectedDate}`
+                : t("noDateSelected")}
+            </Text>
+            <Text style={styles.maxAchievementsText}>
+              {t("maxAchievements", {
+                availability:
+                  availability === 0 ? t("unlimited") : availability,
+              })}
+            </Text>
+          </>
         )}
         {showAskStickerButton && (
           <TouchableOpacity
             style={styles.markButton}
             onPress={handleAskSticker}
           >
-            <Text style={styles.markButtonText}>{t("askSticker")}</Text>
+            <Text style={styles.markButtonText}>
+              {currentUser.role_id === 1 ? t("giveSticker") : t("askSticker")}
+            </Text>
           </TouchableOpacity>
         )}
       </View>
@@ -576,7 +603,9 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
       >
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>{t("askSticker")}</Text>
+            <Text style={styles.modalTitle}>
+              {currentUser.role_id === 1 ? t("giveSticker") : t("askSticker")}
+            </Text>
             <TextInput
               style={styles.input}
               placeholder={t("codePlaceholder")}
@@ -774,6 +803,15 @@ const styles = StyleSheet.create({
   icon: {
     marginRight: 10,
   },
+  leftContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  weightText: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#666",
+  },
   achievementCountText: {
     fontSize: 18,
     fontWeight: "bold",
@@ -879,6 +917,12 @@ const styles = StyleSheet.create({
     color: "#666",
     textAlign: "center",
     marginBottom: 10,
+  },
+  maxAchievementsText: {
+    fontSize: 14,
+    color: "#666",
+    textAlign: "center",
+    marginTop: 10,
   },
   markButton: {
     backgroundColor: "#007AFF",

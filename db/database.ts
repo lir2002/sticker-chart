@@ -2,7 +2,7 @@ import * as SQLite from "expo-sqlite";
 import { Event, EventType, User } from "../types";
 
 // Current database version
-const CURRENT_DB_VERSION = 1;
+const CURRENT_DB_VERSION = 2; // Incremented from 1 to 2
 
 export const initDatabase = async () => {
   const db = await SQLite.openDatabaseAsync("eventmarker.db", { useNewConnection: true });
@@ -27,7 +27,7 @@ export const initDatabase = async () => {
       }
 
       if (currentVersion === 0) {
-        // First initialization: create all tables and insert initial data
+        // First initialization: create all tables
         await db.execAsync(`
           PRAGMA journal_mode = WAL;
 
@@ -51,9 +51,7 @@ export const initDatabase = async () => {
             is_active INTEGER NOT NULL DEFAULT 1,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL,
-            icon TEXT,createUser
-
-
+            icon TEXT,
             FOREIGN KEY (role_id) REFERENCES roles(role_id)
           );
 
@@ -76,7 +74,7 @@ export const initDatabase = async () => {
             FOREIGN KEY (owner) REFERENCES users(id)
           );
 
-          -- Create events table
+          -- Create events table with new fields
           CREATE TABLE IF NOT EXISTS events (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             date TEXT NOT NULL,
@@ -86,19 +84,21 @@ export const initDatabase = async () => {
             photoPath TEXT,
             created_by INTEGER,
             is_verified INTEGER NOT NULL DEFAULT 0,
+            verified_at TEXT, -- New field
+            verified_by INTEGER, -- New field
             FOREIGN KEY (eventType) REFERENCES event_types(name),
-            FOREIGN KEY (created_by) REFERENCES users(id)
+            FOREIGN KEY (created_by) REFERENCES users(id),
+            FOREIGN KEY (verified_by) REFERENCES users(id)
           );
         `);
 
-        // Check if old tables (event_types_old or events_old) exist for migration
+        // Check for old tables for migration
         const tables = await db.getAllAsync<{ name: string }>(
           "SELECT name FROM sqlite_master WHERE type='table';"
         );
         const tableNames = tables.map((t) => t.name);
 
         if (tableNames.includes("event_types_old") || tableNames.includes("events_old")) {
-          // Get admin user ID
           const adminUser = await db.getFirstAsync<{ id: number }>(
             "SELECT id FROM users WHERE name = 'Admin';"
           );
@@ -107,7 +107,7 @@ export const initDatabase = async () => {
             throw new Error("Failed to retrieve admin user ID");
           }
 
-          // Migrate event_types_old (if exists)
+          // Migrate event_types_old
           if (tableNames.includes("event_types_old")) {
             await db.execAsync(`
               INSERT INTO event_types (name, icon, iconColor, availability, owner, weight)
@@ -117,16 +117,25 @@ export const initDatabase = async () => {
             `);
           }
 
-          // Migrate events_old (if exists)
+          // Migrate events_old
           if (tableNames.includes("events_old")) {
             await db.execAsync(`
-              INSERT INTO events (id, date, markedAt, eventType, note, photoPath, created_by, is_verified)
-              SELECT id, date, markedAt, eventType, note, photoPath, ${adminId}, 0
+              INSERT INTO events (id, date, markedAt, eventType, note, photoPath, created_by, is_verified, verified_at, verified_by)
+              SELECT id, date, markedAt, eventType, note, photoPath, ${adminId}, 0, NULL, NULL
               FROM events_old;
               DROP TABLE IF EXISTS events_old;
             `);
           }
         }
+      }
+
+      // Migration for version 1 to 2
+      if (currentVersion === 1) {
+        await db.execAsync(`
+          ALTER TABLE events ADD COLUMN verified_at TEXT;
+          ALTER TABLE events ADD COLUMN verified_by INTEGER;
+          -- Add foreign key constraint for verified_by (cannot be added via ALTER, noted for schema)
+        `);
       }
 
       // Update version number
@@ -177,11 +186,22 @@ export const insertEvent = async (
   photoPath?: string,
   isVerified: boolean = false
 ) => {
-  const db = await SQLite.openDatabaseAsync("eventmarker.db", {useNewConnection: true});
+  const db = await SQLite.openDatabaseAsync("eventmarker.db", { useNewConnection: true });
   try {
     const result = await db.runAsync(
-      "INSERT INTO events (date, markedAt, eventType, created_by, note, photoPath, is_verified) VALUES (?, ?, ?, ?, ?, ?, ?);",
-      [date, markedAt, eventType, createdBy, note || null, photoPath || null, isVerified ? 1 : 0]
+      `INSERT INTO events (date, markedAt, eventType, created_by, note, photoPath, is_verified, verified_at, verified_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+      [
+        date,
+        markedAt,
+        eventType,
+        createdBy,
+        note || null,
+        photoPath || null,
+        isVerified ? 1 : 0,
+        null, // verified_at
+        null, // verified_by
+      ]
     );
     return result.lastInsertRowId || 0;
   } catch (error) {
@@ -192,10 +212,11 @@ export const insertEvent = async (
 };
 
 export const fetchEvents = async (eventType: string) => {
-  const db = await SQLite.openDatabaseAsync("eventmarker.db", {useNewConnection: true});
+  const db = await SQLite.openDatabaseAsync("eventmarker.db", { useNewConnection: true });
   try {
     const events = await db.getAllAsync<Event>(
-      "SELECT id, date, markedAt, eventType, note, photoPath, created_by, is_verified FROM events WHERE eventType = ?;",
+      `SELECT id, date, markedAt, eventType, note, photoPath, created_by, is_verified, verified_at, verified_by
+       FROM events WHERE eventType = ?;`,
       [eventType]
     );
     return events;
@@ -211,9 +232,11 @@ export const fetchEventsWithCreator = async (eventType: string) => {
   try {
     const events = await db.getAllAsync<Event>(
       `SELECT e.id, e.date, e.markedAt, e.eventType, e.note, e.photoPath, 
-              e.created_by, e.is_verified, u.name as creatorName
+              e.created_by, e.is_verified, e.verified_at, e.verified_by, 
+              u.name as creatorName, v.name as verifierName
        FROM events e
        LEFT JOIN users u ON e.created_by = u.id
+       LEFT JOIN users v ON e.verified_by = v.id
        WHERE e.eventType = ?;`,
       [eventType]
     );
@@ -230,9 +253,11 @@ export const fetchAllEventsWithCreator = async () => {
   try {
     const events = await db.getAllAsync<Event>(
       `SELECT e.id, e.date, e.markedAt, e.eventType, e.note, e.photoPath, 
-              e.created_by, e.is_verified, u.name as creatorName
+              e.created_by, e.is_verified, e.verified_at, e.verified_by, 
+              u.name as creatorName, v.name as verifierName
        FROM events e
-       LEFT JOIN users u ON e.created_by = u.id;`
+       LEFT JOIN users u ON e.created_by = u.id
+       LEFT JOIN users v ON e.verified_by = v.id;`
     );
     return events;
   } catch (error) {
@@ -243,14 +268,15 @@ export const fetchAllEventsWithCreator = async () => {
 };
 
 export const fetchAllEvents = async () => {
-  const db = await SQLite.openDatabaseAsync("eventmarker.db", {useNewConnection: true});
+  const db = await SQLite.openDatabaseAsync("eventmarker.db", { useNewConnection: true });
   try {
     const events = await db.getAllAsync<Event>(
-      "SELECT id, date, markedAt, eventType, note, photoPath, created_by, is_verified FROM events;"
+      `SELECT id, date, markedAt, eventType, note, photoPath, created_by, is_verified, verified_at, verified_by
+       FROM events;`
     );
     return events;
   } catch (error) {
-    throw new Error(`Failed to fetch all stickers: ${error}`);
+    throw new Error(`Failed to fetch all events: ${error}`);
   } finally {
     await db.closeAsync();
   }
@@ -270,11 +296,14 @@ export const deleteEvent = async (eventId: number): Promise<void> => {
   }
 };
 
-export const verifyEvent = async (eventId: number): Promise<void> => {
+export const verifyEvent = async (eventId: number, verifierId: number): Promise<void> => {
   const db = await SQLite.openDatabaseAsync("eventmarker.db", { useNewConnection: true });
-  console.log("Verifying event:", eventId);
+  console.log("Verifying event:", eventId, "by verifier:", verifierId);
   try {
-    await db.runAsync("UPDATE events SET is_verified = 1 WHERE id = ?;", [eventId]);
+    await db.runAsync(
+      `UPDATE events SET is_verified = 1, verified_at = ?, verified_by = ? WHERE id = ?;`,
+      [new Date().toISOString(), verifierId, eventId]
+    );
     console.log("Event verified:", eventId);
   } catch (error) {
     console.error("Error verifying event:", error);

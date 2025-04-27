@@ -21,7 +21,11 @@ import Animated, {
   withSpring,
 } from "react-native-reanimated";
 import { Event, EventType } from "../types";
-import { fetchAllEventsWithCreator, getEventTypes, getUsers } from "../db/database";
+import {
+  fetchAllEventsWithCreator,
+  getEventTypes,
+  getUsers,
+} from "../db/database";
 import { useLanguage } from "../LanguageContext";
 import { useNavigation } from "@react-navigation/native";
 
@@ -36,8 +40,12 @@ const CalendarViewAll: React.FC = () => {
   const [users, setUsers] = useState<{ id: number; name: string }[]>([]);
   const [selectedFilters, setSelectedFilters] = useState<string[]>(["All"]);
   const [tempFilters, setTempFilters] = useState<string[]>(["All"]);
-  const [selectedCreatorFilters, setSelectedCreatorFilters] = useState<string[]>(["All"]);
-  const [tempCreatorFilters, setTempCreatorFilters] = useState<string[]>(["All"]);
+  const [selectedCreatorFilters, setSelectedCreatorFilters] = useState<
+    string[]
+  >(["All"]);
+  const [tempCreatorFilters, setTempCreatorFilters] = useState<string[]>([
+    "All",
+  ]);
   const [verifiedFilter, setVerifiedFilter] = useState<string>("All");
   const [tempVerifiedFilter, setTempVerifiedFilter] = useState<string>("All");
   const [filterModalVisible, setFilterModalVisible] = useState(false);
@@ -46,9 +54,14 @@ const CalendarViewAll: React.FC = () => {
   const [selectedDateEvents, setSelectedDateEvents] = useState<Event[]>([]);
   const [photoModalVisible, setPhotoModalVisible] = useState(false);
   const [selectedPhotoUri, setSelectedPhotoUri] = useState<string | null>(null);
-  const [currentYear, setCurrentYear] = useState<number>(new Date().getFullYear());
-  const [currentMonth, setCurrentMonth] = useState<number>(new Date().getMonth() + 1);
-  const [monthlyAchievementCount, setMonthlyAchievementCount] = useState<number>(0);
+  const [currentYear, setCurrentYear] = useState<number>(
+    new Date().getFullYear()
+  );
+  const [currentMonth, setCurrentMonth] = useState<number>(
+    new Date().getMonth() + 1
+  );
+  const [monthlyAchievementCount, setMonthlyAchievementCount] =
+    useState<number>(0);
 
   const scale = useSharedValue(1);
   const savedScale = useSharedValue(1);
@@ -57,7 +70,11 @@ const CalendarViewAll: React.FC = () => {
   const savedTranslateX = useSharedValue(0);
   const savedTranslateY = useSharedValue(0);
 
-  const calculateMonthlyAchievements = (events: Event[], year: number, month: number) => {
+  const calculateMonthlyAchievements = (
+    events: Event[],
+    year: number,
+    month: number
+  ) => {
     const count = events.filter((event) => {
       const [eventYear, eventMonth] = event.date.split("-").map(Number);
       return eventYear === year && eventMonth === month;
@@ -100,8 +117,12 @@ const CalendarViewAll: React.FC = () => {
       const type = types.find((t) => t.name === event.eventType);
       const dotColor = type?.iconColor || "#000000";
       if (!marked[event.date]) {
-        marked[event.date] = { dots: [{ key: event.eventType, color: dotColor }] };
-      } else if (!marked[event.date].dots.some((dot: any) => dot.key === event.eventType)) {
+        marked[event.date] = {
+          dots: [{ key: event.eventType, color: dotColor }],
+        };
+      } else if (
+        !marked[event.date].dots.some((dot: any) => dot.key === event.eventType)
+      ) {
         marked[event.date].dots.push({ key: event.eventType, color: dotColor });
       }
     });
@@ -152,7 +173,9 @@ const CalendarViewAll: React.FC = () => {
 
     let filtered = events;
     if (!tempFilters.includes("All")) {
-      filtered = filtered.filter((event) => tempFilters.includes(event.eventType));
+      filtered = filtered.filter((event) =>
+        tempFilters.includes(event.eventType)
+      );
     }
     if (!tempCreatorFilters.includes("All")) {
       filtered = filtered.filter((event) =>
@@ -169,7 +192,9 @@ const CalendarViewAll: React.FC = () => {
 
   useEffect(() => {
     if (selectedDate) {
-      const dateEvents = filteredEvents.filter((event) => event.date === selectedDate);
+      const dateEvents = filteredEvents.filter(
+        (event) => event.date === selectedDate
+      );
       setSelectedDateEvents(dateEvents);
     }
   }, [filteredEvents, selectedDate]);
@@ -187,7 +212,10 @@ const CalendarViewAll: React.FC = () => {
   };
 
   const renderFilterItem = ({ item }: { item: string }) => (
-    <TouchableOpacity style={styles.filterItem} onPress={() => toggleFilter(item)}>
+    <TouchableOpacity
+      style={styles.filterItem}
+      onPress={() => toggleFilter(item)}
+    >
       <Text style={styles.filterText}>{item}</Text>
       {tempFilters.includes(item) && (
         <MaterialIcons name="check" size={16} color="#007AFF" />
@@ -195,7 +223,11 @@ const CalendarViewAll: React.FC = () => {
     </TouchableOpacity>
   );
 
-  const renderCreatorFilterItem = ({ item }: { item: { id: number; name: string } }) => (
+  const renderCreatorFilterItem = ({
+    item,
+  }: {
+    item: { id: number; name: string };
+  }) => (
     <TouchableOpacity
       style={styles.filterItem}
       onPress={() => toggleCreatorFilter(item.id.toString())}
@@ -262,8 +294,10 @@ const CalendarViewAll: React.FC = () => {
   const panGesture = Gesture.Pan()
     .onUpdate((event) => {
       if (scale.value > 1) {
-        translateX.value = savedTranslateX.value + event.translationX / scale.value;
-        translateY.value = savedTranslateY.value + event.translationY / scale.value;
+        translateX.value =
+          savedTranslateX.value + event.translationX / scale.value;
+        translateY.value =
+          savedTranslateY.value + event.translationY / scale.value;
       }
     })
     .onEnd(() => {
@@ -284,8 +318,12 @@ const CalendarViewAll: React.FC = () => {
   return (
     <View style={styles.container}>
       <View style={styles.filterHeader}>
-        <Text style={styles.filterSummary}>{t("filters")}: {getFilterSummary()}</Text>
-        <Text style={styles.achievementCountText}>{monthlyAchievementCount}</Text>
+        <Text style={styles.filterSummary}>
+          {t("filters")}: {getFilterSummary()}
+        </Text>
+        <Text style={styles.achievementCountText}>
+          {monthlyAchievementCount}
+        </Text>
         <TouchableOpacity
           style={styles.filterButton}
           onPress={() => {
@@ -314,7 +352,9 @@ const CalendarViewAll: React.FC = () => {
       <View style={styles.eventDisplay}>
         {selectedDateEvents.length > 0 ? (
           <ScrollView style={styles.eventScrollView}>
-            <Text style={styles.eventTitle}>{t("achievementsOn")} {selectedDate}</Text>
+            <Text style={styles.eventTitle}>
+              {t("achievementsOn")} {selectedDate}
+            </Text>
             {selectedDateEvents.map((event) => {
               const type = eventTypes.find((t) => t.name === event.eventType);
               return (
@@ -326,26 +366,57 @@ const CalendarViewAll: React.FC = () => {
                     style={styles.eventIcon}
                   />
                   <View>
-                    <Text style={styles.eventText}>{t("type")}: {event.eventType}</Text>
-                    <Text style={styles.eventText}>{t("date")}: {event.date}</Text>
+                    <Text style={styles.eventText}>
+                      {t("type")}: {event.eventType}
+                    </Text>
+                    <Text style={styles.eventText}>
+                      {t("date")}: {event.date}
+                    </Text>
                     <Text style={styles.eventText}>
                       {t("gotAt")}: {new Date(event.markedAt).toLocaleString()}
                     </Text>
                     <View style={styles.verifiedContainer}>
                       <Text style={styles.eventText}>
-                        {t("verified")}: {event.is_verified ? t("yes") : t("no")}
+                        {t("verified")}:{" "}
+                        {event.is_verified ? t("yes") : t("no")}
                       </Text>
                       {event.is_verified && (
-                        <MaterialIcons name="check-circle" size={16} color="green" style={styles.verifiedIcon} />
+                        <MaterialIcons
+                          name="check-circle"
+                          size={16}
+                          color="green"
+                          style={styles.verifiedIcon}
+                        />
                       )}
                     </View>
+                    {event.is_verified ? (
+                      <>
+                        <Text style={styles.eventText}>
+                          {t("verifiedAt")}:{" "}
+                          {new Date(event.verified_at!).toLocaleString()}
+                        </Text>
+                        <Text style={styles.eventText}>
+                          {t("verifiedBy")}:{" "}
+                          {event.verifierName ?? t("unknown")}
+                        </Text>
+                      </>
+                    ) : null}
                     <Text style={styles.eventText}>
                       {t("createdBy")}: {event.creatorName ?? t("unknown")}
                     </Text>
-                    {event.note && <Text style={styles.eventText}>{t("for")}: {event.note}</Text>}
+                    {event.note && (
+                      <Text style={styles.eventText}>
+                        {t("for")}: {event.note}
+                      </Text>
+                    )}
                     {event.photoPath && (
-                      <TouchableOpacity onPress={() => openPhotoModal(event.photoPath)}>
-                        <Image source={{ uri: event.photoPath }} style={styles.eventPhoto} />
+                      <TouchableOpacity
+                        onPress={() => openPhotoModal(event.photoPath)}
+                      >
+                        <Image
+                          source={{ uri: event.photoPath }}
+                          style={styles.eventPhoto}
+                        />
                       </TouchableOpacity>
                     )}
                   </View>
@@ -355,7 +426,9 @@ const CalendarViewAll: React.FC = () => {
           </ScrollView>
         ) : (
           <Text style={styles.noEventText}>
-            {selectedDate ? `${t("noEventsFor")} ${selectedDate}` : t("noDateSelected")}
+            {selectedDate
+              ? `${t("noEventsFor")} ${selectedDate}`
+              : t("noDateSelected")}
           </Text>
         )}
       </View>
@@ -382,7 +455,9 @@ const CalendarViewAll: React.FC = () => {
               keyExtractor={(item) => item.id.toString()}
               style={styles.filterList}
             />
-            <Text style={styles.filterSectionTitle}>{t("verificationStatus")}</Text>
+            <Text style={styles.filterSectionTitle}>
+              {t("verificationStatus")}
+            </Text>
             <FlatList
               data={["All", "Verified", "Unverified"]}
               renderItem={renderVerifiedFilterItem}
