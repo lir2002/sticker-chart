@@ -38,6 +38,8 @@ import { LocaleConfig } from "react-native-calendars";
 import { availableColors, availableIcons } from "../icons";
 import { UserContext } from "../UserContext";
 import { CustomButton } from "./SharedComponents";
+import BackupData from "./BackupData";
+import RestoreData from "./RestoreData";
 
 type HomeScreenNavigationProp = NativeStackNavigationProp<
   RootStackParamList,
@@ -73,6 +75,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const [isAddingEventType, setIsAddingEventType] = useState(false);
   const [newUserPassword, setNewUserPassword] = useState<string>("0000");
   const [newFaceValue, setNewFaceValue] = useState("1"); // Default face value
+  const [backupModalVisible, setBackupModalVisible] = useState(false);
+  const [restoreModalVisible, setRestoreModalVisible] = useState(false);
 
   // Initialize database and user state
   useEffect(() => {
@@ -164,7 +168,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       setAvailability(0);
       setSelectedOwnerId(users.filter((u) => u.role_id === 3)[0]?.id || null);
       setAddTypeModalVisible(false);
-      Alert.alert("Success", t("successAddEventType"));
+      Alert.alert(t("success"), t("successAddEventType"));
     } catch (error: any) {
       Alert.alert("Error", `${t("errorAddEventType")}: ${error.message}`);
     }
@@ -173,7 +177,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   // Verify admin password for adding event type or editing user
   const handleVerifyCode = async () => {
     if (!currentUser) return;
-    const isValid = await verifyUserCode(currentUser.id, parseInt(inputCode));
+    const isValid = await verifyUserCode(currentUser.id, inputCode);
     if (isValid) {
       if (isAddingEventType) {
         setAddTypeModalVisible(true);
@@ -242,7 +246,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   // Verify password for switching user
   const handleVerifySwitchUser = async () => {
     if (!selectedUser) return;
-    const isValid = await verifyUserCode(selectedUser.id, parseInt(inputCode));
+    const isValid = await verifyUserCode(selectedUser.id, inputCode);
     if (isValid) {
       setCurrentUser(selectedUser);
       setSwitchUserModalVisible(false);
@@ -269,7 +273,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       const newUserId = await createUser(
         newUserName,
         newUserRoleId,
-        parseInt(newUserPassword)
+        newUserPassword
       );
       const newUser = await getUsers().then((users) =>
         users.find((u) => u.id === newUserId)
@@ -280,7 +284,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         setNewUserRoleId(3);
         setNewUserPassword("0000"); // Reset to default
         setEditUserModalVisible(false);
-        Alert.alert("Success", t("successCreateUser"));
+        Alert.alert(t("success"), t("successCreateUser"));
       }
     } catch (error) {
       Alert.alert("Error", t("errorCreateUser"));
@@ -300,7 +304,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   // Verify admin password for editing user
   const handleVerifyEditUser = async () => {
     if (!currentUser || !pendingEditUser) return;
-    const isValid = await verifyUserCode(currentUser.id, parseInt(inputCode));
+    const isValid = await verifyUserCode(currentUser.id, inputCode);
     if (isValid) {
       setSelectedUser(pendingEditUser);
       setEditUserModalVisible(true);
@@ -318,12 +322,12 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const handleResetPassword = async () => {
     if (!selectedUser) return;
     try {
-      await resetUserCode(selectedUser.id, 0);
+      await resetUserCode(selectedUser.id, "0000");
       const updatedUsers = users.map((u) =>
-        u.id === selectedUser.id ? { ...u, code: 0 } : u
+        u.id === selectedUser.id ? { ...u, code: "0000" } : u
       );
       setUsers(updatedUsers);
-      Alert.alert("Success", t("passwordReset"));
+      Alert.alert(t("success"), t("passwordReset"));
     } catch (error) {
       Alert.alert("Error", t("errorResetPassword"));
     }
@@ -408,7 +412,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           try {
             const adminUser = await getUserByName("Admin");
             if (adminUser) {
-              await updateUserCode(adminUser.id, parseInt(newCode));
+              await updateUserCode(adminUser.id, newCode);
               setCurrentUser(adminUser);
             }
           } catch (error) {
@@ -449,10 +453,20 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         }}
       />
       {currentUser.role_id === 1 && (
-        <CustomButton
-          title={t("newAchievementType")}
-          onPress={handleAddEventType}
-        />
+        <>
+          <CustomButton
+            title={t("newAchievementType")}
+            onPress={handleAddEventType}
+          />
+          <CustomButton
+            title={t("backupData")}
+            onPress={() => setBackupModalVisible(true)}
+          />
+          <CustomButton
+            title={t("restoreData")}
+            onPress={() => setRestoreModalVisible(true)}
+          />
+        </>
       )}
       <CustomButton
         title={language === "en" ? "切换到中文" : "Switch to English"}
@@ -732,7 +746,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             <Text style={styles.modalTitle}>{t("userList")}</Text>
             <FlatList
               data={
-                currentUser.role_id !== 2
+                currentUser.role_id !== 2 && !isEditingUsers
                   ? users
                   : users.filter((u) => u.name !== "Guest")
               }
@@ -881,8 +895,50 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                 }
               }}
             />
-            <CustomButton title={t("resetPassword")} onPress={handleResetPassword} />
+            <CustomButton
+              title={t("resetPassword")}
+              onPress={handleResetPassword}
+            />
             <CustomButton title={t("deleteUser")} onPress={handleDeleteUser} />
+          </View>
+        </View>
+      </Modal>
+      {/* Backup Data Modal */}
+      <Modal
+        visible={backupModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setBackupModalVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => setBackupModalVisible(false)}
+            >
+              <MaterialIcons name="close" size={24} color="#000" />
+            </TouchableOpacity>
+            <BackupData onClose={() => setBackupModalVisible(false)} />
+          </View>
+        </View>
+      </Modal>
+
+      {/* Restore Data Modal */}
+      <Modal
+        visible={restoreModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setRestoreModalVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => setRestoreModalVisible(false)}
+            >
+              <MaterialIcons name="close" size={24} color="#000" />
+            </TouchableOpacity>
+            <RestoreData onClose={() => setRestoreModalVisible(false)} />
           </View>
         </View>
       </Modal>

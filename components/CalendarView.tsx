@@ -250,7 +250,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
       return;
     }
     try {
-      const isValid = await verifyUserCode(currentUser.id, parseInt(inputCode));
+      const isValid = await verifyUserCode(currentUser.id, inputCode);
       if (isValid) {
         const markedAt = new Date().toISOString();
         if (pendingDate) {
@@ -307,7 +307,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
   const handleVerifyDelete = async () => {
     if (!currentUser || !pendingEventId) return;
     try {
-      const isValid = await verifyUserCode(currentUser.id, parseInt(inputCode));
+      const isValid = await verifyUserCode(currentUser.id, inputCode);
       if (isValid) {
         await deleteEvent(pendingEventId);
         const updatedEvents = events.filter((e) => e.id !== pendingEventId);
@@ -317,7 +317,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
         setDeleteModalVisible(false);
         setInputCode("");
         setPendingEventId(null);
-        Alert.alert("Success", t("eventDeleted"));
+        Alert.alert(t("success"), t("eventDeleted"));
       } else {
         Alert.alert("Error", t("errorIncorrectCode"));
         setInputCode("");
@@ -336,7 +336,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
   const handleConfirmVerifyEvent = async () => {
     if (!currentUser || !pendingEventId) return;
     try {
-      const isValid = await verifyUserCode(currentUser.id, parseInt(inputCode));
+      const isValid = await verifyUserCode(currentUser.id, inputCode);
       if (isValid) {
         await verifyEvent(pendingEventId, currentUser.id);
         const updatedEvents = await fetchEventsWithCreator(eventType);
@@ -344,7 +344,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
         setVerifyEventModalVisible(false);
         setInputCode("");
         setPendingEventId(null);
-        Alert.alert("Success", t("eventVerified"));
+        Alert.alert(t("success"), t("eventVerified"));
       } else {
         Alert.alert("Error", t("errorIncorrectCode"));
         setInputCode("");

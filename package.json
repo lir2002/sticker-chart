@@ -1,11 +1,11 @@
 {
   "name": "stickerchart",
   "version": "1.1.0",
-	"license": "MIT",
-	"author": {
-		"name": "Ethan Li",
-		"email": "lir2002@gmail.com"
-	},
+  "license": "MIT",
+  "author": {
+    "name": "Ethan Li",
+    "email": "lir2002@gmail.com"
+  },
   "main": "index.ts",
   "scripts": {
     "start": "expo start",
@@ -26,6 +26,7 @@
     "expo-image-picker": "~16.0.6",
     "expo-sqlite": "~15.1.4",
     "expo-status-bar": "~2.0.1",
+    "jszip": "^3.10.1",
     "react": "18.3.1",
     "react-native": "0.76.9",
     "react-native-calendars": "^1.1311.0",

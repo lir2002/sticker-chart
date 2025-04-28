@@ -22,7 +22,7 @@ const ChangeCode: React.FC<ChangeCodeProps> = ({ onCodeChanged, onCancel }) => {
       return;
     }
 
-    const isValidOldCode = await verifyUserCode(currentUser.id, parseInt(oldCode));
+    const isValidOldCode = await verifyUserCode(currentUser.id, oldCode);
     if (!isValidOldCode) {
       Alert.alert(t('error'), t('errorIncorrectOldCode'));
       return;
@@ -39,7 +39,7 @@ const ChangeCode: React.FC<ChangeCodeProps> = ({ onCodeChanged, onCancel }) => {
     }
 
     try {
-      await updateUserCode(currentUser.id, parseInt(newCode));
+      await updateUserCode(currentUser.id, newCode);
       Alert.alert(t('success'), t('successUpdateCode'));
       onCodeChanged();
     } catch (error) {

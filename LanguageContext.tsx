@@ -20,10 +20,16 @@ const translations: Translations = {
   changeCode: { en: "Change Code", zh: "更改密码" },
   noEventTypes: { en: "No achievement types yet.", zh: "暂无成就类型。" },
   addNewEventType: { en: "Add New Achievement Type", zh: "添加新成就类型" },
-  namePlaceholder: { en: "Name (max 20 chars, any visible)", zh: "名称（最多20个字符，任意可见）" },
+  namePlaceholder: {
+    en: "Name (max 20 chars, any visible)",
+    zh: "名称（最多20个字符，任意可见）",
+  },
   selectIcon: { en: "Select Icon", zh: "选择图标" },
   selectColor: { en: "Select Icon Color", zh: "选择图标颜色" },
-  selectAvailability: { en: "Select Max Times per Day (0 means no limits)", zh: "选择每日最大次数（0表示不受限制）" },
+  selectAvailability: {
+    en: "Select Max Times per Day (0 means no limits)",
+    zh: "选择每日最大次数（0表示不受限制）",
+  },
   cancel: { en: "Cancel", zh: "取消" },
   confirm: { en: "Confirm", zh: "确认" },
   add: { en: "Add", zh: "添加" },
@@ -42,13 +48,28 @@ const translations: Translations = {
   verify: { en: "Verify", zh: "认证" },
   editIconColor: { en: "Edit Icon and Color", zh: "编辑图标和颜色" },
   save: { en: "Save", zh: "保存" },
-  permissionDeniedGallery: { en: "Permission Denied: Please grant gallery access to upload photos.", zh: "权限拒绝：请授予图库访问权限以上传照片。" },
-  permissionDeniedCamera: { en: "Permission Denied: Please grant camera access to take photos.", zh: "权限拒绝：请授予相机访问权限以拍摄照片。" },
-  errorInitCalendar: { en: "Failed to initialize calendar.", zh: "无法初始化日历。" },
+  permissionDeniedGallery: {
+    en: "Permission Denied: Please grant gallery access to upload photos.",
+    zh: "权限拒绝：请授予图库访问权限以上传照片。",
+  },
+  permissionDeniedCamera: {
+    en: "Permission Denied: Please grant camera access to take photos.",
+    zh: "权限拒绝：请授予相机访问权限以拍摄照片。",
+  },
+  errorInitCalendar: {
+    en: "Failed to initialize calendar.",
+    zh: "无法初始化日历。",
+  },
   errorMarkEvent: { en: "Failed to Give a Sticker", zh: "无法给予贴纸" },
   errorProcessImage: { en: "Failed to process image.", zh: "无法处理图像。" },
-  errorIncorrectCode: { en: "Incorrect verification code.", zh: "认证密码不正确。" },
-  errorUpdateIconColor: { en: "Failed to update icon and color.", zh: "无法更新图标和颜色。" },
+  errorIncorrectCode: {
+    en: "Incorrect verification code.",
+    zh: "认证密码不正确。",
+  },
+  errorUpdateIconColor: {
+    en: "Failed to update icon and color.",
+    zh: "无法更新图标和颜色。",
+  },
   filters: { en: "Filters", zh: "筛选" },
   filterEvents: { en: "Filter Events", zh: "筛选成就" },
   selectFilters: { en: "Select Filters", zh: "选择筛选" },
@@ -61,14 +82,26 @@ const translations: Translations = {
   enterNewCode: { en: "Enter new 4-digit code", zh: "输入新的4位密码" },
   confirmNewCode: { en: "Confirm new 4-digit code", zh: "确认新的4位密码" },
   errorIncorrectOldCode: { en: "Incorrect old code.", zh: "旧密码不正确。" },
-  errorInvalidNewCode: { en: "New code must be 4 digits.", zh: "新密码必须为4位数字。" },
+  errorInvalidNewCode: {
+    en: "New code must be 4 digits.",
+    zh: "新密码必须为4位数字。",
+  },
   errorCodesDoNotMatch: { en: "New codes do not match.", zh: "新密码不匹配。" },
   errorUpdateCode: { en: "Failed to update code.", zh: "无法更新密码。" },
-  successUpdateCode: { en: "Verification code updated.", zh: "认证密码已更新。" },
+  successUpdateCode: {
+    en: "Verification code updated.",
+    zh: "认证密码已更新。",
+  },
   enterVerificationCode: { en: "Enter Your Password", zh: "输入你的密码" },
-  errorAddEventType: { en: "Failed to add achievement type", zh: "添加成就类型失败" },
+  errorAddEventType: {
+    en: "Failed to add achievement type",
+    zh: "添加成就类型失败",
+  },
   setAdminCode: { en: "Set Admin Password", zh: "设置管理员密码" },
-  errorInvalidCode: { en: "Please enter a 4-digit code", zh: "请输入4位数字密码" },
+  errorInvalidCode: {
+    en: "Please enter a 4-digit code",
+    zh: "请输入4位数字密码",
+  },
   errorCodeMismatch: { en: "Codes do not match", zh: "密码不匹配" },
   errorSaveCode: { en: "Failed to save code", zh: "保存密码失败" },
   userProfile: { en: "User Profile", zh: "用户资料" },
@@ -83,15 +116,20 @@ const translations: Translations = {
   errorCreateUser: { en: "Failed to create user", zh: "创建用户失败" },
   errorUpdateUser: { en: "Failed to update user", zh: "更新用户失败" },
   userNamePlaceholder: { en: "Enter user name", zh: "输入用户名" },
-  errorAdminOnly: { en: "Admin only", zh: "仅限管理员" },
   exitApp: { en: "Exit App", zh: "退出应用" },
   errorCloseDatabase: { en: "Failed to close database", zh: "关闭数据库失败" },
   login: { en: "Login", zh: "登录" },
   deleteUser: { en: "Delete User", zh: "删除用户" },
   resetPassword: { en: "Reset Password", zh: "重置密码" },
-  cannotDeleteUser: { en: "Cannot delete user with associated event types", zh: "无法删除拥有关联事件类型的用户" },
+  cannotDeleteUser: {
+    en: "Cannot delete user with associated event types",
+    zh: "无法删除拥有关联事件类型的用户",
+  },
   modifyPassword: { en: "Modify Password", zh: "修改密码" },
-  selectImagePermission: { en: "Permission to access photos required", zh: "需要访问照片的权限" },
+  selectImagePermission: {
+    en: "Permission to access photos required",
+    zh: "需要访问照片的权限",
+  },
   invalidPassword: { en: "Invalid password", zh: "密码无效" },
   userList: { en: "User List", zh: "用户列表" },
   errorInitialize: { en: "Failed to initialize app", zh: "初始化应用失败" },
@@ -101,22 +139,49 @@ const translations: Translations = {
   errorDeleteUser: { en: "Failed to delete user", zh: "删除用户失败" },
   errorSetPassword: { en: "Failed to set password", zh: "设置密码失败" },
   setAdminPassword: { en: "Set Admin Password", zh: "设置管理员密码" },
-  verifyAdminForEdit: { en: "Enter Your Password to Edit User", zh: "输入您的密码以编辑用户" },
-  verifyAdminForAddEventType: { en: "Enter Your Password to Add Event Type", zh: "输入您的密码以添加事件类型" },
+  verifyAdminForEdit: {
+    en: "Enter Your Password to Edit User",
+    zh: "输入您的密码以编辑用户",
+  },
+  verifyAdminForAddEventType: {
+    en: "Enter Your Password to Add Event Type",
+    zh: "输入您的密码以添加事件类型",
+  },
   selectUserToEdit: { en: "Select User to Edit", zh: "选择要编辑的用户" },
-  errorEmptyEventTypeName: { en: "Event type name cannot be empty", zh: "事件类型名称不能为空" },
-  successAddEventType: { en: "Event type added successfully", zh: "事件类型添加成功" },
+  errorEmptyEventTypeName: {
+    en: "Event type name cannot be empty",
+    zh: "事件类型名称不能为空",
+  },
+  successAddEventType: {
+    en: "Event type added successfully",
+    zh: "事件类型添加成功",
+  },
   selectOwner: { en: "Select Owner", zh: "选择拥有者" },
-  noOrdinaryUsers: { en: "No ordinary users available", zh: "没有可用的普通用户" },
-  errorNoOwnerSelected: { en: "Please select an owner", zh: "请选择一个拥有者" },
-  selectOwnerSubtitle: { en: "Select an ordinary user to own this event type", zh: "选择一个普通用户作为此事件类型的拥有者" },
+  noOrdinaryUsers: {
+    en: "No ordinary users available",
+    zh: "没有可用的普通用户",
+  },
+  errorNoOwnerSelected: {
+    en: "Please select an owner",
+    zh: "请选择一个拥有者",
+  },
+  selectOwnerSubtitle: {
+    en: "Select an ordinary user to own this event type",
+    zh: "选择一个普通用户作为此事件类型的拥有者",
+  },
   selectUserRolePrompt: {
     en: "Select the user's role: Admin has full access, User has limited access",
-    zh: "选择用户角色：管理员拥有全部权限，用户拥有有限权限"
+    zh: "选择用户角色：管理员拥有全部权限，用户拥有有限权限",
   },
   initialPassword: { en: "Initial Password", zh: "初始密码" },
-  passwordPlaceholder: { en: "Enter 4-digit password (default: 0000)", zh: "输入4位密码（默认：0000）" },
-  errorInvalidPassword: { en: "Password must be a 4-digit number", zh: "密码必须为4位数字" },
+  passwordPlaceholder: {
+    en: "Enter 4-digit password (default: 0000)",
+    zh: "输入4位密码（默认：0000）",
+  },
+  errorInvalidPassword: {
+    en: "Password must be a 4-digit number",
+    zh: "密码必须为4位数字",
+  },
   successCreateUser: { en: "User created successfully", zh: "用户创建成功" },
   askSticker: { en: "Ask for a Sticker", zh: "要一个贴纸" },
   createdBy: { en: "Created By", zh: "创建者" },
@@ -143,19 +208,59 @@ const translations: Translations = {
   none: { en: "None", zh: "无" },
   errorInit: { en: "Failed to initialize", zh: "初始化失败" },
   faceValue: { en: "Face Value", zh: "面值" },
-  giveSticker:{ en: "Give a Sticker", zh: "给一个贴纸"},
+  giveSticker: { en: "Give a Sticker", zh: "给一个贴纸" },
   maxAchievements: {
     en: "Maximum achievements for one day: {availability}",
     zh: "每日可得最大成就数: {availability}",
   },
-  unlimited: { en: "Unlimited", zh: "无限制"},
+  unlimited: { en: "Unlimited", zh: "无限制" },
   verifiedAt: { en: "Verified At", zh: "认证时间" },
   verifiedBy: { en: "Verified By", zh: "认证人" },
+  passwordReset: { en: "Reset Password", zh: "重置密码" },
+  success: { en: "Success", zh: "成功" },
+  backupData: { en: "Backup Data", zh: "备份数据" },
+  restoreData: { en: "Restore Data", zh: "恢复数据" },
+  backup: { en: "Backup", zh: "备份" },
+  backupComplete: { en: "Backup completed at: ", zh: "备份完成，路径： " },
+  errorBackup: { en: "Failed to backup data", zh: "备份数据失败" },
+  restore: { en: "Restore", zh: "恢复" },
+  restoreComplete: { en: "Data restored successfully", zh: "数据恢复成功" },
+  errorRestore: { en: "Failed to restore data", zh: "恢复数据失败" },
+  selectBackupFile: {
+    en: "Please select a backup file",
+    zh: "请选择一个备份文件",
+  },
+  noBackupFiles: { en: "No backup files found", zh: "未找到备份文件" },
+  errorLoadBackups: {
+    en: "Failed to load backup files",
+    zh: "加载备份文件失败",
+  },
+  errorSelectDirectory: {
+    en: "Failed to select directory",
+    zh: "选择目录失败",
+  },
+  deleteBackups: { en: "Delete Backups", zh: "删除备份" },
+  selectBackups: { en: "Select backups to delete", zh: "选择要删除的备份" },
+  confirmDelete: { en: "Confirm Delete", zh: "确认删除" },
+  noBackups: { en: "No backups found", zh: "未找到备份" },
+  restartApp: { en: "Please restart the app to load the restored data", zh: "请重启应用以加载恢复的数据" },
+  info: { en: "Information", zh: "信息" },
+  deleteSuccess: { en: "Selected backups deleted", zh: "已删除选中的备份" },
+  deleteError: { en: "Failed to delete backups", zh: "删除备份失败" },
+  upload: { en: "Upload", zh: "上传" },
+  uploadBackup: { en: "Upload Backup", zh: "上传备份" },
+  selectBackup: { en: "Select a backup", zh: "选择一个备份" },
+  uploadSuccess: { en: "Backup uploaded successfully", zh: "备份上传成功" },
+  uploadError: { en: "Failed to upload backup", zh: "上传备份失败" },
 };
 
-const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
+const LanguageContext = createContext<LanguageContextType | undefined>(
+  undefined
+);
 
-export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
   const [language, setLanguage] = useState<Language>("en");
 
   useEffect(() => {
@@ -190,7 +295,9 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   return (
-    <LanguageContext.Provider value={{ language, setLanguage: handleSetLanguage, t }}>
+    <LanguageContext.Provider
+      value={{ language, setLanguage: handleSetLanguage, t }}
+    >
       {children}
     </LanguageContext.Provider>
   );

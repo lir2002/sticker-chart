@@ -2,7 +2,7 @@ import * as SQLite from "expo-sqlite";
 import { Event, EventType, User } from "../types";
 
 // Current database version
-const CURRENT_DB_VERSION = 2; // Incremented from 1 to 2
+const CURRENT_DB_VERSION = 3; // Incremented from 2 to 3
 
 export const initDatabase = async () => {
   const db = await SQLite.openDatabaseAsync("eventmarker.db", { useNewConnection: true });
@@ -42,12 +42,12 @@ export const initDatabase = async () => {
           INSERT OR IGNORE INTO roles (role_name) VALUES ('Guest');
           INSERT OR IGNORE INTO roles (role_name) VALUES ('User');
 
-          -- Create users table
+          -- Create users table with code as TEXT
           CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
             role_id INTEGER NOT NULL,
-            code INTEGER NOT NULL,
+            code TEXT NOT NULL,
             is_active INTEGER NOT NULL DEFAULT 1,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL,
@@ -57,11 +57,11 @@ export const initDatabase = async () => {
 
           -- Insert initial admin user
           INSERT OR IGNORE INTO users (name, role_id, code, is_active, created_at, updated_at, icon)
-          VALUES ('Admin', 1, 0, 1, '${new Date().toISOString()}', '${new Date().toISOString()}', NULL);
+          VALUES ('Admin', 1, '0000', 1, '${new Date().toISOString()}', '${new Date().toISOString()}', NULL);
 
           -- Insert initial Guest user
           INSERT OR IGNORE INTO users (name, role_id, code, is_active, created_at, updated_at, icon)
-          VALUES ('Guest', 2, 0, 1, '${new Date().toISOString()}', '${new Date().toISOString()}', NULL);
+          VALUES ('Guest', 2, '0000', 1, '${new Date().toISOString()}', '${new Date().toISOString()}', NULL);
 
           -- Create event_types table
           CREATE TABLE IF NOT EXISTS event_types (
@@ -84,8 +84,8 @@ export const initDatabase = async () => {
             photoPath TEXT,
             created_by INTEGER,
             is_verified INTEGER NOT NULL DEFAULT 0,
-            verified_at TEXT, -- New field
-            verified_by INTEGER, -- New field
+            verified_at TEXT,
+            verified_by INTEGER,
             FOREIGN KEY (eventType) REFERENCES event_types(name),
             FOREIGN KEY (created_by) REFERENCES users(id),
             FOREIGN KEY (verified_by) REFERENCES users(id)
@@ -134,7 +134,35 @@ export const initDatabase = async () => {
         await db.execAsync(`
           ALTER TABLE events ADD COLUMN verified_at TEXT;
           ALTER TABLE events ADD COLUMN verified_by INTEGER;
-          -- Add foreign key constraint for verified_by (cannot be added via ALTER, noted for schema)
+        `);
+      }
+
+      // Migration for version 2 to 3: Convert users.code from INTEGER to TEXT
+      if (currentVersion === 2) {
+        // Create a new table with code as TEXT
+        await db.execAsync(`
+          CREATE TABLE IF NOT EXISTS users_new (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            role_id INTEGER NOT NULL,
+            code TEXT NOT NULL,
+            is_active INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            icon TEXT,
+            FOREIGN KEY (role_id) REFERENCES roles(role_id)
+          );
+
+          -- Migrate data, convert code to 4-digit string with leading zeros
+          INSERT INTO users_new (id, name, role_id, code, is_active, created_at, updated_at, icon)
+          SELECT id, name, role_id, printf('%04d', code), is_active, created_at, updated_at, icon
+          FROM users;
+
+          -- Drop old users table
+          DROP TABLE users;
+
+          -- Rename new table to users
+          ALTER TABLE users_new RENAME TO users;
         `);
       }
 
@@ -369,14 +397,15 @@ export const updateEventType = async (
   }
 };
 
+// Update getUsers to return code as string
 export const getUsers = async () => {
-  const db = await SQLite.openDatabaseAsync("eventmarker.db", {useNewConnection: true});
+  const db = await SQLite.openDatabaseAsync("eventmarker.db", { useNewConnection: true });
   try {
     const users = await db.getAllAsync<{
       id: number;
       name: string;
       role_id: number;
-      code: number;
+      code: string;
       is_active: number;
       created_at: string;
       updated_at: string;
@@ -392,16 +421,17 @@ export const getUsers = async () => {
   }
 };
 
+// Update forceAdminPasswordSetup to check code as string
 export const forceAdminPasswordSetup = async (): Promise<boolean> => {
-  const db = await SQLite.openDatabaseAsync("eventmarker.db", {useNewConnection: true});
+  const db = await SQLite.openDatabaseAsync("eventmarker.db", { useNewConnection: true });
   try {
-    const admin = await db.getFirstAsync<{ code: number }>(
+    const admin = await db.getFirstAsync<{ code: string }>(
       "SELECT code FROM users WHERE name = 'Admin';"
     );
     if (!admin) {
       throw new Error("Admin user not found");
     }
-    return admin.code === 0;
+    return admin.code === "0000";
   } catch (error) {
     throw new Error(`Failed to check admin password: ${error}`);
   } finally {
@@ -409,8 +439,12 @@ export const forceAdminPasswordSetup = async (): Promise<boolean> => {
   }
 };
 
-export const updateUserCode = async (userId: number, newCode: number) => {
-  const db = await SQLite.openDatabaseAsync("eventmarker.db", {useNewConnection: true});
+// Update updateUserCode to accept code as string
+export const updateUserCode = async (userId: number, newCode: string) => {
+  if (!/^\d{4}$/.test(newCode)) {
+    throw new Error("Code must be a 4-digit number");
+  }
+  const db = await SQLite.openDatabaseAsync("eventmarker.db", { useNewConnection: true });
   try {
     await db.runAsync(
       "UPDATE users SET code = ?, updated_at = ? WHERE id = ?;",
@@ -423,11 +457,20 @@ export const updateUserCode = async (userId: number, newCode: number) => {
   }
 };
 
-// Get user by name
+// Update getUserByName to return code as string
 export const getUserByName = async (name: string): Promise<User | null> => {
-  const db = await SQLite.openDatabaseAsync("eventmarker.db", {useNewConnection: true});
+  const db = await SQLite.openDatabaseAsync("eventmarker.db", { useNewConnection: true });
   try {
-    const user = await db.getFirstAsync<User>(
+    const user = await db.getFirstAsync<{
+      id: number;
+      name: string;
+      role_id: number;
+      code: string;
+      is_active: number;
+      created_at: string;
+      updated_at: string;
+      icon?: string;
+    }>(
       "SELECT id, name, role_id, code, is_active, created_at, updated_at, icon FROM users WHERE name = ?;",
       [name]
     );
@@ -440,10 +483,10 @@ export const getUserByName = async (name: string): Promise<User | null> => {
 };
 
 // Verify user code
-export const verifyUserCode = async (userId: number, code: number): Promise<boolean> => {
-  const db = await SQLite.openDatabaseAsync("eventmarker.db", {useNewConnection: true});
+export const verifyUserCode = async (userId: number, code: string): Promise<boolean> => {
+  const db = await SQLite.openDatabaseAsync("eventmarker.db", { useNewConnection: true });
   try {
-    const user = await db.getFirstAsync<{ code: number }>(
+    const user = await db.getFirstAsync<{ code: string }>(
       "SELECT code FROM users WHERE id = ?;",
       [userId]
     );
@@ -455,9 +498,12 @@ export const verifyUserCode = async (userId: number, code: number): Promise<bool
   }
 };
 
-// Create new user
-export const createUser = async (name: string, roleId: number, code: number): Promise<number> => {
-  const db = await SQLite.openDatabaseAsync("eventmarker.db", {useNewConnection: true});
+// Update createUser to accept code as string
+export const createUser = async (name: string, roleId: number, code: string): Promise<number> => {
+  if (!/^\d{4}$/.test(code)) {
+    throw new Error("Code must be a 4-digit number");
+  }
+  const db = await SQLite.openDatabaseAsync("eventmarker.db", { useNewConnection: true });
   try {
     const result = await db.runAsync(
       "INSERT INTO users (name, role_id, code, is_active, created_at, updated_at, icon) VALUES (?, ?, ?, ?, ?, ?, ?);",
@@ -486,9 +532,12 @@ export const updateUserIcon = async (userId: number, icon: string) => {
   }
 };
 
-// Reset user code
-export const resetUserCode = async (userId: number, newCode: number) => {
-  const db = await SQLite.openDatabaseAsync("eventmarker.db", {useNewConnection: true});
+// Update resetUserCode to accept code as string
+export const resetUserCode = async (userId: number, newCode: string) => {
+  if (!/^\d{4}$/.test(newCode)) {
+    throw new Error("Code must be a 4-digit number");
+  }
+  const db = await SQLite.openDatabaseAsync("eventmarker.db", { useNewConnection: true });
   try {
     await db.runAsync(
       "UPDATE users SET code = ?, updated_at = ? WHERE id = ?;",
