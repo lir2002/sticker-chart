@@ -24,11 +24,10 @@ import Animated, {
   useAnimatedStyle,
   withSpring,
 } from "react-native-reanimated";
-import { RootStackParamList, Event, EventType } from "../types";
+import { RootStackParamList, Event } from "../types";
 import {
   insertEvent,
   fetchEventsWithCreator,
-  initDatabase,
   getEventTypes,
   updateEventType,
   verifyUserCode,
@@ -69,7 +68,6 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
   const [pendingDate, setPendingDate] = useState<string | null>(null);
   const [note, setNote] = useState("");
   const [photoUri, setPhotoUri] = useState<string | null>(null);
-  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [photoModalVisible, setPhotoModalVisible] = useState(false);
   const [selectedPhotoUri, setSelectedPhotoUri] = useState<string | null>(null);
@@ -155,7 +153,6 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
   const handleDayPress = (day: { dateString: string }) => {
     const date = day.dateString;
     setSelectedDate(date);
-    setSelectedEvent(null);
   };
 
   const handleAskSticker = () => {
@@ -173,7 +170,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       allowsEditing: true,
       quality: 1,
     });
@@ -191,7 +188,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
     }
 
     const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       allowsEditing: true,
       quality: 1,
     });
@@ -250,49 +247,42 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
       return;
     }
     try {
-      const isValid = await verifyUserCode(currentUser.id, inputCode);
-      if (isValid) {
+      if (pendingDate) {
         const markedAt = new Date().toISOString();
-        if (pendingDate) {
-          const insertedId = await insertEvent(
-            pendingDate,
-            markedAt,
-            eventType,
-            currentUser.id,
-            note || undefined,
-            photoUri || undefined,
-            false // is_verified = false
-          );
-          const newEvent: Event = {
-            id: insertedId,
-            date: pendingDate,
-            markedAt,
-            eventType,
-            created_by: currentUser.id,
-            is_verified: false,
-            note: note || undefined,
-            photoPath: photoUri || undefined,
-            creatorName: currentUser.name,
-          };
-          const updatedEvents = [...events, newEvent];
-          setEvents(updatedEvents);
-          setSelectedEvent(newEvent);
-          calculateMonthlyAchievements(
-            updatedEvents,
-            currentYear,
-            currentMonth
-          );
-          updateMarkedDates(updatedEvents, iconColor);
-        }
-        setVerifyModalVisible(false);
-        setInputCode("");
-        setNote("");
-        setPhotoUri(null);
-        setPendingDate(null);
-      } else {
-        Alert.alert("Error", t("errorIncorrectCode"));
-        setInputCode("");
+        const insertedId = await insertEvent(
+          pendingDate,
+          markedAt,
+          eventType,
+          currentUser.id,
+          note || undefined,
+          photoUri || undefined,
+          false // is_verified = false
+        );
+        const newEvent: Event = {
+          id: insertedId,
+          date: pendingDate,
+          markedAt,
+          eventType,
+          created_by: currentUser.id,
+          is_verified: false,
+          note: note || undefined,
+          photoPath: photoUri || undefined,
+          creatorName: currentUser.name,
+        };
+        const updatedEvents = [...events, newEvent];
+        setEvents(updatedEvents);
+        calculateMonthlyAchievements(
+          updatedEvents,
+          currentYear,
+          currentMonth
+        );
+        updateMarkedDates(updatedEvents, iconColor);
       }
+      setVerifyModalVisible(false);
+      setInputCode("");
+      setNote("");
+      setPhotoUri(null);
+      setPendingDate(null);
     } catch (error: any) {
       console.error("Error marking event:", error);
       Alert.alert("Error", `${t("errorMarkEvent")}: ${error.message}`);
@@ -554,7 +544,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
                       {t("verifiedBy")}: {event.verifierName ?? t("unknown")}
                     </Text>
                   </>
-                ): null}
+                ) : null}
                 {event.photoPath && (
                   <TouchableOpacity
                     onPress={() => openPhotoModal(event.photoPath)}
@@ -594,7 +584,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
           </TouchableOpacity>
         )}
       </View>
-      {/* Ask Sticker Verification Modal */}
+      {/* Ask Sticker Modal */}
       <Modal
         visible={verifyModalVisible}
         transparent
@@ -606,16 +596,6 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
             <Text style={styles.modalTitle}>
               {currentUser.role_id === 1 ? t("giveSticker") : t("askSticker")}
             </Text>
-            <TextInput
-              style={styles.input}
-              placeholder={t("codePlaceholder")}
-              keyboardType="numeric"
-              maxLength={4}
-              value={inputCode}
-              onChangeText={setInputCode}
-              secureTextEntry
-              autoFocus
-            />
             <TextInput
               style={styles.input}
               placeholder={t("notePlaceholder")}
@@ -646,7 +626,6 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
                 title={t("cancel")}
                 onPress={() => {
                   setVerifyModalVisible(false);
-                  setInputCode("");
                   setNote("");
                   setPhotoUri(null);
                   setPendingDate(null);

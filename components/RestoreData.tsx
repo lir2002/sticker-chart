@@ -3,7 +3,6 @@ import React, { useState } from "react";
 import {
   View,
   Text,
-  Button,
   Alert,
   StyleSheet,
   FlatList,
@@ -13,6 +12,7 @@ import * as FileSystem from "expo-file-system";
 import JSZip from "jszip";
 import { useLanguage } from "../LanguageContext";
 import * as SQLite from "expo-sqlite";
+import { CustomButton } from "./SharedComponents";
 
 interface RestoreDataProps {
   onClose: () => void;
@@ -220,12 +220,12 @@ const RestoreData: React.FC<RestoreDataProps> = ({ onClose }) => {
       ) : (
         <Text style={styles.noFilesText}>{t("noBackupFiles")}</Text>
       )}
-      <Button
+      <CustomButton
         title={t("restore")}
         onPress={handleRestore}
         disabled={isRestoring || !selectedFile}
       />
-      <Button title={t("cancel")} onPress={onClose} disabled={isRestoring} />
+      <CustomButton title={t("cancel")} onPress={onClose} disabled={isRestoring} />
     </View>
   );
 };

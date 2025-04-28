@@ -188,6 +188,7 @@ const CalendarViewAll: React.FC = () => {
       filtered = filtered.filter((event) => !event.is_verified);
     }
     setFilteredEvents(filtered);
+    updateMarkedDates(filtered, eventTypes); // Update marked dates with filtered events
   };
 
   useEffect(() => {

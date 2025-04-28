@@ -16,6 +16,7 @@ import { Picker } from "@react-native-picker/picker";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 import * as ImagePicker from "expo-image-picker";
+import * as FileSystem from "expo-file-system";
 import { RootStackParamList, EventType, User } from "../types";
 import {
   getEventTypesWithOwner,
@@ -40,6 +41,7 @@ import { UserContext } from "../UserContext";
 import { CustomButton } from "./SharedComponents";
 import BackupData from "./BackupData";
 import RestoreData from "./RestoreData";
+import * as ImageManipulator from "expo-image-manipulator";
 
 type HomeScreenNavigationProp = NativeStackNavigationProp<
   RootStackParamList,
@@ -208,25 +210,83 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       Alert.alert("Error", t("selectImagePermission"));
       return;
     }
-
+  
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [1, 1],
       quality: 1,
     });
-
+  
     if (!result.canceled && result.assets[0].uri) {
       try {
-        await updateUserIcon(currentUser.id, result.assets[0].uri);
-        const updatedUser = { ...currentUser, icon: result.assets[0].uri };
+        // Define icon directory and file path
+        const iconDir = `${FileSystem.documentDirectory}icons/`;
+        const newIconPath = `${iconDir}icon_${currentUser.id}.jpg`;
+  
+        // Create icons directory if it doesn't exist
+        await FileSystem.makeDirectoryAsync(iconDir, { intermediates: true });
+  
+        // Compress image to ~200KB
+        let quality = 0.7;
+        let fileSize = Infinity;
+        let compressedUri = result.assets[0].uri;
+  
+        // Resize to 256x256 and compress
+        const manipResult = await ImageManipulator.manipulateAsync(
+          result.assets[0].uri,
+          [{ resize: { width: 256, height: 256 } }],
+          { compress: quality, format: ImageManipulator.SaveFormat.JPEG }
+        );
+        compressedUri = manipResult.uri;
+  
+        // Check file size and reduce quality if needed
+        let fileInfo = await FileSystem.getInfoAsync(compressedUri);
+        fileSize = fileInfo.size || Infinity;
+  
+        // Iteratively reduce quality to meet 200KB target
+        while (fileSize > 200000 && quality > 0.1) {
+          quality -= 0.1;
+          const newManipResult = await ImageManipulator.manipulateAsync(
+            result.assets[0].uri,
+            [{ resize: { width: 256, height: 256 } }],
+            { compress: quality, format: ImageManipulator.SaveFormat.JPEG }
+          );
+          compressedUri = newManipResult.uri;
+          fileInfo = await FileSystem.getInfoAsync(compressedUri);
+          fileSize = fileInfo.size || Infinity;
+        }
+  
+        if (fileSize > 200000) {
+          throw new Error("Could not compress image to 200KB or less");
+        }
+  
+        // Delete old icon if it exists
+        if (currentUser.icon) {
+          const oldIconPath = currentUser.icon;
+          const oldIconInfo = await FileSystem.getInfoAsync(oldIconPath);
+          if (oldIconInfo.exists) {
+            await FileSystem.deleteAsync(oldIconPath, { idempotent: true });
+          }
+        }
+  
+        // Copy compressed image to permanent location
+        await FileSystem.copyAsync({
+          from: compressedUri,
+          to: newIconPath,
+        });
+  
+        // Update database and state
+        await updateUserIcon(currentUser.id, newIconPath);
+        const updatedUser = { ...currentUser, icon: newIconPath };
         setCurrentUser(updatedUser);
         const updatedUsers = users.map((u) =>
           u.id === currentUser.id ? updatedUser : u
         );
         setUsers(updatedUsers);
       } catch (error) {
-        Alert.alert("Error", t("errorUpdateIcon"));
+        console.error("Error updating icon:", error);
+        Alert.alert("Error", `${t("errorUpdateIcon")}: ${error.message}`);
       }
     }
   };
