@@ -1,4 +1,3 @@
-// RestoreData.tsx
 import React, { useState } from "react";
 import {
   View,
@@ -13,6 +12,7 @@ import JSZip from "jszip";
 import { useLanguage } from "../LanguageContext";
 import * as SQLite from "expo-sqlite";
 import { CustomButton } from "./SharedComponents";
+import DownloadData from "./DownloadData";
 
 interface RestoreDataProps {
   onClose: () => void;
@@ -23,6 +23,7 @@ const RestoreData: React.FC<RestoreDataProps> = ({ onClose }) => {
   const [isRestoring, setIsRestoring] = useState(false);
   const [backupFiles, setBackupFiles] = useState<string[]>([]);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
+  const [downloadModalVisible, setDownloadModalVisible] = useState(false);
 
   const loadBackupFiles = async () => {
     try {
@@ -221,11 +222,25 @@ const RestoreData: React.FC<RestoreDataProps> = ({ onClose }) => {
         <Text style={styles.noFilesText}>{t("noBackupFiles")}</Text>
       )}
       <CustomButton
+        title={t("download")}
+        onPress={() => setDownloadModalVisible(true)}
+        disabled={isRestoring}
+      />
+      <CustomButton
         title={t("restore")}
         onPress={handleRestore}
         disabled={isRestoring || !selectedFile}
       />
-      <CustomButton title={t("cancel")} onPress={onClose} disabled={isRestoring} />
+      <CustomButton
+        title={t("cancel")}
+        onPress={onClose}
+        disabled={isRestoring}
+      />
+      <DownloadData
+        visible={downloadModalVisible}
+        onClose={() => setDownloadModalVisible(false)}
+        onDownloadComplete={loadBackupFiles}
+      />
     </View>
   );
 };

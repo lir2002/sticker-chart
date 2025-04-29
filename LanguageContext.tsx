@@ -252,6 +252,15 @@ const translations: Translations = {
   selectBackup: { en: "Select a backup", zh: "选择一个备份" },
   uploadSuccess: { en: "Backup uploaded successfully", zh: "备份上传成功" },
   uploadError: { en: "Failed to upload backup", zh: "上传备份失败" },
+  download: { en: "Download", zh: "下载" },
+  downloadBackup: { en: "Download Backup", zh: "下载备份" },
+  downloadComplete: { en: "Backup downloaded successfully", zh: "备份下载成功" },
+  errorDownload: { en: "Failed to download backup", zh: "下载备份失败" },
+  selectZipFile: { en: "Select a .zip file from cloud storage", zh: "从云存储中选择一个 .zip 文件" },
+  pickFile: { en: "Pick File", zh: "选择文件" },
+  filePickCanceled: { en: "File selection canceled", zh: "文件选择已取消" },
+  error: { en: "Error", zh: "错误" },
+  unknownError: { en: "Unknown error occurred", zh: "发生未知错误" },
 };
 
 const LanguageContext = createContext<LanguageContextType | undefined>(
