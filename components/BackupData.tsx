@@ -1,4 +1,3 @@
-// BackupData.tsx
 import React, { useState } from "react";
 import {
   View,
@@ -80,7 +79,18 @@ const BackupData: React.FC<BackupDataProps> = ({ onClose }) => {
           await db.closeAsync();
         }
       })();
-      const dbData = { users, eventTypes, events, roles };
+      const dbVersion = await (async () => {
+        const db = await SQLite.openDatabaseAsync("eventmarker.db", { useNewConnection: true });
+        try {
+          const version = await db.getFirstAsync<{ version: number }>(
+            "SELECT version FROM db_version;"
+          );
+          return version || { version: 0 };
+        } finally {
+          await db.closeAsync();
+        }
+      })();
+      const dbData = { users, eventTypes, events, roles, dbVersion };
       const dbJsonPath = `${tempDir}database.json`;
       await FileSystem.writeAsStringAsync(dbJsonPath, JSON.stringify(dbData));
 

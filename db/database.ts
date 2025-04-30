@@ -167,10 +167,18 @@ export const initDatabase = async () => {
       }
 
       // Update version number
-      await db.runAsync(
-        "INSERT OR REPLACE INTO db_version (version) VALUES (?);",
-        [CURRENT_DB_VERSION]
+      const versionExists = await db.getFirstAsync<{ version: number }>(
+        "SELECT version FROM db_version;"
       );
+      if (versionExists) {
+        await db.runAsync("UPDATE db_version SET version = ?;", [
+          CURRENT_DB_VERSION,
+        ]);
+      } else {
+        await db.runAsync("INSERT INTO db_version (version) VALUES (?);", [
+          CURRENT_DB_VERSION,
+        ]);
+      }
     });
     console.log("Database initialized successfully");
   } catch (error) {

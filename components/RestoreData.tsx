@@ -81,6 +81,7 @@ const RestoreData: React.FC<RestoreDataProps> = ({ onClose }) => {
               DELETE FROM event_types;
               DELETE FROM users;
               DELETE FROM roles;
+              DELETE FROM db_version;
             `);
 
             // Insert roles
@@ -140,6 +141,14 @@ const RestoreData: React.FC<RestoreDataProps> = ({ onClose }) => {
                   event.verified_at || null,
                   event.verified_by || null,
                 ]
+              );
+            }
+
+            // Insert db_version
+            if (dbData.dbVersion && typeof dbData.dbVersion.version === 'number') {
+              await db.runAsync(
+                "INSERT OR REPLACE INTO db_version (version) VALUES (?);",
+                [dbData.dbVersion.version]
               );
             }
           });
