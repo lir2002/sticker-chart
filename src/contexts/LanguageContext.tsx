@@ -267,6 +267,16 @@ const translations: Translations = {
   edit: { en: "Edit", zh: "编辑" },
   contactUpdated: { en: "Contact info updated", zh: "联系方式已更新" },
   errorUpdateContact: { en: "Failed to update contact info", zh: "更新联系方式失败" },
+  assets: { en: "Assets", zh: "资产" },
+  credit: { en: "Credit", zh: "信用" },
+  noWalletData: { en: "No wallet data available", zh: "无钱包数据" },
+  transactionHistory: { en: "Transaction History", zh: "交易记录" },
+  noTransactions: { en: "No transactions found", zh: "未找到交易记录" },
+  reason: { en: "Reason", zh: "原因" },
+  amount: { en: "Amount", zh: "金额" },
+  counterparty: { en: "Counterparty", zh: "交易对象" },
+  timestamp: { en: "Timestamp", zh: "时间" },
+  balance: { en: "Balance", zh: "余额" },
 };
 
 const LanguageContext = createContext<LanguageContextType | undefined>(

@@ -32,11 +32,12 @@ import {
   hasEventTypeOwner,
   updateUserCode,
   updateUserContact,
+  getWallet,
 } from "../db/database";
 import CodeSetup from "../components/CodeSetup";
 import ChangeCode from "../components/ChangeCode";
 import { useLanguage } from "../contexts/LanguageContext";
-import { LocaleConfig } from "react-native-calendars";
+import  LocaleConfig  from "../config/calendarConfig";
 import { availableColors, availableIcons } from "../icons";
 import { UserContext } from "../contexts/UserContext";
 import { CustomButton } from "../components/SharedComponents";
@@ -84,6 +85,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const [isEditingContact, setIsEditingContact] = useState(false);
   const [email, setEmail] = useState(currentUser?.email || "");
   const [phone, setPhone] = useState(currentUser?.phone || "");
+  const [wallet, setWallet] = useState<Wallet | null>(null); // New state for wallet
 
   // Initialize database and user state
   useEffect(() => {
@@ -144,6 +146,22 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       setPhone(currentUser.phone || "");
     }
   }, [currentUser]);
+
+  // Fetch wallet when userProfileModalVisible or currentUser changes
+  useEffect(() => {
+    const fetchWallet = async () => {
+      if (currentUser && userProfileModalVisible) {
+        try {
+          const userWallet = await getWallet(currentUser.id);
+          setWallet(userWallet);
+        } catch (error) {
+          console.error("Error fetching wallet:", error);
+          setWallet(null);
+        }
+      }
+    };
+    fetchWallet();
+  }, [currentUser, userProfileModalVisible]);
 
   // Handle adding new event type (admin only)
   const handleAddEventType = async () => {
@@ -732,6 +750,11 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               <MaterialIcons name="person" size={100} color="#000" />
             )}
             <Text style={styles.modalTitle}>{currentUser.name}</Text>
+            {wallet ? (
+              <Text style={styles.walletInfo}>
+                {t("assets")}: {wallet.assets} | {t("credit")}: {wallet.credit}
+              </Text>
+            ) : null}
             {currentUser.name === "Guest" ? (
               <Button
                 title={t("login")}
@@ -739,6 +762,15 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               />
             ) : (
               <View style={styles.buttonContainer}>
+                <CustomButton
+                  title={t("transactionHistory")}
+                  onPress={() => {
+                    setUserProfileModalVisible(false);
+                    navigation.navigate("TransactionHistory", {
+                      userId: currentUser.id,
+                    });
+                  }}
+                />
                 <CustomButton
                   title={t("changeIcon")}
                   onPress={handleChangeIcon}
@@ -1278,6 +1310,11 @@ const styles = StyleSheet.create({
   userNameText: {
     fontSize: 16,
     marginLeft: 10,
+  },
+  walletInfo: {
+    fontSize: 16,
+    color: "#333",
+    marginBottom: 10,
   },
 });
 

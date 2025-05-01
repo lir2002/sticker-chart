@@ -53,6 +53,7 @@ export type RootStackParamList = {
   CalendarViewAll: undefined;
   CodeSetup: undefined;
   ChangeCode: { userId: number }; // Updated to pass user ID
+  TransactionHistory: { userId: number };
 };
 
 export interface Wallet {

@@ -378,17 +378,16 @@ const CalendarViewAll: React.FC = () => {
                     </Text>
                     <View style={styles.verifiedContainer}>
                       <Text style={styles.eventText}>
-                        {t("verified")}:{" "}
-                        {event.is_verified ? t("yes") : t("no")}
+                        {t("verified")}: {event.is_verified ? t("yes") : t("no")}
                       </Text>
-                      {event.is_verified && (
+                      {event.is_verified ? (
                         <MaterialIcons
                           name="check-circle"
                           size={16}
                           color="green"
                           style={styles.verifiedIcon}
                         />
-                      )}
+                      ) : null}
                     </View>
                     {event.is_verified ? (
                       <>
