@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import * as FileSystem from "expo-file-system";
 import * as Sharing from "expo-sharing";
-import { useLanguage } from "../LanguageContext";
+import { useLanguage } from "../contexts/LanguageContext";
 import { CustomButton } from "./SharedComponents";
 
 interface UploadDataProps {

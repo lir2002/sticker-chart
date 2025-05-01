@@ -31,16 +31,17 @@ import {
   deleteUser,
   hasEventTypeOwner,
   updateUserCode,
+  updateUserContact,
 } from "../db/database";
-import CodeSetup from "./CodeSetup";
-import ChangeCode from "./ChangeCode";
-import { useLanguage } from "../LanguageContext";
+import CodeSetup from "../components/CodeSetup";
+import ChangeCode from "../components/ChangeCode";
+import { useLanguage } from "../contexts/LanguageContext";
 import { LocaleConfig } from "react-native-calendars";
 import { availableColors, availableIcons } from "../icons";
-import { UserContext } from "../UserContext";
-import { CustomButton } from "./SharedComponents";
-import BackupData from "./BackupData";
-import RestoreData from "./RestoreData";
+import { UserContext } from "../contexts/UserContext";
+import { CustomButton } from "../components/SharedComponents";
+import BackupData from "../components/BackupData";
+import RestoreData from "../components/RestoreData";
 import * as ImageManipulator from "expo-image-manipulator";
 
 type HomeScreenNavigationProp = NativeStackNavigationProp<
@@ -79,6 +80,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const [newFaceValue, setNewFaceValue] = useState("1"); // Default face value
   const [backupModalVisible, setBackupModalVisible] = useState(false);
   const [restoreModalVisible, setRestoreModalVisible] = useState(false);
+  const [contactModalVisible, setContactModalVisible] = useState(false);
+  const [isEditingContact, setIsEditingContact] = useState(false);
+  const [email, setEmail] = useState(currentUser?.email || "");
+  const [phone, setPhone] = useState(currentUser?.phone || "");
 
   // Initialize database and user state
   useEffect(() => {
@@ -132,6 +137,13 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       setSelectedOwnerId(null);
     }
   }, [users, selectedOwnerId]);
+
+  useEffect(() => {
+    if (currentUser) {
+      setEmail(currentUser.email || "");
+      setPhone(currentUser.phone || "");
+    }
+  }, [currentUser]);
 
   // Handle adding new event type (admin only)
   const handleAddEventType = async () => {
@@ -742,6 +754,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                   title={t("modifyPassword")}
                   onPress={() => setChangeCodeModalVisible(true)}
                 />
+                <CustomButton
+                  title={t("contactInfo")}
+                  onPress={() => setContactModalVisible(true)}
+                />
                 {currentUser.role_id === 1 && (
                   <>
                     <CustomButton
@@ -999,6 +1015,90 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               <MaterialIcons name="close" size={24} color="#000" />
             </TouchableOpacity>
             <RestoreData onClose={() => setRestoreModalVisible(false)} />
+          </View>
+        </View>
+      </Modal>
+      {/* Contact Info Modal */}
+      <Modal
+        visible={contactModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => {
+          setContactModalVisible(false);
+          setIsEditingContact(false);
+          setEmail(currentUser?.email || "");
+          setPhone(currentUser?.phone || "");
+        }}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => {
+                setContactModalVisible(false);
+                setIsEditingContact(false);
+                setEmail(currentUser?.email || "");
+                setPhone(currentUser?.phone || "");
+              }}
+            >
+              <MaterialIcons name="close" size={24} color="#000" />
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>{t("contactInfo")}</Text>
+            <TextInput
+              style={styles.input}
+              value={email}
+              onChangeText={setEmail}
+              placeholder={t("emailPlaceholder")}
+              editable={isEditingContact}
+              autoCapitalize="none"
+            />
+            <TextInput
+              style={styles.input}
+              value={phone}
+              onChangeText={setPhone}
+              placeholder={t("phonePlaceholder")}
+              editable={isEditingContact}
+              keyboardType="phone-pad"
+            />
+            <View style={styles.buttonContainer}>
+              {isEditingContact ? (
+                <>
+                  <CustomButton
+                    title={t("cancel")}
+                    onPress={() => {
+                      setIsEditingContact(false);
+                      setEmail(currentUser?.email || "");
+                      setPhone(currentUser?.phone || "");
+                    }}
+                  />
+                  <CustomButton
+                    title={t("save")}
+                    onPress={async () => {
+                      if (!currentUser) return;
+                      try {
+                        await updateUserContact(currentUser.id, email, phone);
+                        const updatedUser = { ...currentUser, email, phone };
+                        setCurrentUser(updatedUser);
+                        setUsers(
+                          users.map((u) =>
+                            u.id === currentUser.id ? updatedUser : u
+                          )
+                        );
+                        setIsEditingContact(false);
+                        Alert.alert(t("success"), t("contactUpdated"));
+                      } catch (error) {
+                        Alert.alert("Error", t("errorUpdateContact"));
+                      }
+                    }}
+                  />
+                </>
+              ) : (
+                <CustomButton
+                  title={t("edit")}
+                  onPress={() => setIsEditingContact(true)}
+                />
+              )}
+            </View>
           </View>
         </View>
       </Modal>

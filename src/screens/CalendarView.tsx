@@ -35,9 +35,9 @@ import {
   verifyEvent,
   getUsers,
 } from "../db/database";
-import { useLanguage } from "../LanguageContext";
+import { useLanguage } from "../contexts/LanguageContext";
 import { availableColors, availableIcons } from "../icons";
-import { UserContext } from "../UserContext";
+import { UserContext } from "../contexts/UserContext";
 
 interface CalendarViewProps {
   route: RouteProp<RootStackParamList, "Calendar">;

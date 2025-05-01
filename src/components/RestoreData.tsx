@@ -9,7 +9,7 @@ import {
 } from "react-native";
 import * as FileSystem from "expo-file-system";
 import JSZip from "jszip";
-import { useLanguage } from "../LanguageContext";
+import { useLanguage } from "../contexts/LanguageContext";
 import * as SQLite from "expo-sqlite";
 import { CustomButton } from "./SharedComponents";
 import DownloadData from "./DownloadData";
@@ -57,16 +57,16 @@ const RestoreData: React.FC<RestoreDataProps> = ({ onClose }) => {
       const tempDir = `${FileSystem.cacheDirectory}restore_temp/`;
       const photosDir = `${FileSystem.documentDirectory}photos/`;
       const iconsDir = `${FileSystem.documentDirectory}icons/`;
-
+  
       // Read ZIP file
       const zipContent = await FileSystem.readAsStringAsync(zipPath, {
         encoding: FileSystem.EncodingType.Base64,
       });
       const zip = await JSZip.loadAsync(zipContent, { base64: true });
-
+  
       // Create temp directory
       await FileSystem.makeDirectoryAsync(tempDir, { intermediates: true });
-
+  
       // Extract database.json
       const dbJsonFile = zip.file("database.json");
       if (dbJsonFile) {
@@ -81,9 +81,18 @@ const RestoreData: React.FC<RestoreDataProps> = ({ onClose }) => {
               DELETE FROM event_types;
               DELETE FROM users;
               DELETE FROM roles;
+              DELETE FROM wallets;
               DELETE FROM db_version;
             `);
-
+  
+            // Drop existing transactions_<userId> tables
+            const tables = await db.getAllAsync<{ name: string }>(
+              "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'transactions_%';"
+            );
+            for (const table of tables) {
+              await db.execAsync(`DROP TABLE IF EXISTS ${table.name};`);
+            }
+  
             // Insert roles
             for (const role of dbData.roles) {
               await db.runAsync(
@@ -91,11 +100,12 @@ const RestoreData: React.FC<RestoreDataProps> = ({ onClose }) => {
                 [role.role_id, role.role_name]
               );
             }
-
-            // Insert users
+  
+            // Insert users (with email and phone for version 4+)
             for (const user of dbData.users) {
               await db.runAsync(
-                "INSERT INTO users (id, name, role_id, code, is_active, created_at, updated_at, icon) VALUES (?, ?, ?, ?, ?, ?, ?, ?);",
+                `INSERT INTO users (id, name, role_id, code, is_active, created_at, updated_at, icon, email, phone)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
                 [
                   user.id,
                   user.name,
@@ -105,10 +115,12 @@ const RestoreData: React.FC<RestoreDataProps> = ({ onClose }) => {
                   user.created_at,
                   user.updated_at,
                   user.icon,
+                  user.email || '', // Default to '' for older backups
+                  user.phone || '', // Default to '' for older backups
                 ]
               );
             }
-
+  
             // Insert event_types
             for (const type of dbData.eventTypes) {
               await db.runAsync(
@@ -123,7 +135,7 @@ const RestoreData: React.FC<RestoreDataProps> = ({ onClose }) => {
                 ]
               );
             }
-
+  
             // Insert events
             for (const event of dbData.events) {
               await db.runAsync(
@@ -143,7 +155,52 @@ const RestoreData: React.FC<RestoreDataProps> = ({ onClose }) => {
                 ]
               );
             }
-
+  
+            // Insert wallets (if present in backup)
+            if (dbData.wallets) {
+              for (const wallet of dbData.wallets) {
+                await db.runAsync(
+                  "INSERT INTO wallets (owner, assets, credit) VALUES (?, ?, ?);",
+                  [wallet.owner, wallet.assets, wallet.credit]
+                );
+              }
+            }
+  
+            // Restore transactions_<userId> tables for non-Guest users
+            const nonGuestUsers = dbData.users.filter((user: any) => user.name !== "Guest");
+            for (const user of nonGuestUsers) {
+              const tableName = `transactions_${user.id}`;
+              // Create transactions_<userId> table
+              await db.execAsync(`
+                CREATE TABLE IF NOT EXISTS ${tableName} (
+                  id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  reason TEXT,
+                  amount INTEGER,
+                  counterparty INTEGER,
+                  timestamp TEXT,
+                  balance INTEGER,
+                  FOREIGN KEY (counterparty) REFERENCES users(id)
+                );
+              `);
+              // Insert transactions (if present in backup)
+              if (dbData[tableName]) {
+                for (const transaction of dbData[tableName]) {
+                  await db.runAsync(
+                    `INSERT INTO ${tableName} (id, reason, amount, counterparty, timestamp, balance)
+                     VALUES (?, ?, ?, ?, ?, ?);`,
+                    [
+                      transaction.id,
+                      transaction.reason || null,
+                      transaction.amount || null,
+                      transaction.counterparty || null,
+                      transaction.timestamp || null,
+                      transaction.balance || null,
+                    ]
+                  );
+                }
+              }
+            }
+  
             // Insert db_version
             if (dbData.dbVersion && typeof dbData.dbVersion.version === 'number') {
               await db.runAsync(
@@ -158,7 +215,7 @@ const RestoreData: React.FC<RestoreDataProps> = ({ onClose }) => {
       } else {
         throw new Error("Backup does not contain a valid database file");
       }
-
+  
       // Restore photos
       await FileSystem.deleteAsync(photosDir, { idempotent: true });
       await FileSystem.makeDirectoryAsync(photosDir, { intermediates: true });
@@ -170,7 +227,7 @@ const RestoreData: React.FC<RestoreDataProps> = ({ onClose }) => {
           encoding: FileSystem.EncodingType.Base64,
         });
       }
-
+  
       // Restore icons
       await FileSystem.deleteAsync(iconsDir, { idempotent: true });
       await FileSystem.makeDirectoryAsync(iconsDir, { intermediates: true });
@@ -182,10 +239,10 @@ const RestoreData: React.FC<RestoreDataProps> = ({ onClose }) => {
           encoding: FileSystem.EncodingType.Base64,
         });
       }
-
+  
       // Clean up temp directory
       await FileSystem.deleteAsync(tempDir, { idempotent: true });
-
+  
       Alert.alert(
         t("success"),
         t("restoreComplete"),

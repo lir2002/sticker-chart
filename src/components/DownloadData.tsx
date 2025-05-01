@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { View, Text, Alert, StyleSheet, Modal, Platform } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system";
-import { useLanguage } from "../LanguageContext";
+import { useLanguage } from "../contexts/LanguageContext";
 import { CustomButton } from "./SharedComponents";
 
 interface DownloadDataProps {

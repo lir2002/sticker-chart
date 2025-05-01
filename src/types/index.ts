@@ -36,6 +36,8 @@ export interface User {
   created_at: string; // Creation timestamp
   updated_at: string; // Last update timestamp
   icon?: string; // Optional path to user icon
+  email: string;
+  phone: string;
 }
 
 // Role interface for roles table
@@ -52,3 +54,22 @@ export type RootStackParamList = {
   CodeSetup: undefined;
   ChangeCode: { userId: number }; // Updated to pass user ID
 };
+
+export interface Wallet {
+  owner: number;
+  assets: number;
+  credit: number;
+}
+
+export interface Transaction {
+  id: number;
+  reason: string | null;
+  amount: number | null;
+  counterparty: number | null;
+  timestamp: string | null;
+  balance: number | null;
+}
+
+export interface DbVersion {
+  version: number;
+}

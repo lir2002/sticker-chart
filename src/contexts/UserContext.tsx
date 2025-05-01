@@ -1,7 +1,7 @@
 import React, { createContext, useState, useEffect, ReactNode } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { User } from "./types"; // Adjust path to your types file
-import { getUserByName } from "./db/database"; // Adjust path to your database file
+import { User } from "../types";
+import { getUserByName, forceAdminPasswordSetup } from "../db/database";
 
 // Define the shape of the UserContext
 interface UserContextType {
@@ -10,21 +10,9 @@ interface UserContextType {
   logout: () => void;
 }
 
-// Default Guest user
-const GUEST_USER: User = {
-  id: 2, // Assuming Guest user has ID 2 based on your database schema
-  name: "Guest",
-  role_id: 2, // Guest role
-  code: 0,
-  is_active: 1,
-  created_at: new Date().toISOString(),
-  updated_at: new Date().toISOString(),
-  icon: null,
-};
-
 // Create the context with default values
 export const UserContext = createContext<UserContextType>({
-  currentUser: GUEST_USER,
+  currentUser: null,
   setCurrentUser: () => {},
   logout: () => {},
 });
@@ -41,6 +29,13 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   useEffect(() => {
     const restoreUser = async () => {
       try {
+        // Check if Admin password setup is needed
+        const needsPasswordSetup = await forceAdminPasswordSetup();
+        if (needsPasswordSetup) {
+          // Keep currentUser as null to trigger CodeSetup
+          return;
+        }
+
         // Retrieve stored username
         const storedUserName = await AsyncStorage.getItem("currentUserName");
         if (storedUserName) {
@@ -49,25 +44,33 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
           if (user && user.is_active) {
             setCurrentUser(user);
           } else {
-            // If user is invalid or inactive, set to Guest
-            setCurrentUser(GUEST_USER);
-            await AsyncStorage.setItem("currentUserName", GUEST_USER.name);
+            // Fetch Guest user from database
+            const guestUser = await getUserByName("Guest");
+            if (guestUser) {
+              setCurrentUser(guestUser);
+              await AsyncStorage.setItem("currentUserName", guestUser.name);
+            }
           }
         } else {
           // No stored user, default to Guest
-          setCurrentUser(GUEST_USER);
-          await AsyncStorage.setItem("currentUserName", GUEST_USER.name);
+          const guestUser = await getUserByName("Guest");
+          if (guestUser) {
+            setCurrentUser(guestUser);
+            await AsyncStorage.setItem("currentUserName", guestUser.name);
+          }
         }
       } catch (error) {
         console.error("Error restoring user:", error);
         // Fallback to Guest on error
-        setCurrentUser(GUEST_USER);
-        await AsyncStorage.setItem("currentUserName", GUEST_USER.name);
+        const guestUser = await getUserByName("Guest");
+        if (guestUser) {
+          setCurrentUser(guestUser);
+          await AsyncStorage.setItem("currentUserName", guestUser.name);
+        }
       }
     };
 
-    console.log("Executing restoreUser")
-
+    console.log("Executing restoreUser");
     restoreUser();
   }, []);
 
@@ -77,10 +80,13 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       if (user) {
         setCurrentUser(user);
         await AsyncStorage.setItem("currentUserName", user.name);
-        console.log("Set currentUser:", user?.name)
+        console.log("Set currentUser:", user?.name);
       } else {
-        setCurrentUser(GUEST_USER);
-        await AsyncStorage.setItem("currentUserName", GUEST_USER.name);
+        const guestUser = await getUserByName("Guest");
+        if (guestUser) {
+          setCurrentUser(guestUser);
+          await AsyncStorage.setItem("currentUserName", guestUser.name);
+        }
       }
     } catch (error) {
       console.error("Error saving user to AsyncStorage:", error);
@@ -90,8 +96,11 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   // Logout function
   const logout = async () => {
     try {
-      setCurrentUser(GUEST_USER);
-      await AsyncStorage.setItem("currentUserName", GUEST_USER.name);
+      const guestUser = await getUserByName("Guest");
+      if (guestUser) {
+        setCurrentUser(guestUser);
+        await AsyncStorage.setItem("currentUserName", guestUser.name);
+      }
     } catch (error) {
       console.error("Error during logout:", error);
     }

@@ -1,7 +1,7 @@
 import React, { useState, useContext } from 'react';
 import { View, Text, TextInput, Button, Alert, StyleSheet } from 'react-native';
-import { useLanguage } from '../LanguageContext';
-import { UserContext } from '../UserContext';
+import { useLanguage } from '../contexts/LanguageContext';
+import { UserContext } from '../contexts/UserContext';
 import { verifyUserCode, updateUserCode } from '../db/database';
 
 interface ChangeCodeProps {

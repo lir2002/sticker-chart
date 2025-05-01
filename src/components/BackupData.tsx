@@ -11,9 +11,16 @@ import {
 } from "react-native";
 import * as FileSystem from "expo-file-system";
 import JSZip from "jszip";
-import { useLanguage } from "../LanguageContext";
-import { getUsers, getEventTypes, fetchAllEvents } from "../db/database";
-import * as SQLite from "expo-sqlite";
+import { useLanguage } from "../contexts/LanguageContext";
+import {
+  getUsers,
+  getEventTypes,
+  fetchAllEvents,
+  fetchTransactions,
+  getRoles,
+  getDbVersion,
+  getAllWallets,
+} from "../db/database";
 import UploadData from "./UploadData";
 import { CustomButton } from "./SharedComponents";
 
@@ -49,51 +56,50 @@ const BackupData: React.FC<BackupDataProps> = ({ onClose }) => {
   const handleBackup = async () => {
     setIsBackingUp(true);
     try {
+      const dbVersion = await getDbVersion();
       const backupDir = `${FileSystem.documentDirectory}Sticker-Chart/`;
-      const zipPath = `${backupDir}stickerchart.back.zip`;
+      const zipPath = `${backupDir}stickers.${dbVersion.version}.bak.zip`;
       const tempDir = `${FileSystem.cacheDirectory}backup_temp/`;
       const photosDir = `${FileSystem.documentDirectory}photos/`;
-
+  
       await FileSystem.deleteAsync(tempDir, { idempotent: true });
       await FileSystem.makeDirectoryAsync(backupDir, { intermediates: true });
       await FileSystem.makeDirectoryAsync(tempDir, { intermediates: true });
-
+  
       const zipInfo = await FileSystem.getInfoAsync(zipPath);
       if (zipInfo.exists) {
-        const date = new Date().toISOString().slice(0, 19).replace(/[-T:]/g, '');
-        const newZipPath = `${backupDir}stickerchart.back.${date}.zip`;
+        const date = new Date().toISOString().slice(2, 17).replace(/[-T:]/g, '');
+        const newZipPath = `${backupDir}stickers.${dbVersion.version}.bak.${date}.zip`;
         await FileSystem.moveAsync({ from: zipPath, to: newZipPath });
       }
-
+  
+      // Fetch existing data
       const users = await getUsers();
       const eventTypes = await getEventTypes();
       const events = await fetchAllEvents();
-      const roles = await (async () => {
-        const db = await SQLite.openDatabaseAsync("eventmarker.db", { useNewConnection: true });
-        try {
-          const roles = await db.getAllAsync<{ role_id: number; role_name: string }>(
-            "SELECT role_id, role_name FROM roles;"
-          );
-          return roles;
-        } finally {
-          await db.closeAsync();
-        }
-      })();
-      const dbVersion = await (async () => {
-        const db = await SQLite.openDatabaseAsync("eventmarker.db", { useNewConnection: true });
-        try {
-          const version = await db.getFirstAsync<{ version: number }>(
-            "SELECT version FROM db_version;"
-          );
-          return version || { version: 0 };
-        } finally {
-          await db.closeAsync();
-        }
-      })();
-      const dbData = { users, eventTypes, events, roles, dbVersion };
+      const roles = await getRoles();
+      const wallets = await getAllWallets();
+      // Fetch transactions_<userId> for non-Guest users
+      const transactionsTables: { [key: string]: any[] } = {};
+      const nonGuestUsers = users.filter((user) => user.name !== "Guest");
+      for (const user of nonGuestUsers) {
+        const transactions = await fetchTransactions(user.id);
+        transactionsTables[`transactions_${user.id}`] = transactions;
+      }
+  
+      // Combine all data
+      const dbData = {
+        users,
+        eventTypes,
+        events,
+        roles,
+        dbVersion,
+        wallets,
+        ...transactionsTables,
+      };
       const dbJsonPath = `${tempDir}database.json`;
       await FileSystem.writeAsStringAsync(dbJsonPath, JSON.stringify(dbData));
-
+  
       const zip = new JSZip();
       const dbJsonContent = await FileSystem.readAsStringAsync(dbJsonPath);
       zip.file("database.json", dbJsonContent);
@@ -124,14 +130,17 @@ const BackupData: React.FC<BackupDataProps> = ({ onClose }) => {
           zip.file(`icons/${iconFileName}`, fileContent, { base64: true });
         }
       }
-
+  
       const zipContent = await zip.generateAsync({ type: "base64" });
       await FileSystem.writeAsStringAsync(zipPath, zipContent, {
         encoding: FileSystem.EncodingType.Base64,
       });
-
+  
       await FileSystem.deleteAsync(tempDir, { idempotent: true });
-
+  
+      // Reload backup files to update UI
+      await loadBackupFiles();
+  
       Alert.alert(
         t("success"),
         `${t("backupComplete")} ${zipPath}`,

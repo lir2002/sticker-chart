@@ -26,7 +26,7 @@ import {
   getEventTypes,
   getUsers,
 } from "../db/database";
-import { useLanguage } from "../LanguageContext";
+import { useLanguage } from "../contexts/LanguageContext";
 import { useNavigation } from "@react-navigation/native";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");

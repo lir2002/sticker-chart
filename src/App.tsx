@@ -2,13 +2,13 @@ import React, { useEffect, useState } from "react";
 import { StatusBar } from "expo-status-bar";
 import { NavigationContainer } from "@react-navigation/native";
 import { createStackNavigator } from "@react-navigation/stack";
-import HomeScreen from "./components/HomeScreen";
-import CalendarView from "./components/CalendarView";
+import HomeScreen from "./screens/HomeScreen";
+import CalendarView from "./screens/CalendarView";
 import { RootStackParamList } from "./types";
-import CalendarViewAll from "./components/CalendarViewAll";
-import { LanguageProvider, useLanguage } from "./LanguageContext";
+import CalendarViewAll from "./screens/CalendarViewAll";
+import { LanguageProvider, useLanguage } from "./contexts/LanguageContext";
 import { LocaleConfig } from "react-native-calendars";
-import { UserProvider } from "./UserContext";
+import { UserProvider } from "./contexts/UserContext";
 import { initDatabase } from "./db/database";
 
 // Configure calendar locales for English and Chinese

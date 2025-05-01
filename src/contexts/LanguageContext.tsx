@@ -261,6 +261,12 @@ const translations: Translations = {
   filePickCanceled: { en: "File selection canceled", zh: "文件选择已取消" },
   error: { en: "Error", zh: "错误" },
   unknownError: { en: "Unknown error occurred", zh: "发生未知错误" },
+  contactInfo: { en: "Contact Info", zh: "联系方式" },
+  emailPlaceholder: { en: "Enter email", zh: "输入邮箱" },
+  phonePlaceholder: { en: "Enter phone", zh: "输入电话" },
+  edit: { en: "Edit", zh: "编辑" },
+  contactUpdated: { en: "Contact info updated", zh: "联系方式已更新" },
+  errorUpdateContact: { en: "Failed to update contact info", zh: "更新联系方式失败" },
 };
 
 const LanguageContext = createContext<LanguageContextType | undefined>(
