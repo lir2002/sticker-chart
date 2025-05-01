@@ -4,7 +4,6 @@ import {
   View,
   Text,
   Alert,
-  StyleSheet,
   FlatList,
   TouchableOpacity,
   ActivityIndicator,
@@ -13,6 +12,7 @@ import * as FileSystem from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import { useLanguage } from "../contexts/LanguageContext";
 import { CustomButton } from "./SharedComponents";
+import { styles } from "../styles/uploadDataStyles";
 
 interface UploadDataProps {
   onClose: () => void;
@@ -124,37 +124,5 @@ const UploadData: React.FC<UploadDataProps> = ({ onClose }) => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    padding: 20,
-    alignItems: "center",
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: "bold",
-    marginBottom: 20,
-  },
-  loader: {
-    marginVertical: 20,
-  },
-  fileList: {
-    width: "100%",
-    maxHeight: 200,
-    marginBottom: 20,
-  },
-  fileItem: {
-    padding: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: "#ccc",
-  },
-  selectedFileItem: {
-    backgroundColor: "#e0f0ff",
-  },
-  noFilesText: {
-    fontSize: 14,
-    color: "#666",
-    marginBottom: 20,
-  },
-});
 
 export default UploadData;

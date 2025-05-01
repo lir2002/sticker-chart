@@ -1,8 +1,9 @@
 import React, { useState, useContext } from 'react';
-import { View, Text, TextInput, Button, Alert, StyleSheet } from 'react-native';
+import { View, Text, TextInput, Button, Alert } from 'react-native';
 import { useLanguage } from '../contexts/LanguageContext';
 import { UserContext } from '../contexts/UserContext';
 import { verifyUserCode, updateUserCode } from '../db/database';
+import { styles } from '../styles/changeCodeStyles';
 
 interface ChangeCodeProps {
   onCodeChanged: () => void;
@@ -87,35 +88,5 @@ const ChangeCode: React.FC<ChangeCodeProps> = ({ onCodeChanged, onCancel }) => {
   );
 };
 
-const styles = StyleSheet.create({
-  modalContent: {
-    backgroundColor: '#fff',
-    padding: 20,
-    borderRadius: 10,
-    width: '80%',
-    alignItems: 'center',
-    alignSelf: 'center',
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 10,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    padding: 10,
-    marginVertical: 10,
-    borderRadius: 5,
-    width: '100%',
-    fontSize: 16,
-  },
-  buttonContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    width: '100%',
-    marginTop: 10,
-  },
-});
 
 export default ChangeCode;

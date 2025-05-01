@@ -1,6 +1,7 @@
 import React, { useState } from "react";
-import { View, Text, TextInput, Button, Alert, StyleSheet } from "react-native";
+import { View, Text, TextInput, Button, Alert } from "react-native";
 import { useLanguage } from "../contexts/LanguageContext";
+import { styles } from "../styles/codeSetupStyles";
 
 interface CodeSetupProps {
   onCodeSet: (code: string) => void;
@@ -54,28 +55,5 @@ const CodeSetup: React.FC<CodeSetupProps> = ({ onCodeSet }) => {
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 20,
-    justifyContent: "center",
-    backgroundColor: "#fff",
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "bold",
-    textAlign: "center",
-    marginBottom: 20,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: "#ccc",
-    padding: 10,
-    marginVertical: 10,
-    borderRadius: 5,
-    fontSize: 16,
-  },
-});
 
 export default CodeSetup;
