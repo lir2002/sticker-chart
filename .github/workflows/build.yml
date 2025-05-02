@@ -1,0 +1,108 @@
+name: Build Expo Android APK
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Checkout code
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Step 2: Set up Node.js environment
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      # Step 3: Install project dependencies
+      - name: Install dependencies
+        run: npm install
+
+      # Step 4: Install Expo CLI
+      - name: Install Expo CLI
+        run: npm install -g expo-cli
+
+      # Step 5: Run expo prebuild to generate native Android project
+      - name: Run expo prebuild
+        run: npx expo prebuild --platform android
+
+      # Step 6: Set up JDK 17
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+          cache: 'gradle'
+
+      # Step 7: Decode and save Keystore file
+      - name: Decode Keystore
+        run: |
+          echo "${{ secrets.KEYSTORE_FILE }}" | base64 -d > android/app/keystore.jks
+
+      # Step 8: Configure signing in build.gradle
+      - name: Configure signing in build.gradle
+        run: |
+          # Append signing configuration to android/app/build.gradle
+          cat << 'EOF' >> android/app/build.gradle
+          android {
+              signingConfigs {
+                  release {
+                      storeFile file("keystore.jks")
+                      storePassword System.getenv("RELEASE_KEYSTORE_PASSWORD")
+                      keyAlias System.getenv("RELEASE_KEY_ALIAS")
+                      keyPassword System.getenv("RELEASE_KEY_PASSWORD")
+                  }
+              }
+              buildTypes {
+                  release {
+                      signingConfig signingConfigs.release
+                      minifyEnabled false
+                      proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+                  }
+              }
+          }
+          EOF
+
+      # Step 9: Grant execute permission for gradlew
+      - name: Grant execute permission for gradlew
+        run: chmod +x ./android/gradlew
+
+      # Step 10: Build Debug APK
+      - name: Build Debug APK
+        run: cd android && ./gradlew assembleDebug
+
+      # Step 11: Build Release APK
+      - name: Build Release APK
+        run: cd android && ./gradlew assembleRelease
+        env:
+          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+
+      # Step 12: Build AAB (optional)
+      - name: Build AAB
+        run: cd android && ./gradlew bundleRelease
+        env:
+          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+
+      # Step 13: Upload APK and AAB
+      - name: Upload APK and AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-build-artifacts
+          path: |
+            android/app/build/outputs/apk/**/*.apk
+            android/app/build/outputs/bundle/**/*.aab
