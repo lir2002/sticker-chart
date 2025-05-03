@@ -13,6 +13,8 @@ export interface Event {
   verified_at?: string | null; // New field
   verified_by?: number | null; // New field
   verifierName?: string | null; // New field
+  owner?: number | null; // Added
+  ownerName?: string | null; // Added
 }
 
 // EventType interface for event_types table
@@ -67,6 +69,7 @@ export interface Transaction {
   reason: string | null;
   amount: number | null;
   counterparty: number | null;
+  counterpartyName?: string | null;
   timestamp: string | null;
   balance: number | null;
 }

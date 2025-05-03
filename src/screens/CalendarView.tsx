@@ -2,7 +2,6 @@ import React, { useEffect, useState, useContext } from "react";
 import {
   View,
   Text,
-  StyleSheet,
   TextInput,
   Modal,
   Button,
@@ -31,13 +30,14 @@ import {
   updateEventType,
   verifyUserCode,
   deleteEvent,
-  verifyEvent,
+  verifyEventWithTransaction,
   getUsers,
 } from "../db/database";
 import { useLanguage } from "../contexts/LanguageContext";
 import { availableColors, availableIcons } from "../icons";
 import { UserContext } from "../contexts/UserContext";
 import { styles } from "../styles/calendarViewStyles";
+import { resolvePhotoUri } from "../utils/fileUtils";
 
 interface CalendarViewProps {
   route: RouteProp<RootStackParamList, "Calendar">;
@@ -86,6 +86,8 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
   const [eventTypeOwnerId, setEventTypeOwnerId] = useState<number | null>(null);
   const [users, setUsers] = useState<{ id: number; name: string }[]>([]);
   const [pendingEventId, setPendingEventId] = useState<number | null>(null);
+  const [confirmVerifyModalVisible, setConfirmVerifyModalVisible] =
+    useState(false);
 
   const scale = useSharedValue(1);
   const savedScale = useSharedValue(1);
@@ -169,7 +171,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
+      mediaTypes: ["images"],
       allowsEditing: true,
       quality: 1,
     });
@@ -187,7 +189,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
     }
 
     const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ['images'],
+      mediaTypes: ["images"],
       allowsEditing: true,
       quality: 1,
     });
@@ -223,17 +225,16 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
         }
       }
 
-      const permanentPath = `${
-        FileSystem.documentDirectory
-      }photos/${Date.now()}.jpg`;
-      await FileSystem.makeDirectoryAsync(
-        `${FileSystem.documentDirectory}photos/`,
-        {
-          intermediates: true,
-        }
-      );
+      const photoDir = `${FileSystem.documentDirectory}photos/`;
+      const fileName = `${Date.now()}.jpg`;
+      const relativePath = `photos/${fileName}`;
+      const permanentPath = `${photoDir}${fileName}`;
+
+      await FileSystem.makeDirectoryAsync(photoDir, {
+        intermediates: true,
+      });
       await FileSystem.moveAsync({ from: finalUri, to: permanentPath });
-      setPhotoUri(permanentPath);
+      setPhotoUri(relativePath); // Store relative path
     } catch (error) {
       console.error("Error processing image:", error);
       Alert.alert("Error", t("errorProcessImage"));
@@ -270,11 +271,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
         };
         const updatedEvents = [...events, newEvent];
         setEvents(updatedEvents);
-        calculateMonthlyAchievements(
-          updatedEvents,
-          currentYear,
-          currentMonth
-        );
+        calculateMonthlyAchievements(updatedEvents, currentYear, currentMonth);
         updateMarkedDates(updatedEvents, iconColor);
       }
       setVerifyModalVisible(false);
@@ -317,9 +314,14 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
     }
   };
 
-  const handleVerifyEvent = async (eventId: number) => {
+  const handleVerifyEvent = (eventId: number) => {
     setPendingEventId(eventId);
-    setVerifyEventModalVisible(true);
+    setConfirmVerifyModalVisible(true); // Show confirmation modal
+  };
+
+  const handleConfirmVerification = () => {
+    setConfirmVerifyModalVisible(false);
+    setVerifyEventModalVisible(true); // Proceed to password input
   };
 
   const handleConfirmVerifyEvent = async () => {
@@ -327,7 +329,25 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
     try {
       const isValid = await verifyUserCode(currentUser.id, inputCode);
       if (isValid) {
-        await verifyEvent(pendingEventId, currentUser.id);
+        // Find the event to get its details
+        const event = events.find((e) => e.id === pendingEventId);
+        if (!event) {
+          throw new Error("Event not found");
+        }
+        await verifyEventWithTransaction(
+          pendingEventId,
+          currentUser.id,
+          event.eventType,
+          eventTypeOwnerId,
+          t("transactionReasonVerify", {
+            eventType: event.eventType,
+            createdAt: new Date(event.markedAt).toLocaleString(),
+          }),
+          t("transactionReasonReceive", {
+            eventType: event.eventType,
+            createdAt: new Date(event.markedAt).toLocaleString(),
+          })
+        );
         const updatedEvents = await fetchEventsWithCreator(eventType);
         setEvents(updatedEvents);
         setVerifyEventModalVisible(false);
@@ -338,12 +358,11 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
         Alert.alert("Error", t("errorIncorrectCode"));
         setInputCode("");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error verifying event:", error);
-      Alert.alert("Error", t("errorVerifyEvent"));
+      Alert.alert("Error", `${t("errorVerifyEvent")}: ${error.message}`);
     }
   };
-
   const openPhotoModal = (uri: string) => {
     setSelectedPhotoUri(uri);
     setPhotoModalVisible(true);
@@ -549,7 +568,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
                     onPress={() => openPhotoModal(event.photoPath)}
                   >
                     <Image
-                      source={{ uri: event.photoPath }}
+                      source={{ uri: resolvePhotoUri(event.photoPath)! }}
                       style={styles.eventPhoto}
                     />
                   </TouchableOpacity>
@@ -618,7 +637,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
               </TouchableOpacity>
             </View>
             {photoUri && (
-              <Image source={{ uri: photoUri }} style={styles.photoPreview} />
+              <Image source={{ uri: resolvePhotoUri(photoUri)! }} style={styles.photoPreview} />
             )}
             <View style={styles.buttonContainer}>
               <Button
@@ -713,7 +732,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
         <View style={styles.photoModalContainer}>
           <GestureDetector gesture={composedGestures}>
             <Animated.Image
-              source={{ uri: selectedPhotoUri || "" }}
+              source={{ uri: resolvePhotoUri(selectedPhotoUri) || "" }}
               style={[styles.fullScreenPhoto, animatedStyle]}
               resizeMode="contain"
             />
@@ -758,9 +777,37 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
           </View>
         </View>
       </Modal>
+      {/* Verify Confirmation Modal */}
+      <Modal
+        visible={confirmVerifyModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setConfirmVerifyModalVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>{t("verifyEvent")}</Text>
+            <Text style={styles.modalText}>
+              {t("verifyConfirmation", { faceValue: weight })}
+            </Text>
+            <View style={styles.buttonContainer}>
+              <Button
+                title={t("cancel")}
+                onPress={() => {
+                  setConfirmVerifyModalVisible(false);
+                  setPendingEventId(null);
+                }}
+              />
+              <Button
+                title={t("confirm")}
+                onPress={handleConfirmVerification}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
-
 
 export default CalendarView;

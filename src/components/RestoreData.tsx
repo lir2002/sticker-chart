@@ -1,11 +1,5 @@
 import React, { useState } from "react";
-import {
-  View,
-  Text,
-  Alert,
-  FlatList,
-  TouchableOpacity,
-} from "react-native";
+import { View, Text, Alert, FlatList, TouchableOpacity } from "react-native";
 import * as FileSystem from "expo-file-system";
 import JSZip from "jszip";
 import { useLanguage } from "../contexts/LanguageContext";
@@ -13,6 +7,7 @@ import * as SQLite from "expo-sqlite";
 import { CustomButton } from "./SharedComponents";
 import DownloadData from "./DownloadData";
 import { styles } from "../styles/restoreDataStyles";
+import { DatabaseManager } from "../db/database";
 
 interface RestoreDataProps {
   onClose: () => void;
@@ -57,204 +52,239 @@ const RestoreData: React.FC<RestoreDataProps> = ({ onClose }) => {
       const tempDir = `${FileSystem.cacheDirectory}restore_temp/`;
       const photosDir = `${FileSystem.documentDirectory}photos/`;
       const iconsDir = `${FileSystem.documentDirectory}icons/`;
-  
+
       // Read ZIP file
       const zipContent = await FileSystem.readAsStringAsync(zipPath, {
         encoding: FileSystem.EncodingType.Base64,
       });
       const zip = await JSZip.loadAsync(zipContent, { base64: true });
-  
+
       // Create temp directory
       await FileSystem.makeDirectoryAsync(tempDir, { intermediates: true });
-  
+
       // Extract database.json
       const dbJsonFile = zip.file("database.json");
-      if (dbJsonFile) {
-        const dbJsonContent = await dbJsonFile.async("string");
-        const dbData = JSON.parse(dbJsonContent);
-        const db = await SQLite.openDatabaseAsync("eventmarker.db", { useNewConnection: true });
-        try {
-          await db.withTransactionAsync(async () => {
-            // Clear existing tables
-            await db.execAsync(`
-              DELETE FROM events;
-              DELETE FROM event_types;
-              DELETE FROM users;
-              DELETE FROM roles;
-              DELETE FROM wallets;
-              DELETE FROM db_version;
-            `);
-  
-            // Drop existing transactions_<userId> tables
-            const tables = await db.getAllAsync<{ name: string }>(
-              "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'transactions_%';"
-            );
-            for (const table of tables) {
-              await db.execAsync(`DROP TABLE IF EXISTS ${table.name};`);
-            }
-  
-            // Insert roles
-            for (const role of dbData.roles) {
-              await db.runAsync(
-                "INSERT INTO roles (role_id, role_name) VALUES (?, ?);",
-                [role.role_id, role.role_name]
-              );
-            }
-  
-            // Insert users (with email and phone for version 4+)
-            for (const user of dbData.users) {
-              await db.runAsync(
-                `INSERT INTO users (id, name, role_id, code, is_active, created_at, updated_at, icon, email, phone)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
-                [
-                  user.id,
-                  user.name,
-                  user.role_id,
-                  user.code,
-                  user.is_active,
-                  user.created_at,
-                  user.updated_at,
-                  user.icon,
-                  user.email || '', // Default to '' for older backups
-                  user.phone || '', // Default to '' for older backups
-                ]
-              );
-            }
-  
-            // Insert event_types
-            for (const type of dbData.eventTypes) {
-              await db.runAsync(
-                "INSERT INTO event_types (name, icon, iconColor, availability, owner, weight) VALUES (?, ?, ?, ?, ?, ?);",
-                [
-                  type.name,
-                  type.icon,
-                  type.iconColor,
-                  type.availability,
-                  type.owner || null,
-                  type.weight,
-                ]
-              );
-            }
-  
-            // Insert events
-            for (const event of dbData.events) {
-              await db.runAsync(
-                `INSERT INTO events (id, date, markedAt, eventType, note, photoPath, created_by, is_verified, verified_at, verified_by)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
-                [
-                  event.id,
-                  event.date,
-                  event.markedAt,
-                  event.eventType,
-                  event.note || null,
-                  event.photoPath || null,
-                  event.created_by,
-                  event.is_verified ? 1 : 0,
-                  event.verified_at || null,
-                  event.verified_by || null,
-                ]
-              );
-            }
-  
-            // Insert wallets (if present in backup)
-            if (dbData.wallets) {
-              for (const wallet of dbData.wallets) {
-                await db.runAsync(
-                  "INSERT INTO wallets (owner, assets, credit) VALUES (?, ?, ?);",
-                  [wallet.owner, wallet.assets, wallet.credit]
-                );
-              }
-            }
-  
-            // Restore transactions_<userId> tables for non-Guest users
-            const nonGuestUsers = dbData.users.filter((user: any) => user.name !== "Guest");
-            for (const user of nonGuestUsers) {
-              const tableName = `transactions_${user.id}`;
-              // Create transactions_<userId> table
-              await db.execAsync(`
-                CREATE TABLE IF NOT EXISTS ${tableName} (
-                  id INTEGER PRIMARY KEY AUTOINCREMENT,
-                  reason TEXT,
-                  amount INTEGER,
-                  counterparty INTEGER,
-                  timestamp TEXT,
-                  balance INTEGER,
-                  FOREIGN KEY (counterparty) REFERENCES users(id)
-                );
-              `);
-              // Insert transactions (if present in backup)
-              if (dbData[tableName]) {
-                for (const transaction of dbData[tableName]) {
-                  await db.runAsync(
-                    `INSERT INTO ${tableName} (id, reason, amount, counterparty, timestamp, balance)
-                     VALUES (?, ?, ?, ?, ?, ?);`,
-                    [
-                      transaction.id,
-                      transaction.reason || null,
-                      transaction.amount || null,
-                      transaction.counterparty || null,
-                      transaction.timestamp || null,
-                      transaction.balance || null,
-                    ]
-                  );
-                }
-              }
-            }
-  
-            // Insert db_version
-            if (dbData.dbVersion && typeof dbData.dbVersion.version === 'number') {
-              await db.runAsync(
-                "INSERT OR REPLACE INTO db_version (version) VALUES (?);",
-                [dbData.dbVersion.version]
-              );
-            }
-          });
-        } finally {
-          await db.closeAsync();
-        }
-      } else {
+      if (!dbJsonFile) {
         throw new Error("Backup does not contain a valid database file");
       }
-  
+
+      const dbJsonContent = await dbJsonFile.async("string");
+      const dbData = JSON.parse(dbJsonContent);
+
+      // Migrate absolute paths to relative paths if version < 5 or missing
+      const backupVersion = dbData.dbVersion?.version || 0;
+      if (backupVersion < 5) {
+        // Migrate events.photoPath
+        if (dbData.events) {
+          dbData.events = dbData.events.map((event: any) => {
+            if (event.photoPath && event.photoPath.startsWith("file://")) {
+              const relativePath = event.photoPath.includes("photos/")
+                ? event.photoPath.substring(event.photoPath.indexOf("photos/"))
+                : null; // Fallback
+              return { ...event, photoPath: relativePath };
+            }
+            return event;
+          });
+        }
+
+        // Migrate users.icon
+        if (dbData.users) {
+          dbData.users = dbData.users.map((user: any) => {
+            if (user.icon && user.icon.startsWith("file://")) {
+              const relativePath = user.icon.includes("icons/")
+                ? user.icon.substring(user.icon.indexOf("icons/"))
+                : null; // Fallback
+              return { ...user, icon: relativePath };
+            }
+            return user;
+          });
+        }
+
+        // Update db_version to 5
+        dbData.dbVersion = { version: 5 };
+      }
+
+      const dbManager = DatabaseManager.getInstance();
+      const db = dbManager.getDatabase();
+      try {
+        await db.withTransactionAsync(async () => {
+          // Clear existing tables
+          await db.execAsync(`
+            DELETE FROM events;
+            DELETE FROM event_types;
+            DELETE FROM users;
+            DELETE FROM roles;
+            DELETE FROM wallets;
+            DELETE FROM db_version;
+          `);
+
+          // Drop existing transactions_<userId> tables
+          const tables = await db.getAllAsync<{ name: string }>(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'transactions_%';"
+          );
+          for (const table of tables) {
+            await db.execAsync(`DROP TABLE IF EXISTS ${table.name};`);
+          }
+
+          // Insert roles
+          for (const role of dbData.roles) {
+            await db.runAsync(
+              "INSERT INTO roles (role_id, role_name) VALUES (?, ?);",
+              [role.role_id, role.role_name]
+            );
+          }
+
+          // Insert users
+          for (const user of dbData.users) {
+            await db.runAsync(
+              `INSERT INTO users (id, name, role_id, code, is_active, created_at, updated_at, icon, email, phone)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+              [
+                user.id,
+                user.name,
+                user.role_id,
+                user.code,
+                user.is_active,
+                user.created_at,
+                user.updated_at,
+                user.icon || null,
+                user.email || "",
+                user.phone || "",
+              ]
+            );
+          }
+
+          // Insert event_types
+          for (const type of dbData.eventTypes) {
+            await db.runAsync(
+              "INSERT INTO event_types (name, icon, iconColor, availability, owner, weight) VALUES (?, ?, ?, ?, ?, ?);",
+              [
+                type.name,
+                type.icon,
+                type.iconColor,
+                type.availability,
+                type.owner || null,
+                type.weight,
+              ]
+            );
+          }
+
+          // Insert events
+          for (const event of dbData.events) {
+            await db.runAsync(
+              `INSERT INTO events (id, date, markedAt, eventType, note, photoPath, created_by, is_verified, verified_at, verified_by)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+              [
+                event.id,
+                event.date,
+                event.markedAt,
+                event.eventType,
+                event.note || null,
+                event.photoPath || null,
+                event.created_by,
+                event.is_verified ? 1 : 0,
+                event.verified_at || null,
+                event.verified_by || null,
+              ]
+            );
+          }
+
+          // Insert wallets (if present)
+          if (dbData.wallets) {
+            for (const wallet of dbData.wallets) {
+              await db.runAsync(
+                "INSERT INTO wallets (owner, assets, credit) VALUES (?, ?, ?);",
+                [wallet.owner, wallet.assets, wallet.credit]
+              );
+            }
+          }
+
+          // Restore transactions_<userId> tables for non-Guest users
+          const nonGuestUsers = dbData.users.filter(
+            (user: any) => user.name !== "Guest"
+          );
+          for (const user of nonGuestUsers) {
+            const tableName = `transactions_${user.id}`;
+            await db.execAsync(`
+              CREATE TABLE IF NOT EXISTS ${tableName} (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                reason TEXT,
+                amount INTEGER,
+                counterparty INTEGER,
+                timestamp TEXT,
+                balance INTEGER,
+                FOREIGN KEY (counterparty) REFERENCES users(id)
+              );
+            `);
+            if (dbData[tableName]) {
+              for (const transaction of dbData[tableName]) {
+                await db.runAsync(
+                  `INSERT INTO ${tableName} (id, reason, amount, counterparty, timestamp, balance)
+                   VALUES (?, ?, ?, ?, ?, ?);`,
+                  [
+                    transaction.id,
+                    transaction.reason || null,
+                    transaction.amount || null,
+                    transaction.counterparty || null,
+                    transaction.timestamp || null,
+                    transaction.balance || null,
+                  ]
+                );
+              }
+            }
+          }
+
+          // Insert db_version
+          await db.runAsync(
+            "INSERT OR REPLACE INTO db_version (version) VALUES (?);",
+            [dbData.dbVersion?.version || 5]
+          );
+        });
+      } catch (error: any) {
+        Alert.alert("Failed to convert to Version 5", error.message);
+      }
+
       // Restore photos
       await FileSystem.deleteAsync(photosDir, { idempotent: true });
       await FileSystem.makeDirectoryAsync(photosDir, { intermediates: true });
-      const photoFiles = Object.keys(zip.files).filter((name) => name.startsWith("photos/") && !name.endsWith("/"));
+      const photoFiles = Object.keys(zip.files).filter(
+        (name) => name.startsWith("photos/") && !name.endsWith("/")
+      );
       for (const fileName of photoFiles) {
         const fileContent = await zip.file(fileName)!.async("base64");
-        const destPath = `${photosDir}${fileName.split('/').pop()}`;
+        const destPath = `${photosDir}${fileName.split("/").pop()}`;
         await FileSystem.writeAsStringAsync(destPath, fileContent, {
           encoding: FileSystem.EncodingType.Base64,
         });
       }
-  
+
       // Restore icons
       await FileSystem.deleteAsync(iconsDir, { idempotent: true });
       await FileSystem.makeDirectoryAsync(iconsDir, { intermediates: true });
-      const iconFiles = Object.keys(zip.files).filter((name) => name.startsWith("icons/") && !name.endsWith("/"));
+      const iconFiles = Object.keys(zip.files).filter(
+        (name) => name.startsWith("icons/") && !name.endsWith("/")
+      );
       for (const fileName of iconFiles) {
         const fileContent = await zip.file(fileName)!.async("base64");
-        const destPath = `${iconsDir}${fileName.split('/').pop()}`;
+        const destPath = `${iconsDir}${fileName.split("/").pop()}`;
         await FileSystem.writeAsStringAsync(destPath, fileContent, {
           encoding: FileSystem.EncodingType.Base64,
         });
       }
-  
+
       // Clean up temp directory
       await FileSystem.deleteAsync(tempDir, { idempotent: true });
-  
-      Alert.alert(
-        t("success"),
-        t("restoreComplete"),
-        [{
+
+      Alert.alert(t("success"), t("restoreComplete"), [
+        {
           text: t("ok"),
           onPress: () => {
             onClose();
             Alert.alert(t("info"), t("restartApp"), [{ text: t("ok") }]);
-          }
-        }]
-      );
-    } catch (error) {
+          },
+        },
+      ]);
+    } catch (error: any) {
       console.error("Restore error:", error);
       Alert.alert("Error", `${t("errorRestore")}: ${error.message}`);
     } finally {
@@ -310,6 +340,5 @@ const RestoreData: React.FC<RestoreDataProps> = ({ onClose }) => {
     </View>
   );
 };
-
 
 export default RestoreData;

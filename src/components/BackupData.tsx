@@ -58,35 +58,29 @@ const BackupData: React.FC<BackupDataProps> = ({ onClose }) => {
     try {
       const dbVersion = await getDbVersion();
       const backupDir = `${FileSystem.documentDirectory}Sticker-Chart/`;
-      const zipPath = `${backupDir}stickers.${dbVersion.version}.bak.zip`;
+      const date = new Date().toISOString().slice(2, 17).replace(/[-T:]/g, "");
+      const zipPath = `${backupDir}stickers.${dbVersion.version}.bak.${date}.zip`;
       const tempDir = `${FileSystem.cacheDirectory}backup_temp/`;
       const photosDir = `${FileSystem.documentDirectory}photos/`;
-  
+      const rootDir = `${FileSystem.documentDirectory}`; // Base directory for icons
+
       await FileSystem.deleteAsync(tempDir, { idempotent: true });
       await FileSystem.makeDirectoryAsync(backupDir, { intermediates: true });
       await FileSystem.makeDirectoryAsync(tempDir, { intermediates: true });
-  
-      const zipInfo = await FileSystem.getInfoAsync(zipPath);
-      if (zipInfo.exists) {
-        const date = new Date().toISOString().slice(2, 17).replace(/[-T:]/g, '');
-        const newZipPath = `${backupDir}stickers.${dbVersion.version}.bak.${date}.zip`;
-        await FileSystem.moveAsync({ from: zipPath, to: newZipPath });
-      }
-  
+
       // Fetch existing data
       const users = await getUsers();
       const eventTypes = await getEventTypes();
       const events = await fetchAllEvents();
       const roles = await getRoles();
       const wallets = await getAllWallets();
-      // Fetch transactions_<userId> for non-Guest users
       const transactionsTables: { [key: string]: any[] } = {};
       const nonGuestUsers = users.filter((user) => user.name !== "Guest");
       for (const user of nonGuestUsers) {
         const transactions = await fetchTransactions(user.id);
         transactionsTables[`transactions_${user.id}`] = transactions;
       }
-  
+
       // Combine all data
       const dbData = {
         users,
@@ -99,48 +93,67 @@ const BackupData: React.FC<BackupDataProps> = ({ onClose }) => {
       };
       const dbJsonPath = `${tempDir}database.json`;
       await FileSystem.writeAsStringAsync(dbJsonPath, JSON.stringify(dbData));
-  
+
       const zip = new JSZip();
       const dbJsonContent = await FileSystem.readAsStringAsync(dbJsonPath);
       zip.file("database.json", dbJsonContent);
 
+      // Backup photos
       const photoDirInfo = await FileSystem.getInfoAsync(photosDir);
       if (photoDirInfo.exists) {
         const photoFiles = await FileSystem.readDirectoryAsync(photosDir);
         for (const file of photoFiles) {
-          const fileContent = await FileSystem.readAsStringAsync(`${photosDir}${file}`, {
-            encoding: FileSystem.EncodingType.Base64,
-          });
+          const fileContent = await FileSystem.readAsStringAsync(
+            `${photosDir}${file}`,
+            {
+              encoding: FileSystem.EncodingType.Base64,
+            }
+          );
           zip.file(`photos/${file}`, fileContent, { base64: true });
         }
       }
 
+      // Backup icons
       const iconDir = `${tempDir}icons/`;
       await FileSystem.makeDirectoryAsync(iconDir, { intermediates: true });
       for (const user of users) {
         if (user.icon) {
-          const iconFileName = user.icon.split('/').pop() || `icon_${user.id}.jpg`;
-          await FileSystem.copyAsync({
-            from: user.icon,
-            to: `${iconDir}${iconFileName}`,
-          });
-          const fileContent = await FileSystem.readAsStringAsync(`${iconDir}${iconFileName}`, {
-            encoding: FileSystem.EncodingType.Base64,
-          });
-          zip.file(`icons/${iconFileName}`, fileContent, { base64: true });
+          // Convert relative icon path to absolute
+          const relativeIconPath = user.icon; // e.g., "icons/icon_1.jpg"
+          const absoluteIconPath = `${rootDir}${relativeIconPath}`; // e.g., "file:///.../icons/icon_1.jpg"
+          const iconFileName =
+            relativeIconPath.split("/").pop() || `icon_${user.id}.jpg`;
+
+          // Verify icon file exists
+          const iconFileInfo = await FileSystem.getInfoAsync(absoluteIconPath);
+          if (iconFileInfo.exists) {
+            await FileSystem.copyAsync({
+              from: absoluteIconPath,
+              to: `${iconDir}${iconFileName}`,
+            });
+            const fileContent = await FileSystem.readAsStringAsync(
+              `${iconDir}${iconFileName}`,
+              {
+                encoding: FileSystem.EncodingType.Base64,
+              }
+            );
+            zip.file(`icons/${iconFileName}`, fileContent, { base64: true });
+          } else {
+            console.warn(`Icon file not found: ${absoluteIconPath}`);
+          }
         }
       }
-  
+
       const zipContent = await zip.generateAsync({ type: "base64" });
       await FileSystem.writeAsStringAsync(zipPath, zipContent, {
         encoding: FileSystem.EncodingType.Base64,
       });
-  
+
       await FileSystem.deleteAsync(tempDir, { idempotent: true });
-  
+
       // Reload backup files to update UI
       await loadBackupFiles();
-  
+
       Alert.alert(
         t("success"),
         `${t("backupComplete")} ${zipPath}`,

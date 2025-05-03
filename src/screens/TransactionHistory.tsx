@@ -53,7 +53,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
           {t("amount")}: {item.amount !== null ? item.amount : t("unknown")}
         </Text>
         <Text style={styles.transactionText}>
-          {t("counterparty")}: {item.counterparty || t("unknown")}
+          {t("counterparty")}: {item.counterpartyName || item.counterparty || t("unknown")}
         </Text>
         <Text style={styles.transactionText}>
           {t("timestamp")}: {item.timestamp || t("unknown")}

@@ -21,14 +21,14 @@ import Animated, {
 } from "react-native-reanimated";
 import { Event, EventType } from "../types";
 import {
-  fetchAllEventsWithCreator,
+  fetchAllEventsWithDetails, // Renamed from fetchAllEventsWithCreator
   getEventTypes,
   getUsers,
 } from "../db/database";
 import { useLanguage } from "../contexts/LanguageContext";
 import { useNavigation } from "@react-navigation/native";
 import { styles } from "../styles/calendarViewAllStyles";
-
+import { resolvePhotoUri } from "../utils/fileUtils";
 
 const CalendarViewAll: React.FC = () => {
   const { t, language } = useLanguage();
@@ -39,12 +39,8 @@ const CalendarViewAll: React.FC = () => {
   const [users, setUsers] = useState<{ id: number; name: string }[]>([]);
   const [selectedFilters, setSelectedFilters] = useState<string[]>(["All"]);
   const [tempFilters, setTempFilters] = useState<string[]>(["All"]);
-  const [selectedCreatorFilters, setSelectedCreatorFilters] = useState<
-    string[]
-  >(["All"]);
-  const [tempCreatorFilters, setTempCreatorFilters] = useState<string[]>([
-    "All",
-  ]);
+  const [selectedOwnerFilters, setSelectedOwnerFilters] = useState<string[]>(["All"]);
+  const [tempOwnerFilters, setTempOwnerFilters] = useState<string[]>(["All"]);
   const [verifiedFilter, setVerifiedFilter] = useState<string>("All");
   const [tempVerifiedFilter, setTempVerifiedFilter] = useState<string>("All");
   const [filterModalVisible, setFilterModalVisible] = useState(false);
@@ -84,13 +80,20 @@ const CalendarViewAll: React.FC = () => {
   useEffect(() => {
     const initialize = async () => {
       try {
-        const loadedEvents = await fetchAllEventsWithCreator();
+        const loadedEvents = await fetchAllEventsWithDetails();
         setEvents(loadedEvents);
         setFilteredEvents(loadedEvents);
         const types = await getEventTypes();
         setEventTypes(types);
         const loadedUsers = await getUsers();
-        setUsers(loadedUsers.map((u) => ({ id: u.id, name: u.name })));
+        // Filter users who are owners in event_types
+        const ownerIds = types
+          .map((t) => t.owner)
+          .filter((id): id is number => id !== null);
+        const ownerUsers = loadedUsers
+          .filter((u) => ownerIds.includes(u.id))
+          .map((u) => ({ id: u.id, name: u.name }));
+        setUsers(ownerUsers);
         updateMarkedDates(loadedEvents, types);
       } catch (error) {
         console.error("Initialization error:", error);
@@ -144,19 +147,19 @@ const CalendarViewAll: React.FC = () => {
     });
   };
 
-  const toggleCreatorFilter = (creatorId: string) => {
-    setTempCreatorFilters((prev) => {
-      if (creatorId === "All") {
+  const toggleOwnerFilter = (ownerId: string) => {
+    setTempOwnerFilters((prev) => {
+      if (ownerId === "All") {
         return ["All"];
       }
       if (prev.includes("All")) {
-        return [creatorId];
+        return [ownerId];
       }
-      if (prev.includes(creatorId)) {
-        const newFilters = prev.filter((f) => f !== creatorId);
+      if (prev.includes(ownerId)) {
+        const newFilters = prev.filter((f) => f !== ownerId);
         return newFilters.length > 0 ? newFilters : ["All"];
       }
-      return [...prev, creatorId];
+      return [...prev, ownerId];
     });
   };
 
@@ -166,7 +169,7 @@ const CalendarViewAll: React.FC = () => {
 
   const applyFilters = () => {
     setSelectedFilters(tempFilters);
-    setSelectedCreatorFilters(tempCreatorFilters);
+    setSelectedOwnerFilters(tempOwnerFilters);
     setVerifiedFilter(tempVerifiedFilter);
     setFilterModalVisible(false);
 
@@ -176,10 +179,13 @@ const CalendarViewAll: React.FC = () => {
         tempFilters.includes(event.eventType)
       );
     }
-    if (!tempCreatorFilters.includes("All")) {
-      filtered = filtered.filter((event) =>
-        tempCreatorFilters.includes(event.created_by.toString())
-      );
+    if (!tempOwnerFilters.includes("All")) {
+      filtered = filtered.filter((event) => {
+        const eventType = eventTypes.find((t) => t.name === event.eventType);
+        return eventType?.owner
+          ? tempOwnerFilters.includes(eventType.owner.toString())
+          : false;
+      });
     }
     if (tempVerifiedFilter === "Verified") {
       filtered = filtered.filter((event) => event.is_verified);
@@ -187,7 +193,7 @@ const CalendarViewAll: React.FC = () => {
       filtered = filtered.filter((event) => !event.is_verified);
     }
     setFilteredEvents(filtered);
-    updateMarkedDates(filtered, eventTypes); // Update marked dates with filtered events
+    updateMarkedDates(filtered, eventTypes);
   };
 
   useEffect(() => {
@@ -223,17 +229,17 @@ const CalendarViewAll: React.FC = () => {
     </TouchableOpacity>
   );
 
-  const renderCreatorFilterItem = ({
+  const renderOwnerFilterItem = ({
     item,
   }: {
     item: { id: number; name: string };
   }) => (
     <TouchableOpacity
       style={styles.filterItem}
-      onPress={() => toggleCreatorFilter(item.id.toString())}
+      onPress={() => toggleOwnerFilter(item.id.toString())}
     >
       <Text style={styles.filterText}>{item.name}</Text>
-      {tempCreatorFilters.includes(item.id.toString()) && (
+      {tempOwnerFilters.includes(item.id.toString()) && (
         <MaterialIcons name="check" size={16} color="#007AFF" />
       )}
     </TouchableOpacity>
@@ -258,13 +264,13 @@ const CalendarViewAll: React.FC = () => {
     } else {
       parts.push(selectedFilters.join(", ") || t("none"));
     }
-    if (selectedCreatorFilters.includes("All")) {
-      parts.push(t("allCreators"));
+    if (selectedOwnerFilters.includes("All")) {
+      parts.push(t("allOwners"));
     } else {
-      const creatorNames = selectedCreatorFilters
+      const ownerNames = selectedOwnerFilters
         .map((id) => users.find((u) => u.id.toString() === id)?.name || id)
         .join(", ");
-      parts.push(creatorNames || t("none"));
+      parts.push(ownerNames || t("none"));
     }
     parts.push(t(verifiedFilter.toLowerCase()));
     return parts.join(" | ");
@@ -328,7 +334,7 @@ const CalendarViewAll: React.FC = () => {
           style={styles.filterButton}
           onPress={() => {
             setTempFilters(selectedFilters);
-            setTempCreatorFilters(selectedCreatorFilters);
+            setTempOwnerFilters(selectedOwnerFilters);
             setTempVerifiedFilter(verifiedFilter);
             setFilterModalVisible(true);
           }}
@@ -403,6 +409,9 @@ const CalendarViewAll: React.FC = () => {
                     <Text style={styles.eventText}>
                       {t("createdBy")}: {event.creatorName ?? t("unknown")}
                     </Text>
+                    <Text style={styles.eventText}>
+                      {t("owner")}: {type?.ownerName ?? t("unknown")}
+                    </Text>
                     {event.note && (
                       <Text style={styles.eventText}>
                         {t("for")}: {event.note}
@@ -410,10 +419,10 @@ const CalendarViewAll: React.FC = () => {
                     )}
                     {event.photoPath && (
                       <TouchableOpacity
-                        onPress={() => openPhotoModal(event.photoPath)}
+                        onPress={() => openPhotoModal(event.photoPath!)}
                       >
                         <Image
-                          source={{ uri: event.photoPath }}
+                          source={{ uri: resolvePhotoUri(event.photoPath)! }}
                           style={styles.eventPhoto}
                         />
                       </TouchableOpacity>
@@ -440,17 +449,17 @@ const CalendarViewAll: React.FC = () => {
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>{t("selectFilters")}</Text>
-            <Text style={styles.filterSectionTitle}>{t("eventTypes")}</Text>
+            <Text style={styles.filterSectionTitle}>{t("achievementTypes")}</Text>
             <FlatList
               data={["All", ...eventTypes.map((type) => type.name)]}
               renderItem={renderFilterItem}
               keyExtractor={(item) => item}
               style={styles.filterList}
             />
-            <Text style={styles.filterSectionTitle}>{t("creators")}</Text>
+            <Text style={styles.filterSectionTitle}>{t("owners")}</Text>
             <FlatList
               data={users}
-              renderItem={renderCreatorFilterItem}
+              renderItem={renderOwnerFilterItem}
               keyExtractor={(item) => item.id.toString()}
               style={styles.filterList}
             />
@@ -482,7 +491,7 @@ const CalendarViewAll: React.FC = () => {
         <View style={styles.photoModalContainer}>
           <GestureDetector gesture={composedGestures}>
             <Animated.Image
-              source={{ uri: selectedPhotoUri || "" }}
+              source={{ uri: resolvePhotoUri(selectedPhotoUri) || "" }}
               style={[styles.fullScreenPhoto, animatedStyle]}
               resizeMode="contain"
             />

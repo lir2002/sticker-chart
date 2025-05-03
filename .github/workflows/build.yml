@@ -79,8 +79,8 @@ jobs:
         run: chmod +x ./android/gradlew
 
       # Step 10: Build Debug APK
-      - name: Build Debug APK
-        run: cd android && ./gradlew assembleDebug
+      # - name: Build Debug APK
+      #   run: cd android && ./gradlew assembleDebug
 
       # Step 11: Build Release APK
       - name: Build Release APK
@@ -91,12 +91,12 @@ jobs:
           RELEASE_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
 
       # Step 12: Build AAB (optional)
-      - name: Build AAB
-        run: cd android && ./gradlew bundleRelease
-        env:
-          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          RELEASE_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          RELEASE_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+      # - name: Build AAB
+      #   run: cd android && ./gradlew bundleRelease
+      #   env:
+      #     RELEASE_KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+      #     RELEASE_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+      #     RELEASE_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
 
       # Step 13: Upload APK and AAB
       - name: Upload APK and AAB

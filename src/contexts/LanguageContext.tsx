@@ -122,8 +122,8 @@ const translations: Translations = {
   deleteUser: { en: "Delete User", zh: "删除用户" },
   resetPassword: { en: "Reset Password", zh: "重置密码" },
   cannotDeleteUser: {
-    en: "Cannot delete user with associated event types",
-    zh: "无法删除拥有关联事件类型的用户",
+    en: "Cannot delete user with associated achievement types",
+    zh: "无法删除拥有关联成就类型的用户",
   },
   modifyPassword: { en: "Modify Password", zh: "修改密码" },
   selectImagePermission: {
@@ -144,17 +144,17 @@ const translations: Translations = {
     zh: "输入您的密码以编辑用户",
   },
   verifyAdminForAddEventType: {
-    en: "Enter Your Password to Add Event Type",
-    zh: "输入您的密码以添加事件类型",
+    en: "Enter Your Password to Add Achievement Type",
+    zh: "输入您的密码以添加成就类型",
   },
   selectUserToEdit: { en: "Select User to Edit", zh: "选择要编辑的用户" },
   errorEmptyEventTypeName: {
-    en: "Event type name cannot be empty",
-    zh: "事件类型名称不能为空",
+    en: "Achievement type name cannot be empty",
+    zh: "成就类型名称不能为空",
   },
   successAddEventType: {
-    en: "Event type added successfully",
-    zh: "事件类型添加成功",
+    en: "Achievement type added successfully",
+    zh: "成就类型添加成功",
   },
   selectOwner: { en: "Select Owner", zh: "选择拥有者" },
   noOrdinaryUsers: {
@@ -166,8 +166,8 @@ const translations: Translations = {
     zh: "请选择一个拥有者",
   },
   selectOwnerSubtitle: {
-    en: "Select an ordinary user to own this event type",
-    zh: "选择一个普通用户作为此事件类型的拥有者",
+    en: "Select an ordinary user to own this achievement type",
+    zh: "选择一个普通用户作为此成就类型的拥有者",
   },
   selectUserRolePrompt: {
     en: "Select the user's role: Admin has full access, User has limited access",
@@ -199,12 +199,13 @@ const translations: Translations = {
   verified: { en: "Verified", zh: "已认证" },
   verifyDeleteEvent: { en: "Verify to Delete Event", zh: "认证以删除事件" },
   unknown: { en: "Unknown", zh: "未知" },
-  creators: { en: "Creators", zh: "创建者" },
+  owner: { en: "Owner", zh: "所有人" },
+  owners: { en: "Owners", zh: "所有者" },
   verificationStatus: { en: "Verification Status", zh: "认证状态" },
   all: { en: "All", zh: "全部" },
   unverified: { en: "Unverified", zh: "未认证" },
-  allTypes: { en: "All Types", zh: "所有类型" },
-  allCreators: { en: "All Creators", zh: "所有创建者" },
+  allTypes: { en: "All Types", zh: "全部类型" },
+  allOwners: { en: "All Owners", zh: "全部所有者" },
   none: { en: "None", zh: "无" },
   errorInit: { en: "Failed to initialize", zh: "初始化失败" },
   faceValue: { en: "Face Value", zh: "面值" },
@@ -277,6 +278,43 @@ const translations: Translations = {
   counterparty: { en: "Counterparty", zh: "交易对象" },
   timestamp: { en: "Timestamp", zh: "时间" },
   balance: { en: "Balance", zh: "余额" },
+  transactionReasonAdminVerify: {
+    en: "Verified achievement '{eventType}' created at {markedAt}",
+    zh: "验证了创建于 {markedAt} 的 '{eventType}' 成就",
+  },
+  transactionReasonOwnerReward: {
+    en: "Received verification for achievement '{eventType}' created at {markedAt}",
+    zh: "获得创建于 {markedAt} 的 '{eventType}' 成就的验证奖励",
+  },
+  insufficientCredit: {
+    en: "Insufficient credit to verify the event.",
+    zh: "点数不足，无法验证该事件。",
+  },
+  eventTypeNotFound: {
+    en: "Achievement type not found.",
+    zh: "未找到成就类型。",
+  },
+  ownerWalletNotFound: {
+    en: "Achievement type owner's wallet not found.",
+    zh: "成就类型所有者的钱包未找到。",
+  },
+  eventNotFound: {
+    en: "Event not found.",
+    zh: "未找到事件。",
+  },
+  verifyConfirmation: {
+    en: "Verification will consume {faceValue} asset(s). Do you want to continue?",
+    zh: "验证将消耗{faceValue}个币。是否继续？",
+  },
+  transactionReasonVerify: {
+    en: "Verified achievement '{eventType}' created at {createdAt}",
+    zh: "验证了于{createdAt}创建的「{eventType}」成就",
+  },
+  transactionReasonReceive: {
+    en: "Received verification for achievement '{eventType}' created at {createdAt}",
+    zh: "获得于{createdAt}创建的「{eventType}」成就的验证",
+  },
+  achievementTypes: {en: "Achievement Types", zh: "成就类型"},
 };
 
 const LanguageContext = createContext<LanguageContextType | undefined>(

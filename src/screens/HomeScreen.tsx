@@ -45,6 +45,7 @@ import BackupData from "../components/BackupData";
 import RestoreData from "../components/RestoreData";
 import * as ImageManipulator from "expo-image-manipulator";
 import { styles } from "../styles/homeScreenStyles";
+import { processUserIcon, resolvePhotoUri } from "../utils/fileUtils";
 
 type HomeScreenNavigationProp = NativeStackNavigationProp<
   RootStackParamList,
@@ -234,88 +235,46 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   };
 
   // Handle user icon selection
-  const handleChangeIcon = async () => {
-    if (!currentUser) return;
+  const handleChangeIcon = async (user: User) => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
       Alert.alert("Error", t("selectImagePermission"));
       return;
     }
-
+  
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: 'images',
       allowsEditing: true,
       aspect: [1, 1],
       quality: 1,
     });
-
+  
     if (!result.canceled && result.assets[0].uri) {
       try {
-        // Define icon directory and file path
-        const iconDir = `${FileSystem.documentDirectory}icons/`;
-        const newIconPath = `${iconDir}icon_${currentUser.id}.jpg`;
-
-        // Create icons directory if it doesn't exist
-        await FileSystem.makeDirectoryAsync(iconDir, { intermediates: true });
-
-        // Compress image to ~200KB
-        let quality = 0.7;
-        let fileSize = Infinity;
-        let compressedUri = result.assets[0].uri;
-
-        // Resize to 256x256 and compress
-        const manipResult = await ImageManipulator.manipulateAsync(
+        const relativePath = await processUserIcon(
           result.assets[0].uri,
-          [{ resize: { width: 256, height: 256 } }],
-          { compress: quality, format: ImageManipulator.SaveFormat.JPEG }
+          user.id,
+          user.icon
         );
-        compressedUri = manipResult.uri;
-
-        // Check file size and reduce quality if needed
-        let fileInfo = await FileSystem.getInfoAsync(compressedUri);
-        fileSize = fileInfo.size || Infinity;
-
-        // Iteratively reduce quality to meet 200KB target
-        while (fileSize > 200000 && quality > 0.1) {
-          quality -= 0.1;
-          const newManipResult = await ImageManipulator.manipulateAsync(
-            result.assets[0].uri,
-            [{ resize: { width: 256, height: 256 } }],
-            { compress: quality, format: ImageManipulator.SaveFormat.JPEG }
-          );
-          compressedUri = newManipResult.uri;
-          fileInfo = await FileSystem.getInfoAsync(compressedUri);
-          fileSize = fileInfo.size || Infinity;
+  
+        // Update database
+        await updateUserIcon(user.id, relativePath);
+        const updatedUser = { ...user, icon: relativePath };
+  
+        // Update state based on whether the user is currentUser or selectedUser
+        if (user.id === currentUser?.id) {
+          setCurrentUser(updatedUser);
         }
-
-        if (fileSize > 200000) {
-          throw new Error("Could not compress image to 200KB or less");
+        if (user.id === selectedUser?.id) {
+          setSelectedUser(updatedUser);
         }
-
-        // Delete old icon if it exists
-        if (currentUser.icon) {
-          const oldIconPath = currentUser.icon;
-          const oldIconInfo = await FileSystem.getInfoAsync(oldIconPath);
-          if (oldIconInfo.exists) {
-            await FileSystem.deleteAsync(oldIconPath, { idempotent: true });
-          }
-        }
-
-        // Copy compressed image to permanent location
-        await FileSystem.copyAsync({
-          from: compressedUri,
-          to: newIconPath,
-        });
-
-        // Update database and state
-        await updateUserIcon(currentUser.id, newIconPath);
-        const updatedUser = { ...currentUser, icon: newIconPath };
-        setCurrentUser(updatedUser);
+  
+        // Update users array
         const updatedUsers = users.map((u) =>
-          u.id === currentUser.id ? updatedUser : u
+          u.id === user.id ? updatedUser : u
         );
         setUsers(updatedUsers);
-      } catch (error) {
+      } catch (error: any) {
         console.error("Error updating icon:", error);
         Alert.alert("Error", `${t("errorUpdateIcon")}: ${error.message}`);
       }
@@ -378,7 +337,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         Alert.alert(t("success"), t("successCreateUser"));
       }
     } catch (error) {
-      Alert.alert("Error", t("errorCreateUser"));
+      Alert.alert("Error", t("errorCreateUser")+error.message);
     }
   };
 
@@ -520,7 +479,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         <Text style={styles.title}>{t("title")}</Text>
         <TouchableOpacity onPress={() => setUserProfileModalVisible(true)}>
           {currentUser.icon ? (
-            <Image source={{ uri: currentUser.icon }} style={styles.userIcon} />
+            <Image source={{ uri: resolvePhotoUri(currentUser.icon)! }} style={styles.userIcon} />
           ) : (
             <MaterialIcons name="person" size={30} color="#000" />
           )}
@@ -744,7 +703,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             </TouchableOpacity>
             {currentUser.icon ? (
               <Image
-                source={{ uri: currentUser.icon }}
+                source={{ uri: resolvePhotoUri(currentUser.icon)! }}
                 style={styles.largeUserIcon}
               />
             ) : (
@@ -774,7 +733,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                 />
                 <CustomButton
                   title={t("changeIcon")}
-                  onPress={handleChangeIcon}
+                  onPress={() => currentUser && handleChangeIcon(currentUser)}
                 />
                 <CustomButton
                   title={t("switchUser")}
@@ -871,7 +830,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                   <View style={styles.userItemContainer}>
                     {item.icon ? (
                       <Image
-                        source={{ uri: item.icon }}
+                        source={{ uri: resolvePhotoUri(item.icon)! }}
                         style={styles.userIcon}
                       />
                     ) : (
@@ -964,7 +923,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             <Text style={styles.modalTitle}>{selectedUser?.name}</Text>
             {selectedUser?.icon ? (
               <Image
-                source={{ uri: selectedUser.icon }}
+                source={{ uri: resolvePhotoUri(selectedUser.icon)! }}
                 style={styles.largeUserIcon}
               />
             ) : (
@@ -972,37 +931,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             )}
             <CustomButton
               title={t("changeIcon")}
-              onPress={async () => {
-                const permission =
-                  await ImagePicker.requestMediaLibraryPermissionsAsync();
-                if (!permission.granted) {
-                  Alert.alert("Error", t("selectImagePermission"));
-                  return;
-                }
-                const result = await ImagePicker.launchImageLibraryAsync({
-                  mediaTypes: ImagePicker.MediaTypeOptions.Images,
-                  allowsEditing: true,
-                  aspect: [1, 1],
-                  quality: 1,
-                });
-                if (!result.canceled && result.assets[0].uri && selectedUser) {
-                  try {
-                    await updateUserIcon(selectedUser.id, result.assets[0].uri);
-                    const updatedUser = {
-                      ...selectedUser,
-                      icon: result.assets[0].uri,
-                    };
-                    setSelectedUser(updatedUser);
-                    setUsers(
-                      users.map((u) =>
-                        u.id === selectedUser.id ? updatedUser : u
-                      )
-                    );
-                  } catch (error) {
-                    Alert.alert("Error", t("errorUpdateIcon"));
-                  }
-                }
-              }}
+              onPress={() => selectedUser && handleChangeIcon(selectedUser)}
             />
             <CustomButton
               title={t("resetPassword")}
