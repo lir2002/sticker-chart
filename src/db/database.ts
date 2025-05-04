@@ -437,6 +437,28 @@ export const getUserByName = async (name: string): Promise<User | null> => {
   return user || null;
 };
 
+// In database.ts
+export const getUserById = async (userId: number): Promise<User | null> => {
+  const dbManager = DatabaseManager.getInstance();
+  const db = dbManager.getDatabase();
+  const user = await db.getFirstAsync<{
+    id: number;
+    name: string;
+    role_id: number;
+    code: string;
+    is_active: number;
+    created_at: string;
+    updated_at: string;
+    icon?: string;
+    email: string;
+    phone: string;
+  }>(
+    "SELECT id, name, role_id, code, is_active, created_at, updated_at, icon, email, phone FROM users WHERE id = ?;",
+    [userId]
+  );
+  return user || null;
+};
+
 // Update user contact
 export const updateUserContact = async (
   userId: number,
@@ -511,7 +533,8 @@ export const fetchTransactions = async (userId: number) => {
   }>(
     `SELECT t.id, t.reason, t.amount, t.counterparty, u.name AS counterpartyName, t.timestamp, t.balance
      FROM transactions_${userId} t
-     LEFT JOIN users u ON t.counterparty = u.id;`
+     LEFT JOIN users u ON t.counterparty = u.id
+     ORDER BY t.timestamp DESC;`
   );
   return transactions;
 };

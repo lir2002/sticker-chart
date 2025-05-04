@@ -315,6 +315,11 @@ const translations: Translations = {
     zh: "获得于{createdAt}创建的「{eventType}」成就的验证",
   },
   achievementTypes: {en: "Achievement Types", zh: "成就类型"},
+  claimDailyAllowance: { en: "Claim Daily Allowance", zh: "领取津贴" },
+  dailyAllowance: { en: "Daily Allowance", zh: "每日津贴" },
+  dailyAllowanceClaimed: { en: "Daily allowance claimed successfully", zh: "每日津贴领取成功" },
+  errorClaimDaily: { en: "Failed to claim daily allowance", zh: "领取每日津贴失败" },
+  errorLoadData: { en: "Failed to load data", zh: "加载数据失败" },
 };
 
 const LanguageContext = createContext<LanguageContextType | undefined>(
