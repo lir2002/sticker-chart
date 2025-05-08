@@ -1,16 +1,5 @@
 import React, { useEffect, useState } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  TouchableOpacity,
-  Modal,
-  Button,
-  Alert,
-  Image,
-  ScrollView,
-} from "react-native";
+import { Alert, Dimensions, Modal as RNModal, Appearance } from "react-native";
 import { Calendar } from "react-native-calendars";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
@@ -19,27 +8,196 @@ import Animated, {
   useAnimatedStyle,
   withSpring,
 } from "react-native-reanimated";
+import {
+  YStack,
+  XStack,
+  Text,
+  styled,
+  Button,
+  Image,
+  ScrollView,
+  useTheme,
+} from "tamagui";
+import { useNavigation } from "@react-navigation/native";
+import { useLanguage } from "../contexts/LanguageContext";
 import { Event, EventType } from "../types";
 import {
-  fetchAllEventsWithDetails, // Renamed from fetchAllEventsWithCreator
+  fetchAllEventsWithDetails,
   getEventTypes,
   getUsers,
 } from "../db/database";
-import { useLanguage } from "../contexts/LanguageContext";
-import { useNavigation } from "@react-navigation/native";
-import { styles } from "../styles/calendarViewAllStyles";
 import { resolvePhotoUri } from "../utils/fileUtils";
+import { CustomButton } from "../components/SharedComponents"; // Import CustomButton
+
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
+
+// Styled components
+const Container = styled(YStack, {
+  flex: 1,
+  p: "$4",
+  bg: "$background",
+});
+
+const FilterHeader = styled(XStack, {
+  jc: "space-between",
+  ai: "center",
+  mb: "$2",
+});
+
+const FilterSummary = styled(Text, {
+  fontSize: "$3",
+  color: "$text",
+  flex: 1,
+});
+
+const AchievementCountText = styled(Text, {
+  fontSize: "$3",
+  fontWeight: "bold",
+  color: "$gray",
+  flex: 1,
+  ta: "center",
+});
+
+const FilterButton = styled(XStack, {
+  flexDirection: "row",
+  ai: "center",
+  p: "$2",
+  bg: "$selectedBackground",
+  br: "$2",
+});
+
+const FilterButtonText = styled(Text, {
+  fontSize: "$3",
+  color: "$primary",
+  ml: "$2",
+});
+
+const FilterItem = styled(XStack, {
+  flexDirection: "row",
+  ai: "center",
+  p: "$3",
+  borderBottomWidth: 1,
+  borderBottomColor: "$border",
+});
+
+const FilterText = styled(Text, {
+  fontSize: "$3",
+  color: "$text",
+  flex: 1,
+});
+
+const FilterSectionTitle = styled(Text, {
+  fontSize: "$4",
+  fontWeight: "bold",
+  mt: "$2",
+  mb: "$1",
+  color: "$text",
+});
+
+const ModalContainer = styled(YStack, {
+  f: 1,
+  jc: "center",
+  ai: "center",
+  bg: "$overlay",
+});
+
+const ModalContent = styled(YStack, {
+  bg: "$modalBackground",
+  p: "$4",
+  br: "$2",
+  w: "80%",
+  maxHeight: "80%",
+});
+
+const ModalTitle = styled(Text, {
+  fontSize: "$5",
+  fontWeight: "bold",
+  mb: "$2",
+  color: "$text",
+});
+
+const ModalButtonContainer = styled(XStack, {
+  jc: "space-between",
+  mt: "$2",
+  w: "50%",
+  gap: "$3"
+});
+
+const EventDisplay = styled(YStack, {
+  mt: "$4",
+  p: "$3",
+  bg: "$lightGray",
+  br: "$2",
+  borderWidth: 1,
+  borderColor: "$border",
+  f: 1,
+});
+
+const EventTitle = styled(Text, {
+  fontSize: "$4",
+  fontWeight: "bold",
+  mb: "$2",
+  color: "$text",
+});
+
+const EventItem = styled(XStack, {
+  flexDirection: "row",
+  ai: "center",
+  mb: "$2",
+});
+
+const EventText = styled(Text, {
+  fontSize: "$3",
+  color: "$text",
+});
+
+const VerifiedContainer = styled(XStack, {
+  flexDirection: "row",
+  ai: "center",
+});
+
+const EventPhoto = styled(Image, {
+  w: 100,
+  h: 100,
+  br: "$2",
+  mt: "$2",
+});
+
+const NoEventText = styled(Text, {
+  fontSize: "$3",
+  color: "$gray",
+  ta: "center",
+});
+
+const PhotoModalContainer = styled(YStack, {
+  f: 1,
+  bg: "$photoBackground",
+  jc: "center",
+  ai: "center",
+});
+
+const CloseButton = styled(Button, {
+  position: "absolute",
+  top: 40,
+  right: 20,
+  bg: "$overlay",
+  br: 20,
+  p: "$1",
+});
 
 const CalendarViewAll: React.FC = () => {
   const { t, language } = useLanguage();
   const navigation = useNavigation();
+  const theme = useTheme();
   const [events, setEvents] = useState<Event[]>([]);
   const [filteredEvents, setFilteredEvents] = useState<Event[]>([]);
   const [eventTypes, setEventTypes] = useState<EventType[]>([]);
   const [users, setUsers] = useState<{ id: number; name: string }[]>([]);
   const [selectedFilters, setSelectedFilters] = useState<string[]>(["All"]);
   const [tempFilters, setTempFilters] = useState<string[]>(["All"]);
-  const [selectedOwnerFilters, setSelectedOwnerFilters] = useState<string[]>(["All"]);
+  const [selectedOwnerFilters, setSelectedOwnerFilters] = useState<string[]>([
+    "All",
+  ]);
   const [tempOwnerFilters, setTempOwnerFilters] = useState<string[]>(["All"]);
   const [verifiedFilter, setVerifiedFilter] = useState<string>("All");
   const [tempVerifiedFilter, setTempVerifiedFilter] = useState<string>("All");
@@ -57,6 +215,7 @@ const CalendarViewAll: React.FC = () => {
   );
   const [monthlyAchievementCount, setMonthlyAchievementCount] =
     useState<number>(0);
+  const [colorScheme, setColorScheme] = useState(Appearance.getColorScheme());
 
   const scale = useSharedValue(1);
   const savedScale = useSharedValue(1);
@@ -64,6 +223,14 @@ const CalendarViewAll: React.FC = () => {
   const translateY = useSharedValue(0);
   const savedTranslateX = useSharedValue(0);
   const savedTranslateY = useSharedValue(0);
+
+  // Listen for system theme changes
+  useEffect(() => {
+    const subscription = Appearance.addChangeListener(({ colorScheme }) => {
+      setColorScheme(colorScheme);
+    });
+    return () => subscription.remove();
+  }, []);
 
   const calculateMonthlyAchievements = (
     events: Event[],
@@ -86,7 +253,6 @@ const CalendarViewAll: React.FC = () => {
         const types = await getEventTypes();
         setEventTypes(types);
         const loadedUsers = await getUsers();
-        // Filter users who are owners in event_types
         const ownerIds = types
           .map((t) => t.owner)
           .filter((id): id is number => id !== null);
@@ -101,7 +267,7 @@ const CalendarViewAll: React.FC = () => {
       }
     };
     initialize();
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     navigation.setOptions({
@@ -218,15 +384,12 @@ const CalendarViewAll: React.FC = () => {
   };
 
   const renderFilterItem = ({ item }: { item: string }) => (
-    <TouchableOpacity
-      style={styles.filterItem}
-      onPress={() => toggleFilter(item)}
-    >
-      <Text style={styles.filterText}>{item}</Text>
+    <FilterItem key={item} onPress={() => toggleFilter(item)}>
+      <FilterText>{item}</FilterText>
       {tempFilters.includes(item) && (
-        <MaterialIcons name="check" size={16} color="#007AFF" />
+        <MaterialIcons name="check" size={16} color={theme.primary.val} />
       )}
-    </TouchableOpacity>
+    </FilterItem>
   );
 
   const renderOwnerFilterItem = ({
@@ -234,27 +397,24 @@ const CalendarViewAll: React.FC = () => {
   }: {
     item: { id: number; name: string };
   }) => (
-    <TouchableOpacity
-      style={styles.filterItem}
+    <FilterItem
+      key={item.id.toString()}
       onPress={() => toggleOwnerFilter(item.id.toString())}
     >
-      <Text style={styles.filterText}>{item.name}</Text>
+      <FilterText>{item.name}</FilterText>
       {tempOwnerFilters.includes(item.id.toString()) && (
-        <MaterialIcons name="check" size={16} color="#007AFF" />
+        <MaterialIcons name="check" size={16} color={theme.primary.val} />
       )}
-    </TouchableOpacity>
+    </FilterItem>
   );
 
   const renderVerifiedFilterItem = ({ item }: { item: string }) => (
-    <TouchableOpacity
-      style={styles.filterItem}
-      onPress={() => toggleVerifiedFilter(item)}
-    >
-      <Text style={styles.filterText}>{t(item.toLowerCase())}</Text>
+    <FilterItem key={item} onPress={() => toggleVerifiedFilter(item)}>
+      <FilterText>{t(item.toLowerCase())}</FilterText>
       {tempVerifiedFilter === item && (
-        <MaterialIcons name="check" size={16} color="#007AFF" />
+        <MaterialIcons name="check" size={16} color={theme.primary.val} />
       )}
-    </TouchableOpacity>
+    </FilterItem>
   );
 
   const getFilterSummary = () => {
@@ -321,17 +481,27 @@ const CalendarViewAll: React.FC = () => {
     ],
   }));
 
+  // Calendar theme
+  const calendarTheme = {
+    calendarBackground: theme.background.val,
+    textSectionTitleColor: theme.text.val,
+    selectedDayBackgroundColor: theme.primary.val,
+    selectedDayTextColor: theme.modalBackground.val,
+    todayTextColor: theme.primary.val,
+    dayTextColor: theme.text.val,
+    textDisabledColor: theme.gray.val,
+    arrowColor: theme.primary.val,
+    monthTextColor: theme.text.val,
+  };
+
   return (
-    <View style={styles.container}>
-      <View style={styles.filterHeader}>
-        <Text style={styles.filterSummary}>
+    <Container>
+      <FilterHeader>
+        <FilterSummary>
           {t("filters")}: {getFilterSummary()}
-        </Text>
-        <Text style={styles.achievementCountText}>
-          {monthlyAchievementCount}
-        </Text>
-        <TouchableOpacity
-          style={styles.filterButton}
+        </FilterSummary>
+        <AchievementCountText>{monthlyAchievementCount}</AchievementCountText>
+        <FilterButton
           onPress={() => {
             setTempFilters(selectedFilters);
             setTempOwnerFilters(selectedOwnerFilters);
@@ -339,172 +509,167 @@ const CalendarViewAll: React.FC = () => {
             setFilterModalVisible(true);
           }}
         >
-          <MaterialIcons name="filter-list" size={24} color="#007AFF" />
-          <Text style={styles.filterButtonText}>{t("filterEvents")}</Text>
-        </TouchableOpacity>
-      </View>
+          <MaterialIcons
+            name="filter-list"
+            size={24}
+            color={theme.primary.val}
+          />
+          <FilterButtonText>{t("filterEvents")}</FilterButtonText>
+        </FilterButton>
+      </FilterHeader>
       <Calendar
+        key={colorScheme} // Force re-render on theme change
         onDayPress={handleDayPress}
         onMonthChange={handleMonthChange}
         markedDates={markedDates}
         markingType={"multi-dot"}
         locale={language}
-        theme={{
-          selectedDayBackgroundColor: "#007AFF",
-          todayTextColor: "#007AFF",
-          arrowColor: "#007AFF",
-        }}
+        theme={calendarTheme}
       />
-      <View style={styles.eventDisplay}>
+      <EventDisplay>
         {selectedDateEvents.length > 0 ? (
-          <ScrollView style={styles.eventScrollView}>
-            <Text style={styles.eventTitle}>
+          <ScrollView flexGrow={1}>
+            <EventTitle>
               {t("achievementsOn")} {selectedDate}
-            </Text>
+            </EventTitle>
             {selectedDateEvents.map((event) => {
               const type = eventTypes.find((t) => t.name === event.eventType);
               return (
-                <View key={event.id} style={styles.eventItem}>
+                <EventItem key={event.id}>
                   <MaterialIcons
                     name={type?.icon || "event"}
                     size={16}
                     color={type?.iconColor || "#000000"}
-                    style={styles.eventIcon}
+                    style={{ marginRight: 10 }}
                   />
-                  <View>
-                    <Text style={styles.eventText}>
+                  <YStack>
+                    <EventText>
                       {t("type")}: {event.eventType}
-                    </Text>
-                    <Text style={styles.eventText}>
+                    </EventText>
+                    <EventText>
                       {t("date")}: {event.date}
-                    </Text>
-                    <Text style={styles.eventText}>
+                    </EventText>
+                    <EventText>
                       {t("gotAt")}: {new Date(event.markedAt).toLocaleString()}
-                    </Text>
-                    <View style={styles.verifiedContainer}>
-                      <Text style={styles.eventText}>
-                        {t("verified")}: {event.is_verified ? t("yes") : t("no")}
-                      </Text>
+                    </EventText>
+                    <VerifiedContainer>
+                      <EventText>
+                        {t("verified")}:{" "}
+                        {event.is_verified ? t("yes") : t("no")}
+                      </EventText>
                       {event.is_verified ? (
                         <MaterialIcons
                           name="check-circle"
                           size={16}
-                          color="green"
-                          style={styles.verifiedIcon}
+                          color={theme.verified.val}
+                          style={{ marginLeft: 5 }}
                         />
                       ) : null}
-                    </View>
+                    </VerifiedContainer>
                     {event.is_verified ? (
                       <>
-                        <Text style={styles.eventText}>
+                        <EventText>
                           {t("verifiedAt")}:{" "}
                           {new Date(event.verified_at!).toLocaleString()}
-                        </Text>
-                        <Text style={styles.eventText}>
+                        </EventText>
+                        <EventText>
                           {t("verifiedBy")}:{" "}
                           {event.verifierName ?? t("unknown")}
-                        </Text>
+                        </EventText>
                       </>
                     ) : null}
-                    <Text style={styles.eventText}>
+                    <EventText>
                       {t("createdBy")}: {event.creatorName ?? t("unknown")}
-                    </Text>
-                    <Text style={styles.eventText}>
+                    </EventText>
+                    <EventText>
                       {t("owner")}: {type?.ownerName ?? t("unknown")}
-                    </Text>
+                    </EventText>
                     {event.note && (
-                      <Text style={styles.eventText}>
+                      <EventText>
                         {t("for")}: {event.note}
-                      </Text>
+                      </EventText>
                     )}
                     {event.photoPath && (
-                      <TouchableOpacity
+                      <EventPhoto
+                        source={{ uri: resolvePhotoUri(event.photoPath)! }}
                         onPress={() => openPhotoModal(event.photoPath!)}
-                      >
-                        <Image
-                          source={{ uri: resolvePhotoUri(event.photoPath)! }}
-                          style={styles.eventPhoto}
-                        />
-                      </TouchableOpacity>
+                      />
                     )}
-                  </View>
-                </View>
+                  </YStack>
+                </EventItem>
               );
             })}
           </ScrollView>
         ) : (
-          <Text style={styles.noEventText}>
+          <NoEventText>
             {selectedDate
               ? `${t("noEventsFor")} ${selectedDate}`
               : t("noDateSelected")}
-          </Text>
+          </NoEventText>
         )}
-      </View>
-      <Modal
+      </EventDisplay>
+      <RNModal
         visible={filterModalVisible}
         transparent
         animationType="slide"
         onRequestClose={() => setFilterModalVisible(false)}
       >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>{t("selectFilters")}</Text>
-            <Text style={styles.filterSectionTitle}>{t("achievementTypes")}</Text>
-            <FlatList
-              data={["All", ...eventTypes.map((type) => type.name)]}
-              renderItem={renderFilterItem}
-              keyExtractor={(item) => item}
-              style={styles.filterList}
-            />
-            <Text style={styles.filterSectionTitle}>{t("owners")}</Text>
-            <FlatList
-              data={users}
-              renderItem={renderOwnerFilterItem}
-              keyExtractor={(item) => item.id.toString()}
-              style={styles.filterList}
-            />
-            <Text style={styles.filterSectionTitle}>
-              {t("verificationStatus")}
-            </Text>
-            <FlatList
-              data={["All", "Verified", "Unverified"]}
-              renderItem={renderVerifiedFilterItem}
-              keyExtractor={(item) => item}
-              style={styles.filterList}
-            />
-            <View style={styles.modalButtonContainer}>
-              <Button
+        <ModalContainer>
+          <ModalContent>
+            <ModalTitle>{t("selectFilters")}</ModalTitle>
+            <FilterSectionTitle>{t("achievementTypes")}</FilterSectionTitle>
+            <ScrollView style={{ maxHeight: 150 }}>
+              {["All", ...eventTypes.map((type) => type.name)].map((item) =>
+                renderFilterItem({ item })
+              )}
+            </ScrollView>
+            <FilterSectionTitle>{t("owners")}</FilterSectionTitle>
+            <ScrollView style={{ maxHeight: 150 }}>
+              {users.map((item) => renderOwnerFilterItem({ item }))}
+            </ScrollView>
+            <FilterSectionTitle>{t("verificationStatus")}</FilterSectionTitle>
+            <ScrollView style={{ maxHeight: 150 }}>
+              {["All", "Verified", "Unverified"].map((item) =>
+                renderVerifiedFilterItem({ item })
+              )}
+            </ScrollView>
+            <ModalButtonContainer>
+              <CustomButton
                 title={t("cancel")}
                 onPress={() => setFilterModalVisible(false)}
               />
-              <Button title={t("done")} onPress={applyFilters} />
-            </View>
-          </View>
-        </View>
-      </Modal>
-      <Modal
+              <CustomButton title={t("done")} onPress={applyFilters} />
+            </ModalButtonContainer>
+          </ModalContent>
+        </ModalContainer>
+      </RNModal>
+      <RNModal
         visible={photoModalVisible}
         transparent
         animationType="fade"
         onRequestClose={() => setPhotoModalVisible(false)}
       >
-        <View style={styles.photoModalContainer}>
+        <PhotoModalContainer>
           <GestureDetector gesture={composedGestures}>
             <Animated.Image
               source={{ uri: resolvePhotoUri(selectedPhotoUri) || "" }}
-              style={[styles.fullScreenPhoto, animatedStyle]}
+              style={[
+                animatedStyle,
+                { width: SCREEN_WIDTH, height: SCREEN_HEIGHT },
+              ]}
               resizeMode="contain"
             />
           </GestureDetector>
-          <TouchableOpacity
-            style={styles.closeButton}
-            onPress={() => setPhotoModalVisible(false)}
-          >
-            <MaterialIcons name="close" size={30} color="#fff" />
-          </TouchableOpacity>
-        </View>
-      </Modal>
-    </View>
+          <CloseButton onPress={() => setPhotoModalVisible(false)}>
+            <MaterialIcons
+              name="close"
+              size={30}
+              color={theme.modalBackground.val}
+            />
+          </CloseButton>
+        </PhotoModalContainer>
+      </RNModal>
+    </Container>
   );
 };
 

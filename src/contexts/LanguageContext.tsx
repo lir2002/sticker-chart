@@ -244,7 +244,10 @@ const translations: Translations = {
   selectBackups: { en: "Select backups to delete", zh: "选择要删除的备份" },
   confirmDelete: { en: "Confirm Delete", zh: "确认删除" },
   noBackups: { en: "No backups found", zh: "未找到备份" },
-  restartApp: { en: "Please restart the app to load the restored data", zh: "请重启应用以加载恢复的数据" },
+  restartApp: {
+    en: "Please restart the app to load the restored data",
+    zh: "请重启应用以加载恢复的数据",
+  },
   info: { en: "Information", zh: "信息" },
   deleteSuccess: { en: "Selected backups deleted", zh: "已删除选中的备份" },
   deleteError: { en: "Failed to delete backups", zh: "删除备份失败" },
@@ -255,9 +258,15 @@ const translations: Translations = {
   uploadError: { en: "Failed to upload backup", zh: "上传备份失败" },
   download: { en: "Download", zh: "下载" },
   downloadBackup: { en: "Download Backup", zh: "下载备份" },
-  downloadComplete: { en: "Backup downloaded successfully", zh: "备份下载成功" },
+  downloadComplete: {
+    en: "Backup downloaded successfully",
+    zh: "备份下载成功",
+  },
   errorDownload: { en: "Failed to download backup", zh: "下载备份失败" },
-  selectZipFile: { en: "Select a .zip file from cloud storage", zh: "从云存储中选择一个 .zip 文件" },
+  selectZipFile: {
+    en: "Select a .zip file from cloud storage",
+    zh: "从云存储中选择一个 .zip 文件",
+  },
   pickFile: { en: "Pick File", zh: "选择文件" },
   filePickCanceled: { en: "File selection canceled", zh: "文件选择已取消" },
   error: { en: "Error", zh: "错误" },
@@ -267,7 +276,10 @@ const translations: Translations = {
   phonePlaceholder: { en: "Enter phone", zh: "输入电话" },
   edit: { en: "Edit", zh: "编辑" },
   contactUpdated: { en: "Contact info updated", zh: "联系方式已更新" },
-  errorUpdateContact: { en: "Failed to update contact info", zh: "更新联系方式失败" },
+  errorUpdateContact: {
+    en: "Failed to update contact info",
+    zh: "更新联系方式失败",
+  },
   assets: { en: "Assets", zh: "资产" },
   credit: { en: "Credit", zh: "信用" },
   noWalletData: { en: "No wallet data available", zh: "无钱包数据" },
@@ -314,12 +326,20 @@ const translations: Translations = {
     en: "Received verification for achievement '{eventType}' created at {createdAt}",
     zh: "获得于{createdAt}创建的「{eventType}」成就的验证",
   },
-  achievementTypes: {en: "Achievement Types", zh: "成就类型"},
+  achievementTypes: { en: "Achievement Types", zh: "成就类型" },
   claimDailyAllowance: { en: "Claim Daily Allowance", zh: "领取津贴" },
   dailyAllowance: { en: "Daily Allowance", zh: "每日津贴" },
-  dailyAllowanceClaimed: { en: "Daily allowance claimed successfully", zh: "每日津贴领取成功" },
-  errorClaimDaily: { en: "Failed to claim daily allowance", zh: "领取每日津贴失败" },
+  dailyAllowanceClaimed: {
+    en: "Daily allowance claimed successfully",
+    zh: "每日津贴领取成功",
+  },
+  errorClaimDaily: {
+    en: "Failed to claim daily allowance",
+    zh: "领取每日津贴失败",
+  },
   errorLoadData: { en: "Failed to load data", zh: "加载数据失败" },
+  confirmCodePlaceholder: { en: "Confirm 4-digit code", zh: "请确定4位数密码" },
+  setCode: { en: "Set Admin Password", zh: "设置管理员密码" },
 };
 
 const LanguageContext = createContext<LanguageContextType | undefined>(

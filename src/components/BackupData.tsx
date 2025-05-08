@@ -1,7 +1,5 @@
 import React, { useState } from "react";
 import {
-  View,
-  Text,
   Alert,
   FlatList,
   TouchableOpacity,
@@ -22,7 +20,8 @@ import {
 } from "../db/database";
 import UploadData from "./UploadData";
 import { CustomButton } from "./SharedComponents";
-import { styles } from "../styles/backupDataStyles";
+import { Stack, YStack, Text, useTheme } from "tamagui";
+import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 
 interface BackupDataProps {
   onClose: () => void;
@@ -30,6 +29,7 @@ interface BackupDataProps {
 
 const BackupData: React.FC<BackupDataProps> = ({ onClose }) => {
   const { t } = useLanguage();
+  const theme = useTheme();
   const [isBackingUp, setIsBackingUp] = useState(false);
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [uploadModalVisible, setUploadModalVisible] = useState(false);
@@ -62,13 +62,12 @@ const BackupData: React.FC<BackupDataProps> = ({ onClose }) => {
       const zipPath = `${backupDir}stickers.${dbVersion.version}.bak.${date}.zip`;
       const tempDir = `${FileSystem.cacheDirectory}backup_temp/`;
       const photosDir = `${FileSystem.documentDirectory}photos/`;
-      const rootDir = `${FileSystem.documentDirectory}`; // Base directory for icons
+      const rootDir = `${FileSystem.documentDirectory}`;
 
       await FileSystem.deleteAsync(tempDir, { idempotent: true });
       await FileSystem.makeDirectoryAsync(backupDir, { intermediates: true });
       await FileSystem.makeDirectoryAsync(tempDir, { intermediates: true });
 
-      // Fetch existing data
       const users = await getUsers();
       const eventTypes = await getEventTypes();
       const events = await fetchAllEvents();
@@ -81,7 +80,6 @@ const BackupData: React.FC<BackupDataProps> = ({ onClose }) => {
         transactionsTables[`transactions_${user.id}`] = transactions;
       }
 
-      // Combine all data
       const dbData = {
         users,
         eventTypes,
@@ -98,7 +96,6 @@ const BackupData: React.FC<BackupDataProps> = ({ onClose }) => {
       const dbJsonContent = await FileSystem.readAsStringAsync(dbJsonPath);
       zip.file("database.json", dbJsonContent);
 
-      // Backup photos
       const photoDirInfo = await FileSystem.getInfoAsync(photosDir);
       if (photoDirInfo.exists) {
         const photoFiles = await FileSystem.readDirectoryAsync(photosDir);
@@ -113,18 +110,15 @@ const BackupData: React.FC<BackupDataProps> = ({ onClose }) => {
         }
       }
 
-      // Backup icons
       const iconDir = `${tempDir}icons/`;
       await FileSystem.makeDirectoryAsync(iconDir, { intermediates: true });
       for (const user of users) {
         if (user.icon) {
-          // Convert relative icon path to absolute
-          const relativeIconPath = user.icon; // e.g., "icons/icon_1.jpg"
-          const absoluteIconPath = `${rootDir}${relativeIconPath}`; // e.g., "file:///.../icons/icon_1.jpg"
+          const relativeIconPath = user.icon;
+          const absoluteIconPath = `${rootDir}${relativeIconPath}`;
           const iconFileName =
             relativeIconPath.split("/").pop() || `icon_${user.id}.jpg`;
 
-          // Verify icon file exists
           const iconFileInfo = await FileSystem.getInfoAsync(absoluteIconPath);
           if (iconFileInfo.exists) {
             await FileSystem.copyAsync({
@@ -151,14 +145,11 @@ const BackupData: React.FC<BackupDataProps> = ({ onClose }) => {
 
       await FileSystem.deleteAsync(tempDir, { idempotent: true });
 
-      // Reload backup files to update UI
       await loadBackupFiles();
 
-      Alert.alert(
-        t("success"),
-        `${t("backupComplete")} ${zipPath}`,
-        [{ text: t("ok"), onPress: onClose }]
-      );
+      Alert.alert(t("success"), `${t("backupComplete")} ${zipPath}`, [
+        { text: t("ok"), onPress: onClose },
+      ]);
     } catch (error) {
       console.error("Backup error:", error);
       Alert.alert("Error", `${t("errorBackup")}: ${error.message}`);
@@ -174,9 +165,7 @@ const BackupData: React.FC<BackupDataProps> = ({ onClose }) => {
 
   const toggleBackupSelection = (file: string) => {
     setSelectedBackups((prev) =>
-      prev.includes(file)
-        ? prev.filter((f) => f !== file)
-        : [...prev, file]
+      prev.includes(file) ? prev.filter((f) => f !== file) : [...prev, file]
     );
   };
 
@@ -195,7 +184,9 @@ const BackupData: React.FC<BackupDataProps> = ({ onClose }) => {
           await FileSystem.deleteAsync(filePath, { idempotent: true });
         }
       }
-      setBackupFiles((prev) => prev.filter((f) => !selectedBackups.includes(f)));
+      setBackupFiles((prev) =>
+        prev.filter((f) => !selectedBackups.includes(f))
+      );
       setSelectedBackups([]);
       Alert.alert(t("success"), t("deleteSuccess"), [
         { text: t("ok"), onPress: () => setDeleteModalVisible(false) },
@@ -210,22 +201,31 @@ const BackupData: React.FC<BackupDataProps> = ({ onClose }) => {
 
   const renderBackupFile = ({ item }: { item: string }) => (
     <TouchableOpacity
-      style={[
-        styles.fileItem,
-        selectedBackups.includes(item) && styles.selectedFileItem,
-      ]}
       onPress={() => toggleBackupSelection(item)}
       disabled={isDeleting}
     >
-      <Text>{item}</Text>
+      <YStack
+        p="$2"
+        borderBottomWidth={1}
+        borderBottomColor="$border"
+        bg={selectedBackups.includes(item) ? "$selectedBackground" : undefined}
+      >
+        <Text color="$text">{item}</Text>
+      </YStack>
     </TouchableOpacity>
   );
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>{t("backupData")}</Text>
+    <YStack p="$4" ai="center" bg="$modalBackground">
+      <Text fontSize="$5" fontWeight="bold" mb="$4" color="$text">
+        {t("backupData")}
+      </Text>
       {isBackingUp || isDeleting ? (
-        <ActivityIndicator size="large" color="#0000ff" style={styles.loader} />
+        <ActivityIndicator
+          size="large"
+          color="$primary"
+          style={{ marginVertical: 20 }}
+        />
       ) : (
         <>
           <CustomButton
@@ -258,27 +258,39 @@ const BackupData: React.FC<BackupDataProps> = ({ onClose }) => {
         animationType="slide"
         onRequestClose={() => setDeleteModalVisible(false)}
       >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
+        <Stack f={1} jc="center" ai="center" bg="$overlay">
+          <YStack
+            bg="$modalBackground"
+            p="$4"
+            br="$2"
+            w="80%"
+            maxHeight="80%"
+            ai="center"
+            position="relative"
+          >
             <TouchableOpacity
-              style={styles.closeButton}
               onPress={() => setDeleteModalVisible(false)}
               disabled={isDeleting}
+              style={{ position: "absolute", top: 10, right: 10 }}
             >
-              <Text style={styles.closeButtonText}>×</Text>
+              <MaterialIcons name="close" size={24} color={theme.icon.val} />
             </TouchableOpacity>
-            <Text style={styles.modalTitle}>{t("deleteBackups")}</Text>
+            <Text fontSize="$5" fontWeight="bold" mb="$4" color="$text">
+              {t("deleteBackups")}
+            </Text>
             {isDeleting ? (
-              <ActivityIndicator size="large" color="#0000ff" />
+              <ActivityIndicator size="large" color="$primary" />
             ) : backupFiles.length > 0 ? (
               <FlatList
                 data={backupFiles}
                 renderItem={renderBackupFile}
                 keyExtractor={(item) => item}
-                style={styles.fileList}
+                style={{ width: "100%", maxHeight: 200, marginBottom: 20 }}
               />
             ) : (
-              <Text style={styles.noFilesText}>{t("noBackups")}</Text>
+              <Text fontSize="$3" color="$gray" mb="$4">
+                {t("noBackups")}
+              </Text>
             )}
             <CustomButton
               title={t("confirmDelete")}
@@ -290,8 +302,8 @@ const BackupData: React.FC<BackupDataProps> = ({ onClose }) => {
               onPress={() => setDeleteModalVisible(false)}
               disabled={isDeleting}
             />
-          </View>
-        </View>
+          </YStack>
+        </Stack>
       </Modal>
 
       {/* Upload Backup Modal */}
@@ -301,19 +313,27 @@ const BackupData: React.FC<BackupDataProps> = ({ onClose }) => {
         animationType="slide"
         onRequestClose={() => setUploadModalVisible(false)}
       >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
+        <Stack f={1} jc="center" ai="center" bg="$overlay">
+          <YStack
+            bg="$modalBackground"
+            p="$4"
+            br="$2"
+            w="80%"
+            maxHeight="80%"
+            ai="center"
+            position="relative"
+          >
             <TouchableOpacity
-              style={styles.closeButton}
               onPress={() => setUploadModalVisible(false)}
+              style={{ position: "absolute", top: 10, right: 10 }}
             >
-              <Text style={styles.closeButtonText}>×</Text>
+              <MaterialIcons name="close" size={24} color={theme.icon.val} />
             </TouchableOpacity>
             <UploadData onClose={() => setUploadModalVisible(false)} />
-          </View>
-        </View>
+          </YStack>
+        </Stack>
       </Modal>
-    </View>
+    </YStack>
   );
 };
 

@@ -1,10 +1,11 @@
 import React, { useState } from "react";
-import { View, Text, Alert, Modal, Platform } from "react-native";
+import { Alert, Modal, Platform, TouchableOpacity } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system";
+import { Stack, Text, YStack, useTheme } from "tamagui";
 import { useLanguage } from "../contexts/LanguageContext";
 import { CustomButton } from "./SharedComponents";
-import { styles } from "../styles/downloadDataStyles";
+import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 
 interface DownloadDataProps {
   visible: boolean;
@@ -18,6 +19,7 @@ const DownloadData: React.FC<DownloadDataProps> = ({
   onDownloadComplete,
 }) => {
   const { t } = useLanguage();
+  const theme = useTheme();
   const [isDownloading, setIsDownloading] = useState(false);
 
   const handlePickFile = async () => {
@@ -27,47 +29,43 @@ const DownloadData: React.FC<DownloadDataProps> = ({
 
       const result = await DocumentPicker.getDocumentAsync({
         type: "application/zip",
-        copyToCacheDirectory: true, // Cache for reliability
+        copyToCacheDirectory: true,
       });
       console.log("DocumentPicker result:", JSON.stringify(result, null, 2));
 
-      // Handle DocumentPickerResult
       if ("canceled" in result && result.canceled) {
         console.log("Picker canceled");
         Alert.alert(t("info"), t("filePickCanceled"));
         return;
       }
 
-      // Type narrow to DocumentPickerSuccessResult
       if ("assets" in result && result.assets && result.assets.length > 0) {
         const asset = result.assets[0];
 
         const backupDir = `${FileSystem.documentDirectory}Sticker-Chart/`;
         const dirInfo = await FileSystem.getInfoAsync(backupDir);
         if (!dirInfo.exists) {
-          await FileSystem.makeDirectoryAsync(backupDir, { intermediates: true });
+          await FileSystem.makeDirectoryAsync(backupDir, {
+            intermediates: true,
+          });
         }
 
-        // Ensure filename has .zip extension
         const fileName = asset.name.endsWith(".zip")
           ? asset.name
           : `${asset.name}.zip`;
         const destPath = `${backupDir}${fileName}`;
 
-        // Verify source file accessibility
         const sourceInfo = await FileSystem.getInfoAsync(asset.uri);
         if (!sourceInfo.exists) {
           throw new Error(`Source file inaccessible: ${asset.uri}`);
         }
 
-        // Try copying the file
         try {
           await FileSystem.copyAsync({
             from: asset.uri,
             to: destPath,
           });
         } catch (copyError) {
-          // Fallback: Read and write file content
           const content = await FileSystem.readAsStringAsync(asset.uri, {
             encoding: FileSystem.EncodingType.Base64,
           });
@@ -76,13 +74,11 @@ const DownloadData: React.FC<DownloadDataProps> = ({
           });
         }
 
-        // Verify destination file
         const destInfo = await FileSystem.getInfoAsync(destPath);
         if (!destInfo.exists) {
           throw new Error(`Failed to create file at: ${destPath}`);
         }
 
-        // Log success and trigger completion
         Alert.alert(t("success"), t("downloadComplete"), [
           {
             text: t("ok"),
@@ -105,7 +101,6 @@ const DownloadData: React.FC<DownloadDataProps> = ({
     }
   };
 
-
   return (
     <Modal
       visible={visible}
@@ -113,10 +108,26 @@ const DownloadData: React.FC<DownloadDataProps> = ({
       animationType="slide"
       onRequestClose={onClose}
     >
-      <View style={styles.modalContainer}>
-        <View style={styles.modalContent}>
-          <Text style={styles.modalTitle}>{t("downloadBackup")}</Text>
-          <Text style={styles.instructionText}>
+      <Stack f={1} jc="center" ai="center" bg="$overlay">
+        <YStack
+          bg="$modalBackground"
+          p="$4"
+          br="$2"
+          w="80%"
+          ai="center"
+          position="relative"
+        >
+          <TouchableOpacity
+            onPress={onClose}
+            disabled={isDownloading}
+            style={{ position: "absolute", top: 10, right: 10 }}
+          >
+            <MaterialIcons name="close" size={24} color={theme.icon.val} />
+          </TouchableOpacity>
+          <Text fontSize="$5" fontWeight="bold" mb="$2" color="$text">
+            {t("downloadBackup")}
+          </Text>
+          <Text fontSize="$3" color="$gray" mb="$4" ta="center">
             {t("selectZipFile")}
           </Text>
           <CustomButton
@@ -129,8 +140,8 @@ const DownloadData: React.FC<DownloadDataProps> = ({
             onPress={onClose}
             disabled={isDownloading}
           />
-        </View>
-      </View>
+        </YStack>
+      </Stack>
     </Modal>
   );
 };

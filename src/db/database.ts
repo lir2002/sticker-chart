@@ -395,7 +395,7 @@ export const createUser = async (
 };
 
 // Get users
-export const getUsers = async () => {
+export const getUsers = async (): Promise<User[]>  => {
   const dbManager = DatabaseManager.getInstance();
   const db = dbManager.getDatabase();
   const users = await db.getAllAsync<{

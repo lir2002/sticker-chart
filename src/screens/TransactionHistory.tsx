@@ -1,11 +1,9 @@
 import React, { useState, useEffect } from "react";
 import {
-  View,
-  Text,
+  Alert,
   FlatList,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
 } from "react-native";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
@@ -15,15 +13,53 @@ import {
   getWallet,
   updateWallet,
   insertTransaction,
-  getUserById, // New helper function
+  getUserById,
 } from "../db/database";
 import { useLanguage } from "../contexts/LanguageContext";
-import { styles } from "../styles/transactionHistoryStyles";
+import { YStack, XStack, Text, useTheme } from "tamagui";
 
 type TransactionHistoryProps = NativeStackScreenProps<
   RootStackParamList,
   "TransactionHistory"
 >;
+
+const commonTextProps = {
+  fontSize: "$4",
+  mb: "$1",
+  color: "$text",
+};
+
+// Reusable TransactionItem component
+const TransactionItem: React.FC<{
+  item: Transaction;
+  t: (key: string) => string;
+}> = ({ item, t }) => {
+  const theme = useTheme();
+  const formatNumber = (num: number): string =>
+    num.toLocaleString(undefined, { signDisplay: "always" });
+
+  return (
+    <YStack bg="$background" p="$4" my="$1" mx="$4" br="$2" elevation={2}>
+      <Text {...commonTextProps}>
+        {t("reason")}: {item.reason || t("unknown")}
+      </Text>
+      <Text {...commonTextProps}>
+        {t("amount")}:{" "}
+        {item.amount !== null ? formatNumber(item.amount) : t("unknown")}
+      </Text>
+      <Text {...commonTextProps}>
+        {t("counterparty")}:{" "}
+        {item.counterpartyName || item.counterparty || t("unknown")}
+      </Text>
+      <Text {...commonTextProps}>
+        {t("timestamp")}: {item.timestamp || t("unknown")}
+      </Text>
+      <Text {...commonTextProps}>
+        {t("balance")}: {item.balance !== null ? item.balance : t("unknown")}
+      </Text>
+    </YStack>
+  );
+};
 
 const TransactionHistory: React.FC<TransactionHistoryProps> = ({
   navigation,
@@ -31,6 +67,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
 }) => {
   const { userId } = route.params;
   const { t } = useLanguage();
+  const theme = useTheme();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [hasClaimedDaily, setHasClaimedDaily] = useState(false);
@@ -47,16 +84,13 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
     const loadData = async () => {
       setIsLoading(true);
       try {
-        // Check if user is admin
         const user = await getUserById(userId);
-        const isAdminUser = user?.role_id === 1; // Assuming role_id 1 is Admin
+        const isAdminUser = user?.role_id === 1;
         setIsAdmin(isAdminUser);
 
-        // Load transactions
         const userTransactions = await fetchTransactions(userId);
         setTransactions(userTransactions);
 
-        // Check if daily allowance was claimed today
         if (isAdminUser) {
           const hasClaimed = await checkDailyAllowanceClaimed(
             userId,
@@ -74,11 +108,6 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
     loadData();
   }, [userId, t]);
 
-  function formatNumber(num: number) :string {
-    return num.toLocaleString(undefined, { signDisplay: "always" });
-  }
-
-  // Helper to check if daily allowance was claimed today
   const checkDailyAllowanceClaimed = async (
     userId: number,
     transactions: Transaction[]
@@ -103,39 +132,33 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
       (tx) =>
         tx.counterparty === userId &&
         tx.amount === 5 &&
-        tx.reason === t("dailyAllowance") &&
         tx.timestamp &&
         tx.timestamp >= startOfDay &&
         tx.timestamp <= endOfDay
     );
   };
 
-  // Handle claiming daily allowance
   const handleClaimDailyAllowance = async () => {
     setIsClaiming(true);
     try {
-      // Get current wallet
       const wallet = await getWallet(userId);
       if (!wallet) {
         throw new Error("Wallet not found");
       }
 
-      // Update assets
       const newAssets = wallet.assets + 5;
       await updateWallet(userId, newAssets, wallet.credit);
 
-      // Insert transaction
       const timestamp = new Date().toISOString();
       await insertTransaction(
         userId,
-        t("dailyAllowance"), // "每日用例" or "Daily Allowance"
+        t("dailyAllowance"),
         5,
-        userId, // Counterparty is self
+        userId,
         timestamp,
         newAssets
       );
 
-      // Refresh transactions
       const updatedTransactions = await fetchTransactions(userId);
       setTransactions(updatedTransactions);
       setHasClaimedDaily(true);
@@ -149,71 +172,83 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
     }
   };
 
-  const renderTransaction = ({ item }: { item: Transaction }) => (
-    <View style={styles.transactionItem}>
-      <View style={styles.transactionDetails}>
-        <Text style={styles.transactionText}>
-          {t("reason")}: {item.reason || t("unknown")}
-        </Text>
-        <Text style={styles.transactionText}>
-          {t("amount")}: {item.amount !== null ? formatNumber(item.amount) : t("unknown")}
-        </Text>
-        <Text style={styles.transactionText}>
-          {t("counterparty")}:{" "}
-          {item.counterpartyName || item.counterparty || t("unknown")}
-        </Text>
-        <Text style={styles.transactionText}>
-          {t("timestamp")}: {item.timestamp || t("unknown")}
-        </Text>
-        <Text style={styles.transactionText}>
-          {t("balance")}: {item.balance !== null ? item.balance : t("unknown")}
-        </Text>
-      </View>
-    </View>
-  );
-
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <MaterialIcons name="arrow-back" size={24} color="#000" />
+    <YStack f={1} bg="$lightGray">
+      <XStack
+        ai="center"
+        p="$4"
+        bg="$background"
+        borderBottomWidth={1}
+        borderBottomColor="$border"
+      >
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          accessibilityLabel={t("goBack")}
+        >
+          <MaterialIcons name="arrow-back" size={24} color={theme.text.val} />
         </TouchableOpacity>
-        <Text style={styles.title}>{t("transactionHistory")}</Text>
-      </View>
+        <Text fontSize="$5" fontWeight="bold" ml="$4" color="$text">
+          {t("transactionHistory")}
+        </Text>
+      </XStack>
       {isLoading ? (
-        <ActivityIndicator size="large" color="#0000ff" style={styles.loader} />
+        <ActivityIndicator
+          size="large"
+          color={theme.primary.val}
+          style={{ marginTop: 32 }}
+        />
       ) : (
         <>
           {isAdmin && (
             <TouchableOpacity
-              style={[
-                styles.claimButton,
-                hasClaimedDaily && styles.claimButtonDisabled,
-              ]}
               onPress={handleClaimDailyAllowance}
               disabled={hasClaimedDaily || isClaiming}
+              accessibilityLabel={t("claimDailyAllowance")}
+              accessibilityState={{ disabled: hasClaimedDaily || isClaiming }}
             >
-              {isClaiming ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <Text style={styles.claimButtonText}>
-                  {t("claimDailyAllowance")}
-                </Text>
-              )}
+              <YStack
+                bg={hasClaimedDaily || isClaiming ? "$disabled" : "$primary"}
+                p="$3"
+                m="$4"
+                br="$2"
+                ai="center"
+                opacity={hasClaimedDaily || isClaiming ? 0.7 : 1}
+              >
+                {isClaiming ? (
+                  <ActivityIndicator
+                    size="small"
+                    color={theme.modalBackground.val}
+                  />
+                ) : (
+                  <Text
+                    color={
+                      hasClaimedDaily || isClaiming
+                        ? "$gray"
+                        : "$modalBackground"
+                    }
+                    fontSize="$4"
+                    fontWeight="bold"
+                  >
+                    {t("claimDailyAllowance")}
+                  </Text>
+                )}
+              </YStack>
             </TouchableOpacity>
           )}
           {transactions.length === 0 ? (
-            <Text style={styles.emptyText}>{t("noTransactions")}</Text>
+            <Text fontSize="$4" ta="center" mt="$8" color="$gray">
+              {t("noTransactions")}
+            </Text>
           ) : (
             <FlatList
               data={transactions}
-              renderItem={renderTransaction}
+              renderItem={({ item }) => <TransactionItem item={item} t={t} />}
               keyExtractor={(item) => item.id.toString()}
             />
           )}
         </>
       )}
-    </View>
+    </YStack>
   );
 };
 

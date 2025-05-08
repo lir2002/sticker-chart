@@ -1,23 +1,18 @@
 import React, { useState, useEffect, useContext } from "react";
 import {
-  View,
-  Text,
-  TextInput,
-  Button,
   Alert,
-  StyleSheet,
   FlatList,
   TouchableOpacity,
   Modal,
   ScrollView,
   Image,
+  Button,
 } from "react-native";
 import { Picker } from "@react-native-picker/picker";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 import * as ImagePicker from "expo-image-picker";
-import * as FileSystem from "expo-file-system";
-import { RootStackParamList, EventType, User } from "../types";
+import { RootStackParamList, EventType, User, Wallet } from "../types";
 import {
   getEventTypesWithOwner,
   insertEventType,
@@ -37,14 +32,13 @@ import {
 import CodeSetup from "../components/CodeSetup";
 import ChangeCode from "../components/ChangeCode";
 import { useLanguage } from "../contexts/LanguageContext";
-import  LocaleConfig  from "../config/calendarConfig";
+import LocaleConfig from "../config/calendarConfig";
 import { availableColors, availableIcons } from "../icons";
 import { UserContext } from "../contexts/UserContext";
-import { CustomButton } from "../components/SharedComponents";
+import { CustomButton, StyledInput } from "../components/SharedComponents";
 import BackupData from "../components/BackupData";
 import RestoreData from "../components/RestoreData";
-import * as ImageManipulator from "expo-image-manipulator";
-import { styles } from "../styles/homeScreenStyles";
+import { YStack, XStack, Text, useTheme } from "tamagui";
 import { processUserIcon, resolvePhotoUri } from "../utils/fileUtils";
 
 type HomeScreenNavigationProp = NativeStackNavigationProp<
@@ -56,7 +50,61 @@ interface HomeScreenProps {
   navigation: HomeScreenNavigationProp;
 }
 
+const ModalContainer: React.FC<{
+  visible: boolean;
+  onClose: () => void;
+  children: React.ReactNode;
+}> = ({ visible, onClose, children }) => {
+  const theme = useTheme();
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+    >
+      <YStack f={1} jc="center" ai="center" bg="$overlay">
+        <YStack
+          bg="$modalBackground"
+          p="$4"
+          br="$2"
+          w="80%"
+          ai="center"
+          position="relative"
+        >
+          <TouchableOpacity
+            onPress={onClose}
+            style={{ position: "absolute", top: 10, right: 10 }}
+          >
+            <MaterialIcons name="close" size={24} color={theme.icon.val} />
+          </TouchableOpacity>
+          {children}
+        </YStack>
+      </YStack>
+    </Modal>
+  );
+};
+
+const PickerField: React.FC<{
+  selectedValue: any;
+  onValueChange: (value: any) => void;
+  items: { label: string; value: any }[];
+  enabled?: boolean;
+}> = ({ selectedValue, onValueChange, items, enabled }) => (
+  <Picker
+    selectedValue={selectedValue}
+    onValueChange={onValueChange}
+    style={{ width: "100%", marginBottom: 10 }}
+    enabled={enabled}
+  >
+    {items.map((item) => (
+      <Picker.Item key={item.value} label={item.label} value={item.value} />
+    ))}
+  </Picker>
+);
+
 const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
+  const theme = useTheme();
   const { language, setLanguage, t } = useLanguage();
   const [eventTypes, setEventTypes] = useState<EventType[]>([]);
   const [newTypeName, setNewTypeName] = useState("");
@@ -77,27 +125,42 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [pendingEditUser, setPendingEditUser] = useState<User | null>(null);
   const [newUserName, setNewUserName] = useState("");
-  const [newUserRoleId, setNewUserRoleId] = useState<number>(3); // Default to User
+  const [newUserRoleId, setNewUserRoleId] = useState<number>(3);
   const [isAddingEventType, setIsAddingEventType] = useState(false);
   const [newUserPassword, setNewUserPassword] = useState<string>("0000");
-  const [newFaceValue, setNewFaceValue] = useState("1"); // Default face value
+  const [newFaceValue, setNewFaceValue] = useState("1");
   const [backupModalVisible, setBackupModalVisible] = useState(false);
   const [restoreModalVisible, setRestoreModalVisible] = useState(false);
   const [contactModalVisible, setContactModalVisible] = useState(false);
   const [isEditingContact, setIsEditingContact] = useState(false);
   const [email, setEmail] = useState(currentUser?.email || "");
   const [phone, setPhone] = useState(currentUser?.phone || "");
-  const [wallet, setWallet] = useState<Wallet | null>(null); // New state for wallet
+  const [wallet, setWallet] = useState<Wallet | null>(null);
+  const [needsInitial, setNeedsInitial] = useState<true | false>(false);
+  const [cacheBuster, setCacheBuster] = useState(Date.now()); // Add cacheBuster
 
-  // Initialize database and user state
+  const modalTitleProps = {
+    fontSize: "$4",
+    fontWeight: "bold",
+    mb: "$2",
+    color: "$text",
+  };
+
+  const iconLabelProps = {
+    fontSize: "$3",
+    my: "$2",
+    alignSelf: "flex-start" as const,
+    color: "$text",
+  };
+
   useEffect(() => {
     const initialize = async () => {
       try {
         const needsPasswordSetup = await forceAdminPasswordSetup();
-        console.log("Current user:", currentUser?.name);
         if (needsPasswordSetup) {
           // Admin password not set, show CodeSetup
           setCurrentUser(null);
+          setNeedsInitial(true);
         } else if (!currentUser) {
           // Only set Guest if no user is currently set
           const guestUser = await getUserByName("Guest");
@@ -136,7 +199,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   useEffect(() => {
     const ordinaryUsers = users.filter((u) => u.role_id === 3);
     if (ordinaryUsers.length > 0 && !selectedOwnerId) {
-      setSelectedOwnerId(ordinaryUsers[0].id); // Default to first ordinary user
+      setSelectedOwnerId(ordinaryUsers[0].id);
     } else if (ordinaryUsers.length === 0) {
       setSelectedOwnerId(null);
     }
@@ -192,7 +255,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         selectedColor,
         availability,
         selectedOwnerId,
-        1
+        parseInt(newFaceValue)
       );
       const updatedTypes = await getEventTypesWithOwner();
       setEventTypes(updatedTypes);
@@ -217,7 +280,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         setAddTypeModalVisible(true);
         setIsAddingEventType(false);
       } else if (pendingEditUser) {
-        await handleVerifyEditUser();
+        setSelectedUser(pendingEditUser);
+        setEditUserModalVisible(true);
+        setPendingEditUser(null);
+        setSwitchUserModalVisible(false);
       }
       setVerifyCodeModalVisible(false);
       setInputCode("");
@@ -241,14 +307,14 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       Alert.alert("Error", t("selectImagePermission"));
       return;
     }
-  
+
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: 'images',
+      mediaTypes: "images",
       allowsEditing: true,
       aspect: [1, 1],
       quality: 1,
     });
-  
+
     if (!result.canceled && result.assets[0].uri) {
       try {
         const relativePath = await processUserIcon(
@@ -256,11 +322,11 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           user.id,
           user.icon
         );
-  
+
         // Update database
         await updateUserIcon(user.id, relativePath);
         const updatedUser = { ...user, icon: relativePath };
-  
+
         // Update state based on whether the user is currentUser or selectedUser
         if (user.id === currentUser?.id) {
           setCurrentUser(updatedUser);
@@ -268,12 +334,14 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         if (user.id === selectedUser?.id) {
           setSelectedUser(updatedUser);
         }
-  
+
         // Update users array
         const updatedUsers = users.map((u) =>
           u.id === user.id ? updatedUser : u
         );
         setUsers(updatedUsers);
+
+        setCacheBuster(Date.now()); // Update cacheBuster to force Image reload
       } catch (error: any) {
         console.error("Error updating icon:", error);
         Alert.alert("Error", `${t("errorUpdateIcon")}: ${error.message}`);
@@ -336,8 +404,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         setEditUserModalVisible(false);
         Alert.alert(t("success"), t("successCreateUser"));
       }
-    } catch (error) {
-      Alert.alert("Error", t("errorCreateUser")+error.message);
+    } catch (error: any) {
+      Alert.alert("Error", `${t("errorCreateUser")}: ${error.message}`);
     }
   };
 
@@ -351,24 +419,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     setVerifyCodeModalVisible(true); // Prompt for admin password
   };
 
-  // Verify admin password for editing user
-  const handleVerifyEditUser = async () => {
-    if (!currentUser || !pendingEditUser) return;
-    const isValid = await verifyUserCode(currentUser.id, inputCode);
-    if (isValid) {
-      setSelectedUser(pendingEditUser);
-      setEditUserModalVisible(true);
-      setVerifyCodeModalVisible(false);
-      setInputCode("");
-      setPendingEditUser(null);
-      setSwitchUserModalVisible(false);
-    } else {
-      Alert.alert("Error", t("invalidPassword"));
-      setInputCode("");
-    }
-  };
-
-  // Handle resetting user password
   const handleResetPassword = async () => {
     if (!selectedUser) return;
     try {
@@ -407,7 +457,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
   const renderEventType = ({ item }: { item: EventType }) => (
     <TouchableOpacity
-      style={styles.eventTypeItem}
       onPress={() =>
         navigation.navigate("Calendar", {
           eventType: item.name,
@@ -416,46 +465,62 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         })
       }
     >
-      <View style={styles.leftContainer}>
-        <MaterialIcons
-          name={item.icon}
-          size={24}
-          color={item.iconColor}
-          style={styles.icon}
-        />
-        <Text style={styles.weightText}>{item.weight}</Text>
-        <Text style={styles.eventTypeText}>{item.name}</Text>
-      </View>
-      <Text style={styles.ownerText}>{item.ownerName ?? t("unknown")}</Text>
+      <XStack
+        f={1}
+        p="$3"
+        bg="$lightGray"
+        br="$2"
+        mb="$2"
+        borderWidth={1}
+        borderColor="$border"
+        jc="space-between"
+        ai="center"
+      >
+        <XStack ai="center">
+          <MaterialIcons name={item.icon} size={24} color={item.iconColor} />
+          <Text fontSize="$4" fontWeight="bold" color="$primary" mx="$2">
+            {item.weight}
+          </Text>
+          <Text fontSize="$4" color="$text">
+            {item.name}
+          </Text>
+        </XStack>
+        <Text fontSize="$3" color="$gray">
+          {item.ownerName ?? t("unknown")}
+        </Text>
+      </XStack>
     </TouchableOpacity>
   );
 
-  const renderIconOption = (icon: string) => (
+  const renderUserItem = ({ item }: { item: User }) => (
     <TouchableOpacity
-      key={icon}
-      style={[
-        styles.iconOption,
-        selectedIcon === icon && styles.selectedIconOption,
-      ]}
-      onPress={() => setSelectedIcon(icon)}
+      onPress={() =>
+        isEditingUsers ? handleEditUser(item) : handleSwitchUser(item)
+      }
     >
-      <MaterialIcons name={icon} size={24} color={selectedColor} />
+      <XStack
+        ai="center"
+        py="$2"
+        p="$3"
+        borderBottomWidth={1}
+        borderBottomColor="$border"
+      >
+        {item.icon ? (
+          <Image
+            source={{ uri: `${resolvePhotoUri(item.icon)}?t=${cacheBuster}` }}
+            style={{ width: 30, height: 30, borderRadius: 15 }}
+          />
+        ) : (
+          <MaterialIcons name="person" size={24} color={theme.icon.val} />
+        )}
+        <Text fontSize="$4" ml="$2" color="$text">
+          {item.name}
+        </Text>
+      </XStack>
     </TouchableOpacity>
   );
 
-  const renderColorOption = (color: string) => (
-    <TouchableOpacity
-      key={color}
-      style={[
-        styles.colorOption,
-        { backgroundColor: color },
-        selectedColor === color && styles.selectedColorOption,
-      ]}
-      onPress={() => setSelectedColor(color)}
-    />
-  );
-
-  if (!currentUser) {
+  if (needsInitial) {
     return (
       <CodeSetup
         onCodeSet={async (newCode: string) => {
@@ -464,6 +529,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             if (adminUser) {
               await updateUserCode(adminUser.id, newCode);
               setCurrentUser(adminUser);
+              setNeedsInitial(false);
             }
           } catch (error) {
             Alert.alert("Error", t("errorSetPassword"));
@@ -473,599 +539,499 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     );
   }
 
-  return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>{t("title")}</Text>
-        <TouchableOpacity onPress={() => setUserProfileModalVisible(true)}>
-          {currentUser.icon ? (
-            <Image source={{ uri: resolvePhotoUri(currentUser.icon)! }} style={styles.userIcon} />
-          ) : (
-            <MaterialIcons name="person" size={30} color="#000" />
-          )}
-        </TouchableOpacity>
-      </View>
-      <Text style={styles.subtitle}>{t("achievements")}</Text>
-      <FlatList
-        data={eventTypes}
-        renderItem={renderEventType}
-        keyExtractor={(item) => item.name}
-        ListEmptyComponent={<Text>{t("noEventTypes")}</Text>}
-      />
-      <CustomButton
-        title={t("viewAllStickers")}
-        onPress={() => {
-          console.log(
-            "Navigating to CalendarViewAll, currentUser:",
-            currentUser?.name
-          );
-          navigation.navigate("CalendarViewAll");
-        }}
-      />
-      {currentUser.role_id === 1 && (
-        <>
-          <CustomButton
-            title={t("newAchievementType")}
-            onPress={handleAddEventType}
-          />
-          <CustomButton
-            title={t("backupData")}
-            onPress={() => setBackupModalVisible(true)}
-          />
-          <CustomButton
-            title={t("restoreData")}
-            onPress={() => setRestoreModalVisible(true)}
-          />
-        </>
-      )}
-      <CustomButton
-        title={language === "en" ? "切换到中文" : "Switch to English"}
-        onPress={() => setLanguage(language === "en" ? "zh" : "en")}
-      />
-      {/* AddType Modal */}
-      <Modal
-        visible={addTypeModalVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setAddTypeModalVisible(false)}
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>{t("addNewEventType")}</Text>
-            <TextInput
-              style={styles.input}
-              placeholder={t("namePlaceholder")}
-              maxLength={20}
-              value={newTypeName}
-              onChangeText={setNewTypeName}
-              autoFocus
-            />
-            <Text style={styles.iconLabel}>{t("selectIcon")}</Text>
-            <ScrollView horizontal style={styles.iconPicker}>
-              {availableIcons.map((icon) => (
-                <TouchableOpacity
-                  key={icon}
-                  style={[
-                    styles.iconOption,
-                    selectedIcon === icon && styles.selectedIconOption,
-                  ]}
-                  onPress={() => setSelectedIcon(icon)}
-                >
-                  <MaterialIcons name={icon} size={24} color={selectedColor} />
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-            <Text style={styles.iconLabel}>{t("selectColor")}</Text>
-            <ScrollView horizontal style={styles.colorPicker}>
-              {availableColors.map((color) => (
-                <TouchableOpacity
-                  key={color}
-                  style={[
-                    styles.colorOption,
-                    { backgroundColor: color },
-                    selectedColor === color && styles.selectedColorOption,
-                  ]}
-                  onPress={() => setSelectedColor(color)}
-                />
-              ))}
-            </ScrollView>
-            <Text style={styles.iconLabel}>{t("selectAvailability")}</Text>
-            <Picker
-              selectedValue={availability}
-              onValueChange={(value) => setAvailability(value)}
-              style={styles.picker}
-            >
-              {Array.from({ length: 101 }, (_, i) => (
-                <Picker.Item key={i} label={`${i}`} value={i} />
-              ))}
-            </Picker>
-            <Text style={styles.faceValueLabel}>{t("faceValue")}</Text>
-            <Picker
-              selectedValue={newFaceValue}
-              onValueChange={(value) => setNewFaceValue(value)}
-              style={styles.picker}
-            >
-              {[1, 2, 3, 4, 5].map((value) => (
-                <Picker.Item
-                  key={value}
-                  label={value.toString()}
-                  value={value.toString()}
-                />
-              ))}
-            </Picker>
-            <Text style={styles.iconLabel}>{t("selectOwner")}</Text>
-            <Picker
-              selectedValue={selectedOwnerId}
-              onValueChange={(value) => setSelectedOwnerId(value)}
-              style={styles.picker}
-              enabled={users.filter((u) => u.role_id === 3).length > 0}
-            >
-              {users
-                .filter((u) => u.role_id === 3)
-                .map((user) => (
-                  <Picker.Item
-                    key={user.id}
-                    label={user.name}
-                    value={user.id}
-                  />
-                ))}
-              {users.filter((u) => u.role_id === 3).length === 0 && (
-                <Picker.Item label={t("noOrdinaryUsers")} value={null} />
-              )}
-            </Picker>
-            <View style={styles.buttonContainerOk}>
-              <Button
-                title={t("cancel")}
-                onPress={() => {
-                  setNewTypeName("");
-                  setSelectedIcon("event");
-                  setSelectedColor("#000000");
-                  setAvailability(0);
-                  setSelectedOwnerId(
-                    users.filter((u) => u.role_id === 3)[0]?.id || null
-                  );
-                  setAddTypeModalVisible(false);
-                }}
-              />
-              <Button
-                title={t("add")}
-                onPress={handleSubmitEventType}
-                disabled={!newTypeName.trim() || !selectedOwnerId}
-              />
-            </View>
-          </View>
-        </View>
-      </Modal>
-      {/* VerifyCode Modal */}
-      <Modal
-        visible={verifyCodeModalVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setVerifyCodeModalVisible(false)}
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>
-              {pendingEditUser
-                ? t("verifyAdminForEdit")
-                : isAddingEventType
-                ? t("verifyAdminForAddEventType")
-                : t("enterVerificationCode")}
-            </Text>
-            <TextInput
-              style={styles.input}
-              placeholder={t("codePlaceholder")}
-              keyboardType="numeric"
-              maxLength={4}
-              value={inputCode}
-              onChangeText={handleCodeInputChange}
-              secureTextEntry
-              autoFocus
-            />
-            <View style={styles.buttonContainerOk}>
-              <Button
-                title={t("cancel")}
-                onPress={() => {
-                  setVerifyCodeModalVisible(false);
-                  setInputCode("");
-                  setPendingEditUser(null);
-                  setSelectedUser(null);
-                  setIsAddingEventType(false);
-                }}
-              />
-              <Button
-                title={t("verify")}
-                onPress={
-                  switchUserModalVisible && !isEditingUsers
-                    ? handleVerifySwitchUser
-                    : handleVerifyCode
-                }
-                disabled={inputCode.trim() === ""}
-              />
-            </View>
-          </View>
-        </View>
-      </Modal>
-      {/* UserProfile Modal */}
-      <Modal
-        visible={userProfileModalVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setUserProfileModalVisible(false)}
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={() => setUserProfileModalVisible(false)}
-            >
-              <MaterialIcons name="close" size={24} color="#000" />
-            </TouchableOpacity>
+  if (currentUser)
+    return (
+      <YStack f={1} p="$4" bg="$background">
+        <XStack jc="space-between" ai="center" mb="$4">
+          <Text fontSize="$5" fontWeight="bold" color="$text">
+            {t("title")}
+          </Text>
+          <TouchableOpacity onPress={() => setUserProfileModalVisible(true)}>
             {currentUser.icon ? (
               <Image
-                source={{ uri: resolvePhotoUri(currentUser.icon)! }}
-                style={styles.largeUserIcon}
+                source={{
+                  uri: `${resolvePhotoUri(currentUser.icon)}?t=${cacheBuster}`,
+                }}
+                style={{ width: 30, height: 30, borderRadius: 15 }}
               />
             ) : (
-              <MaterialIcons name="person" size={100} color="#000" />
+              <MaterialIcons name="person" size={30} color={theme.icon.val} />
             )}
-            <Text style={styles.modalTitle}>{currentUser.name}</Text>
-            {wallet ? (
-              <Text style={styles.walletInfo}>
-                {t("assets")}: {wallet.assets} | {t("credit")}: {wallet.credit}
-              </Text>
-            ) : null}
-            {currentUser.name === "Guest" ? (
-              <Button
-                title={t("login")}
-                onPress={() => setSwitchUserModalVisible(true)}
-              />
-            ) : (
-              <View style={styles.buttonContainer}>
-                <CustomButton
-                  title={t("transactionHistory")}
-                  onPress={() => {
-                    setUserProfileModalVisible(false);
-                    navigation.navigate("TransactionHistory", {
-                      userId: currentUser.id,
-                    });
-                  }}
-                />
-                <CustomButton
-                  title={t("changeIcon")}
-                  onPress={() => currentUser && handleChangeIcon(currentUser)}
-                />
-                <CustomButton
-                  title={t("switchUser")}
-                  onPress={() => {
-                    setIsEditingUsers(false);
-                    setSwitchUserModalVisible(true);
-                  }}
-                />
-                <CustomButton
-                  title={t("modifyPassword")}
-                  onPress={() => setChangeCodeModalVisible(true)}
-                />
-                <CustomButton
-                  title={t("contactInfo")}
-                  onPress={() => setContactModalVisible(true)}
-                />
-                {currentUser.role_id === 1 && (
-                  <>
-                    <CustomButton
-                      title={t("createUser")}
-                      onPress={() => setEditUserModalVisible(true)}
-                    />
-                    <CustomButton
-                      title={t("editUser")}
-                      onPress={() => {
-                        setIsEditingUsers(true);
-                        setSwitchUserModalVisible(true);
-                      }}
-                    />
-                  </>
-                )}
-              </View>
-            )}
-          </View>
-        </View>
-      </Modal>
-      {/* ChangeCode Modal */}
-      <Modal
-        visible={changeCodeModalVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setChangeCodeModalVisible(false)}
-      >
-        <View style={styles.modalContainer}>
-          <TouchableOpacity
-            style={styles.closeButton}
-            onPress={() => setChangeCodeModalVisible(false)}
-          >
-            <MaterialIcons name="close" size={24} color="#000" />
           </TouchableOpacity>
-          <ChangeCode
-            onCodeChanged={() => {
-              setChangeCodeModalVisible(false);
-              setUserProfileModalVisible(false); // Optional: Close user profile modal
-            }}
-            onCancel={() => setChangeCodeModalVisible(false)}
+        </XStack>
+        <Text fontSize="$5" fontWeight="bold" mt="$4" mb="$2" color="$text">
+          {t("achievements")}
+        </Text>
+        <FlatList
+          data={eventTypes}
+          renderItem={renderEventType}
+          keyExtractor={(item) => item.name}
+          ListEmptyComponent={
+            <Text fontSize="$4" color="$gray" textAlign="center" mt="$4">
+              {t("noEventTypes")}
+            </Text>
+          }
+        />
+        <CustomButton
+          title={t("viewAllStickers")}
+          onPress={() => navigation.navigate("CalendarViewAll")}
+        />
+        {currentUser.role_id === 1 && (
+          <>
+            <CustomButton
+              title={t("newAchievementType")}
+              onPress={handleAddEventType}
+            />
+            <CustomButton
+              title={t("backupData")}
+              onPress={() => setBackupModalVisible(true)}
+            />
+            <CustomButton
+              title={t("restoreData")}
+              onPress={() => setRestoreModalVisible(true)}
+            />
+          </>
+        )}
+        <CustomButton
+          title={language === "en" ? "切换到中文" : "Switch to English"}
+          onPress={() => setLanguage(language === "en" ? "zh" : "en")}
+        />
+
+        {/* AddType Modal */}
+        <ModalContainer
+          visible={addTypeModalVisible}
+          onClose={() => {
+            setNewTypeName("");
+            setSelectedIcon("event");
+            setSelectedColor("#000000");
+            setAvailability(0);
+            setSelectedOwnerId(
+              users.filter((u) => u.role_id === 3)[0]?.id || null
+            );
+            setAddTypeModalVisible(false);
+          }}
+        >
+          <Text {...modalTitleProps}>{t("addNewEventType")}</Text>
+          <StyledInput
+            placeholder={t("namePlaceholder")}
+            value={newTypeName}
+            onChangeText={setNewTypeName}
+            maxLength={20}
+            autoFocus
           />
-        </View>
-      </Modal>
-      {/* SwitchUser Modal */}
-      <Modal
-        visible={switchUserModalVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setSwitchUserModalVisible(false)}
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={() => {
-                setSwitchUserModalVisible(false);
-                setIsEditingUsers(false);
-              }}
-            >
-              <MaterialIcons name="close" size={24} color="#000" />
-            </TouchableOpacity>
-            <Text style={styles.modalTitle}>{t("userList")}</Text>
-            <FlatList
-              data={
-                currentUser.role_id !== 2 && !isEditingUsers
-                  ? users
-                  : users.filter((u) => u.name !== "Guest")
-              }
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={styles.typeItem}
-                  onPress={() =>
-                    isEditingUsers
-                      ? handleEditUser(item)
-                      : handleSwitchUser(item)
-                  }
-                >
-                  <View style={styles.userItemContainer}>
-                    {item.icon ? (
-                      <Image
-                        source={{ uri: resolvePhotoUri(item.icon)! }}
-                        style={styles.userIcon}
-                      />
-                    ) : (
-                      <MaterialIcons name="person" size={24} color="#000" />
-                    )}
-                    <Text style={styles.userNameText}>{item.name}</Text>
-                  </View>
+          <Text {...iconLabelProps}>{t("selectIcon")}</Text>
+          <ScrollView horizontal style={{ flexGrow: 0, marginBottom: 10 }}>
+            {availableIcons.map((icon) => (
+              <YStack
+                key={icon}
+                p="$2"
+                bg={selectedIcon === icon ? "$lightGray" : undefined}
+                br="$1"
+              >
+                <TouchableOpacity onPress={() => setSelectedIcon(icon)}>
+                  <MaterialIcons name={icon} size={24} color={selectedColor} />
                 </TouchableOpacity>
-              )}
-              keyExtractor={(item) => item.id.toString()}
-            />
-          </View>
-        </View>
-      </Modal>
-      {/* Create User Modal */}
-      <Modal
-        visible={editUserModalVisible && !selectedUser}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setEditUserModalVisible(false)}
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={() => setEditUserModalVisible(false)}
-            >
-              <MaterialIcons name="close" size={24} color="#000" />
-            </TouchableOpacity>
-            <Text style={styles.modalTitle}>{t("createUser")}</Text>
-            <TextInput
-              style={styles.input}
-              placeholder={t("namePlaceholder")}
-              value={newUserName}
-              onChangeText={setNewUserName}
-              autoFocus
-            />
-            <Text style={styles.iconLabel}>{t("selectUserRolePrompt")}</Text>
-            <Picker
-              selectedValue={newUserRoleId}
-              onValueChange={(value) => setNewUserRoleId(value)}
-              style={styles.picker}
-            >
-              <Picker.Item label="User" value={3} />
-              <Picker.Item label="Admin" value={1} />
-            </Picker>
-            <Text style={styles.iconLabel}>{t("initialPassword")}</Text>
-            <TextInput
-              style={styles.input}
-              placeholder={t("passwordPlaceholder")}
-              keyboardType="numeric"
-              maxLength={4}
-              value={newUserPassword}
-              onChangeText={(text) => {
-                if (text.match(/^\d*$/)) {
-                  setNewUserPassword(text);
-                }
+              </YStack>
+            ))}
+          </ScrollView>
+          <Text {...iconLabelProps}>{t("selectColor")}</Text>
+          <ScrollView horizontal style={{ flexGrow: 0, marginBottom: 10 }}>
+            {availableColors.map((color) => (
+              <YStack
+                key={color}
+                w={30}
+                h={30}
+                br="$10"
+                m="$1"
+                bg={color}
+                borderWidth={selectedColor === color ? 2 : 0}
+                borderColor="$primary"
+              >
+                <TouchableOpacity
+                  onPress={() => setSelectedColor(color)}
+                  style={{ flex: 1 }}
+                />
+              </YStack>
+            ))}
+          </ScrollView>
+          <Text {...iconLabelProps}>{t("selectAvailability")}</Text>
+          <PickerField
+            selectedValue={availability}
+            onValueChange={setAvailability}
+            items={Array.from({ length: 101 }, (_, i) => ({
+              label: `${i}`,
+              value: i,
+            }))}
+          />
+          <Text {...iconLabelProps}>{t("faceValue")}</Text>
+          <PickerField
+            selectedValue={newFaceValue}
+            onValueChange={setNewFaceValue}
+            items={[1, 2, 3, 4, 5].map((value) => ({
+              label: value.toString(),
+              value: value.toString(),
+            }))}
+          />
+          <Text {...iconLabelProps}>{t("selectOwner")}</Text>
+          <PickerField
+            selectedValue={selectedOwnerId}
+            onValueChange={setSelectedOwnerId}
+            items={
+              users.filter((u) => u.role_id === 3).length > 0
+                ? users
+                    .filter((u) => u.role_id === 3)
+                    .map((user) => ({ label: user.name, value: user.id }))
+                : [{ label: t("noOrdinaryUsers"), value: null }]
+            }
+            enabled={users.filter((u) => u.role_id === 3).length > 0}
+          />
+          <XStack jc="space-between" w="100%" mt="$2">
+            <Button
+              title={t("cancel")}
+              onPress={() => {
+                setNewTypeName("");
+                setSelectedIcon("event");
+                setSelectedColor("#000000");
+                setAvailability(0);
+                setSelectedOwnerId(
+                  users.filter((u) => u.role_id === 3)[0]?.id || null
+                );
+                setAddTypeModalVisible(false);
               }}
-              secureTextEntry
             />
             <Button
-              title={t("create")}
-              onPress={handleCreateUser}
-              disabled={
-                !newUserName.trim() || !newUserPassword.match(/^\d{4}$/)
-              }
+              title={t("add")}
+              onPress={handleSubmitEventType}
+              disabled={!newTypeName.trim() || !selectedOwnerId}
             />
-          </View>
-        </View>
-      </Modal>
-      {/* Edit User Modal */}
-      <Modal
-        visible={editUserModalVisible && !!selectedUser}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setEditUserModalVisible(false)}
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={() => {
-                setEditUserModalVisible(false);
-                setSelectedUser(null);
-              }}
-            >
-              <MaterialIcons name="close" size={24} color="#000" />
-            </TouchableOpacity>
-            <Text style={styles.modalTitle}>{t("editUser")}</Text>
-            <Text style={styles.modalTitle}>{selectedUser?.name}</Text>
-            {selectedUser?.icon ? (
-              <Image
-                source={{ uri: resolvePhotoUri(selectedUser.icon)! }}
-                style={styles.largeUserIcon}
-              />
-            ) : (
-              <MaterialIcons name="person" size={100} color="#000" />
-            )}
-            <CustomButton
-              title={t("changeIcon")}
-              onPress={() => selectedUser && handleChangeIcon(selectedUser)}
-            />
-            <CustomButton
-              title={t("resetPassword")}
-              onPress={handleResetPassword}
-            />
-            <CustomButton title={t("deleteUser")} onPress={handleDeleteUser} />
-          </View>
-        </View>
-      </Modal>
-      {/* Backup Data Modal */}
-      <Modal
-        visible={backupModalVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setBackupModalVisible(false)}
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={() => setBackupModalVisible(false)}
-            >
-              <MaterialIcons name="close" size={24} color="#000" />
-            </TouchableOpacity>
-            <BackupData onClose={() => setBackupModalVisible(false)} />
-          </View>
-        </View>
-      </Modal>
+          </XStack>
+        </ModalContainer>
 
-      {/* Restore Data Modal */}
-      <Modal
-        visible={restoreModalVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setRestoreModalVisible(false)}
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={() => setRestoreModalVisible(false)}
-            >
-              <MaterialIcons name="close" size={24} color="#000" />
-            </TouchableOpacity>
-            <RestoreData onClose={() => setRestoreModalVisible(false)} />
-          </View>
-        </View>
-      </Modal>
-      {/* Contact Info Modal */}
-      <Modal
-        visible={contactModalVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => {
-          setContactModalVisible(false);
-          setIsEditingContact(false);
-          setEmail(currentUser?.email || "");
-          setPhone(currentUser?.phone || "");
-        }}
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <TouchableOpacity
-              style={styles.closeButton}
+        {/* VerifyCode Modal */}
+        <ModalContainer
+          visible={verifyCodeModalVisible}
+          onClose={() => {
+            setVerifyCodeModalVisible(false);
+            setInputCode("");
+            setPendingEditUser(null);
+            setSelectedUser(null);
+            setIsAddingEventType(false);
+          }}
+        >
+          <Text {...modalTitleProps}>
+            {pendingEditUser
+              ? t("verifyAdminForEdit")
+              : isAddingEventType
+              ? t("verifyAdminForAddEventType")
+              : t("enterVerificationCode")}
+          </Text>
+          <StyledInput
+            placeholder={t("codePlaceholder")}
+            value={inputCode}
+            onChangeText={handleCodeInputChange}
+            keyboardType="numeric"
+            maxLength={4}
+            secureTextEntry
+            autoFocus
+          />
+          <XStack jc="space-between" w="100%" mt="$2">
+            <Button
+              title={t("cancel")}
               onPress={() => {
-                setContactModalVisible(false);
-                setIsEditingContact(false);
-                setEmail(currentUser?.email || "");
-                setPhone(currentUser?.phone || "");
+                setVerifyCodeModalVisible(false);
+                setInputCode("");
+                setPendingEditUser(null);
+                setSelectedUser(null);
+                setIsAddingEventType(false);
               }}
-            >
-              <MaterialIcons name="close" size={24} color="#000" />
-            </TouchableOpacity>
-            <Text style={styles.modalTitle}>{t("contactInfo")}</Text>
-            <TextInput
-              style={styles.input}
-              value={email}
-              onChangeText={setEmail}
-              placeholder={t("emailPlaceholder")}
-              editable={isEditingContact}
-              autoCapitalize="none"
             />
-            <TextInput
-              style={styles.input}
-              value={phone}
-              onChangeText={setPhone}
-              placeholder={t("phonePlaceholder")}
-              editable={isEditingContact}
-              keyboardType="phone-pad"
+            <Button
+              title={t("verify")}
+              onPress={
+                switchUserModalVisible && !isEditingUsers
+                  ? handleVerifySwitchUser
+                  : handleVerifyCode
+              }
+              disabled={inputCode.trim() === ""}
             />
-            <View style={styles.buttonContainer}>
-              {isEditingContact ? (
+          </XStack>
+        </ModalContainer>
+
+        {/* UserProfile Modal */}
+        <ModalContainer
+          visible={userProfileModalVisible}
+          onClose={() => setUserProfileModalVisible(false)}
+        >
+          {currentUser.icon ? (
+            <Image
+              source={{
+                uri: `${resolvePhotoUri(currentUser.icon)}?t=${cacheBuster}`,
+              }}
+              style={{
+                width: 100,
+                height: 100,
+                borderRadius: 50,
+                marginBottom: 10,
+              }}
+            />
+          ) : (
+            <MaterialIcons name="person" size={100} color={theme.icon.val} />
+          )}
+          <Text {...modalTitleProps}>{currentUser.name}</Text>
+          {wallet ? (
+            <Text fontSize="$4" color="$text" mb="$2">
+              {t("assets")}: {wallet.assets} | {t("credit")}: {wallet.credit}
+            </Text>
+          ) : null}
+          {currentUser.name === "Guest" ? (
+            <CustomButton
+              title={t("login")}
+              onPress={() => setSwitchUserModalVisible(true)}
+            />
+          ) : (
+            <YStack w="100%" mt="$2">
+              <CustomButton
+                title={t("transactionHistory")}
+                onPress={() => {
+                  setUserProfileModalVisible(false);
+                  navigation.navigate("TransactionHistory", {
+                    userId: currentUser.id,
+                  });
+                }}
+              />
+              <CustomButton
+                title={t("changeIcon")}
+                onPress={() => currentUser && handleChangeIcon(currentUser)}
+              />
+              <CustomButton
+                title={t("switchUser")}
+                onPress={() => {
+                  setIsEditingUsers(false);
+                  setSwitchUserModalVisible(true);
+                }}
+              />
+              <CustomButton
+                title={t("modifyPassword")}
+                onPress={() => setChangeCodeModalVisible(true)}
+              />
+              <CustomButton
+                title={t("contactInfo")}
+                onPress={() => setContactModalVisible(true)}
+              />
+              {currentUser.role_id === 1 && (
                 <>
                   <CustomButton
-                    title={t("cancel")}
-                    onPress={() => {
-                      setIsEditingContact(false);
-                      setEmail(currentUser?.email || "");
-                      setPhone(currentUser?.phone || "");
-                    }}
+                    title={t("createUser")}
+                    onPress={() => setEditUserModalVisible(true)}
                   />
                   <CustomButton
-                    title={t("save")}
-                    onPress={async () => {
-                      if (!currentUser) return;
-                      try {
-                        await updateUserContact(currentUser.id, email, phone);
-                        const updatedUser = { ...currentUser, email, phone };
-                        setCurrentUser(updatedUser);
-                        setUsers(
-                          users.map((u) =>
-                            u.id === currentUser.id ? updatedUser : u
-                          )
-                        );
-                        setIsEditingContact(false);
-                        Alert.alert(t("success"), t("contactUpdated"));
-                      } catch (error) {
-                        Alert.alert("Error", t("errorUpdateContact"));
-                      }
+                    title={t("editUser")}
+                    onPress={() => {
+                      setIsEditingUsers(true);
+                      setSwitchUserModalVisible(true);
                     }}
                   />
                 </>
-              ) : (
-                <CustomButton
-                  title={t("edit")}
-                  onPress={() => setIsEditingContact(true)}
-                />
               )}
-            </View>
-          </View>
-        </View>
-      </Modal>
-    </View>
-  );
+            </YStack>
+          )}
+        </ModalContainer>
+
+        {/* ChangeCode Modal */}
+        <ModalContainer
+          visible={changeCodeModalVisible}
+          onClose={() => setChangeCodeModalVisible(false)}
+        >
+          <ChangeCode
+            onCodeChanged={() => {
+              setChangeCodeModalVisible(false);
+              setUserProfileModalVisible(false);
+            }}
+            onCancel={() => setChangeCodeModalVisible(false)}
+          />
+        </ModalContainer>
+
+        {/* SwitchUser Modal */}
+        <ModalContainer
+          visible={switchUserModalVisible}
+          onClose={() => {
+            setSwitchUserModalVisible(false);
+            setIsEditingUsers(false);
+          }}
+        >
+          <Text {...modalTitleProps}>{t("userList")}</Text>
+          <FlatList
+            data={
+              currentUser.role_id !== 2 && !isEditingUsers
+                ? users
+                : users.filter((u) => u.name !== "Guest")
+            }
+            renderItem={renderUserItem}
+            keyExtractor={(item) => item.id.toString()}
+          />
+        </ModalContainer>
+
+        {/* Create User Modal */}
+        <ModalContainer
+          visible={editUserModalVisible && !selectedUser}
+          onClose={() => setEditUserModalVisible(false)}
+        >
+          <Text {...modalTitleProps}>{t("createUser")}</Text>
+          <StyledInput
+            placeholder={t("namePlaceholder")}
+            value={newUserName}
+            onChangeText={setNewUserName}
+            autoFocus
+          />
+          <Text {...iconLabelProps}>{t("selectUserRolePrompt")}</Text>
+          <PickerField
+            selectedValue={newUserRoleId}
+            onValueChange={setNewUserRoleId}
+            items={[
+              { label: "User", value: 3 },
+              { label: "Admin", value: 1 },
+            ]}
+          />
+          <Text {...iconLabelProps}>{t("initialPassword")}</Text>
+          <StyledInput
+            placeholder={t("passwordPlaceholder")}
+            value={newUserPassword}
+            onChangeText={(text) => {
+              if (text.match(/^\d*$/)) {
+                setNewUserPassword(text);
+              }
+            }}
+            keyboardType="numeric"
+            maxLength={4}
+            secureTextEntry
+          />
+          <CustomButton
+            title={t("create")}
+            onPress={handleCreateUser}
+            disabled={!newUserName.trim() || !newUserPassword.match(/^\d{4}$/)}
+          />
+        </ModalContainer>
+
+        {/* Edit User Modal */}
+        <ModalContainer
+          visible={editUserModalVisible && !!selectedUser}
+          onClose={() => {
+            setEditUserModalVisible(false);
+            setSelectedUser(null);
+          }}
+        >
+          <Text {...modalTitleProps}>{t("editUser")}</Text>
+          <Text {...modalTitleProps}>{selectedUser?.name}</Text>
+          {selectedUser?.icon ? (
+            <Image
+              source={{
+                uri: `${resolvePhotoUri(selectedUser.icon)}?t=${cacheBuster}`,
+              }}
+              style={{
+                width: 100,
+                height: 100,
+                borderRadius: 50,
+                marginBottom: 10,
+              }}
+            />
+          ) : (
+            <MaterialIcons name="person" size={100} color={theme.icon.val} />
+          )}
+          <CustomButton
+            title={t("changeIcon")}
+            onPress={() => selectedUser && handleChangeIcon(selectedUser)}
+          />
+          <CustomButton
+            title={t("resetPassword")}
+            onPress={handleResetPassword}
+          />
+          <CustomButton title={t("deleteUser")} onPress={handleDeleteUser} />
+        </ModalContainer>
+
+        {/* Backup Data Modal */}
+        <ModalContainer
+          visible={backupModalVisible}
+          onClose={() => setBackupModalVisible(false)}
+        >
+          <BackupData onClose={() => setBackupModalVisible(false)} />
+        </ModalContainer>
+
+        {/* Restore Data Modal */}
+        <ModalContainer
+          visible={restoreModalVisible}
+          onClose={() => setRestoreModalVisible(false)}
+        >
+          <RestoreData onClose={() => setRestoreModalVisible(false)} />
+        </ModalContainer>
+
+        {/* Contact Info Modal */}
+        <ModalContainer
+          visible={contactModalVisible}
+          onClose={() => {
+            setContactModalVisible(false);
+            setIsEditingContact(false);
+            setEmail(currentUser?.email || "");
+            setPhone(currentUser?.phone || "");
+          }}
+        >
+          <Text {...modalTitleProps}>{t("contactInfo")}</Text>
+          <StyledInput
+            value={email}
+            onChangeText={setEmail}
+            placeholder={t("emailPlaceholder")}
+            editable={isEditingContact}
+            keyboardType="email-address"
+            autoCapitalize="none"
+          />
+          <StyledInput
+            value={phone}
+            onChangeText={setPhone}
+            placeholder={t("phonePlaceholder")}
+            editable={isEditingContact}
+            keyboardType="phone-pad"
+          />
+          <YStack w="100%" mt="$2">
+            {isEditingContact ? (
+              <>
+                <Button
+                  title={t("cancel")}
+                  onPress={() => {
+                    setIsEditingContact(false);
+                    setEmail(currentUser?.email || "");
+                    setPhone(currentUser?.phone || "");
+                  }}
+                />
+                <Button
+                  title={t("save")}
+                  onPress={async () => {
+                    if (!currentUser) return;
+                    try {
+                      await updateUserContact(currentUser.id, email, phone);
+                      const updatedUser = { ...currentUser, email, phone };
+                      setCurrentUser(updatedUser);
+                      setUsers(
+                        users.map((u) =>
+                          u.id === currentUser.id ? updatedUser : u
+                        )
+                      );
+                      setIsEditingContact(false);
+                      Alert.alert(t("success"), t("contactUpdated"));
+                    } catch (error) {
+                      Alert.alert("Error", t("errorUpdateContact"));
+                    }
+                  }}
+                />
+              </>
+            ) : (
+              <CustomButton
+                title={t("edit")}
+                onPress={() => setIsEditingContact(true)}
+              />
+            )}
+          </YStack>
+        </ModalContainer>
+      </YStack>
+    );
 };
 
 export default HomeScreen;

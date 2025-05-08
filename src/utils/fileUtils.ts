@@ -16,7 +16,7 @@ export const resolvePhotoUri = (path: string | null): string | null => {
 export const processUserIcon = async (
   uri: string,
   userId: number,
-  existingIcon: string | null
+  existingIcon?: string
 ): Promise<string> => {
   if (!FileSystem.documentDirectory) {
     throw new Error("Document directory not available");

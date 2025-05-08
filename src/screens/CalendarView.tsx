@@ -1,17 +1,6 @@
 import React, { useEffect, useState, useContext } from "react";
-import {
-  View,
-  Text,
-  TextInput,
-  Modal,
-  Button,
-  TouchableOpacity,
-  Image,
-  Alert,
-  ScrollView,
-} from "react-native";
+import { Alert, Dimensions, Modal as RNModal, Appearance } from "react-native";
 import { Calendar } from "react-native-calendars";
-import { RouteProp } from "@react-navigation/native";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 import * as ImagePicker from "expo-image-picker";
 import * as ImageManipulator from "expo-image-manipulator";
@@ -22,6 +11,20 @@ import Animated, {
   useAnimatedStyle,
   withSpring,
 } from "react-native-reanimated";
+import {
+  YStack,
+  XStack,
+  Text,
+  styled,
+  Button,
+  Image,
+  ScrollView,
+  useTheme,
+} from "tamagui";
+import { RouteProp } from "@react-navigation/native";
+import { useLanguage } from "../contexts/LanguageContext";
+import { UserContext } from "../contexts/UserContext";
+import { StyledInput, CustomButton } from "../components/SharedComponents";
 import { RootStackParamList, Event } from "../types";
 import {
   insertEvent,
@@ -33,11 +36,10 @@ import {
   verifyEventWithTransaction,
   getUsers,
 } from "../db/database";
-import { useLanguage } from "../contexts/LanguageContext";
 import { availableColors, availableIcons } from "../icons";
-import { UserContext } from "../contexts/UserContext";
-import { styles } from "../styles/calendarViewStyles";
 import { resolvePhotoUri } from "../utils/fileUtils";
+
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 interface CalendarViewProps {
   route: RouteProp<RootStackParamList, "Calendar">;
@@ -45,6 +47,248 @@ interface CalendarViewProps {
 
 const MAX_NOTE_LENGTH = 200;
 const MAX_PHOTO_SIZE = 1_048_576;
+
+// Styled components (unchanged from previous response)
+const Container = styled(YStack, {
+  flex: 1,
+  p: "$4",
+  bg: "$background",
+});
+
+const TitleContainer = styled(XStack, {
+  ai: "center",
+  jc: "space-between",
+  mb: "$4",
+});
+
+const Title = styled(Text, {
+  fontSize: "$6",
+  fontWeight: "bold",
+  color: "$text",
+});
+
+const LeftContainer = styled(XStack, {
+  ai: "center",
+});
+
+const WeightText = styled(Text, {
+  fontSize: "$5",
+  fontWeight: "bold",
+  color: "$gray",
+});
+
+const AchievementCountText = styled(Text, {
+  fontSize: "$5",
+  fontWeight: "bold",
+  color: "$gray",
+});
+
+const ModalContainer = styled(YStack, {
+  f: 1,
+  jc: "center",
+  ai: "center",
+  bg: "$overlay",
+});
+
+const ModalContent = styled(YStack, {
+  bg: "$modalBackground",
+  p: "$4",
+  br: "$2",
+  w: "80%",
+  ai: "center",
+});
+
+const ModalTitle = styled(Text, {
+  fontSize: "$5",
+  fontWeight: "bold",
+  mb: "$2",
+  color: "$text",
+});
+
+const ModalText = styled(Text, {
+  fontSize: "$3",
+  mb: "$2",
+  ta: "center",
+  color: "$text",
+});
+
+const CharCount = styled(Text, {
+  fontSize: "$2",
+  color: "$gray",
+  alignSelf: "flex-end",
+  mb: "$2",
+});
+
+const PhotoButtonContainer = styled(XStack, {
+  jc: "space-between",
+  w: "100%",
+  mb: "$2",
+});
+
+const PhotoButton = styled(Button, {
+  bg: "$primary",
+  p: "$2",
+  br: "$2",
+  f: 1,
+  mx: "$2",
+  h: 40,
+});
+
+const PhotoButtonText = styled(Text, {
+  color: "$modalBackground",
+  fontSize: "$3",
+  ta: "center",
+});
+
+const PhotoPreview = styled(Image, {
+  w: 100,
+  h: 100,
+  br: "$2",
+  mb: "$2",
+});
+
+const EventDisplay = styled(YStack, {
+  mt: "$4",
+  p: "$3",
+  bg: "$lightGray",
+  borderWidth: 1,
+  borderColor: "$border",
+  br: "$2",
+  f: 1,
+});
+
+const EventTitle = styled(Text, {
+  fontSize: "$4",
+  fontWeight: "bold",
+  mb: "$2",
+  color: "$text",
+});
+
+const EventItem = styled(YStack, {
+  mb: "$3",
+  pb: "$2",
+  borderBottomWidth: 1,
+  borderBottomColor: "$border",
+});
+
+const EventHeader = styled(XStack, {
+  jc: "space-between",
+  ai: "center",
+  mb: "$1",
+});
+
+const EventText = styled(Text, {
+  fontSize: "$3",
+  mb: "$1",
+  color: "$text",
+});
+
+const NoEventText = styled(Text, {
+  fontSize: "$3",
+  color: "$gray",
+  ta: "center",
+  mb: "$2",
+});
+
+const MaxAchievementsText = styled(Text, {
+  fontSize: "$3",
+  color: "$gray",
+  ta: "center",
+  mt: "$2",
+});
+
+const MarkButton = styled(Button, {
+  bg: "$primary",
+  p: "$2",
+  br: "$2",
+  h: 40,
+});
+
+const MarkButtonText = styled(Text, {
+  color: "$modalBackground",
+  fontSize: "$3",
+  fontWeight: "bold",
+  ta: "center",
+});
+
+const EventPhoto = styled(Image, {
+  w: 100,
+  h: 100,
+  br: "$2",
+  mt: "$2",
+});
+
+const PhotoModalContainer = styled(YStack, {
+  f: 1,
+  bg: "$photoBackground",
+  jc: "center",
+  ai: "center",
+});
+
+const FullScreenPhoto = styled(Image, {
+  w: SCREEN_WIDTH,
+  h: SCREEN_HEIGHT,
+});
+
+const CloseButton = styled(Button, {
+  position: "absolute",
+  top: 40,
+  right: 20,
+  bg: "$overlay",
+  br: 20,
+  p: "$1",
+});
+
+const IconLabel = styled(Text, {
+  fontSize: "$4",
+  my: "$2",
+  alignSelf: "flex-start",
+  color: "$text",
+});
+
+const IconOption = styled(YStack, {
+  p: "$2",
+  variants: {
+    selected: {
+      true: {
+        bg: "$selectedBackground",
+        br: "$2",
+      },
+    },
+  },
+});
+
+const ColorOption = styled(YStack, {
+  w: 30,
+  h: 30,
+  br: 15,
+  mx: "$1",
+  variants: {
+    selected: {
+      true: {
+        borderWidth: 2,
+        borderColor: "$primary",
+      },
+    },
+  },
+});
+
+const ActionButtons = styled(XStack, {
+  flexDirection: "row",
+});
+
+const ActionButton = styled(Button, {
+  ml: "$2",
+  bg: "$primary",
+  p: "$1",
+  br: "$2",
+  h: 30,
+});
+
+const ActionButtonText = styled(Text, {
+  color: "$modalBackground",
+  fontSize: "$2",
+});
 
 const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
   const {
@@ -58,6 +302,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
     initialIconColor || "#000000"
   );
   const { t } = useLanguage();
+  const theme = useTheme();
   const [events, setEvents] = useState<Event[]>([]);
   const [markedDates, setMarkedDates] = useState<{ [key: string]: any }>({});
   const [verifyModalVisible, setVerifyModalVisible] = useState(false);
@@ -88,6 +333,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
   const [pendingEventId, setPendingEventId] = useState<number | null>(null);
   const [confirmVerifyModalVisible, setConfirmVerifyModalVisible] =
     useState(false);
+  const [colorScheme, setColorScheme] = useState(Appearance.getColorScheme());
 
   const scale = useSharedValue(1);
   const savedScale = useSharedValue(1);
@@ -95,6 +341,14 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
   const translateY = useSharedValue(0);
   const savedTranslateX = useSharedValue(0);
   const savedTranslateY = useSharedValue(0);
+
+  // Listen for system theme changes
+  useEffect(() => {
+    const subscription = Appearance.addChangeListener(({ colorScheme }) => {
+      setColorScheme(colorScheme);
+    });
+    return () => subscription.remove();
+  }, []);
 
   const calculateMonthlyAchievements = (
     events: Event[],
@@ -111,14 +365,11 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
   useEffect(() => {
     const initialize = async () => {
       try {
-        // Fetch users for creator names
         const allUsers = await getUsers();
         setUsers(allUsers.map((u) => ({ id: u.id, name: u.name })));
-        // Fetch events with creator names
         const loadedEvents = await fetchEventsWithCreator(eventType);
         setEvents(loadedEvents);
         calculateMonthlyAchievements(loadedEvents, currentYear, currentMonth);
-        // Fetch event type details
         const eventTypes = await getEventTypes();
         const type = eventTypes.find((t) => t.name === eventType);
         if (type?.icon) setIcon(type.icon);
@@ -171,7 +422,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       quality: 1,
     });
@@ -189,7 +440,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
     }
 
     const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ["images"],
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       quality: 1,
     });
@@ -234,7 +485,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
         intermediates: true,
       });
       await FileSystem.moveAsync({ from: finalUri, to: permanentPath });
-      setPhotoUri(relativePath); // Store relative path
+      setPhotoUri(relativePath);
     } catch (error) {
       console.error("Error processing image:", error);
       Alert.alert("Error", t("errorProcessImage"));
@@ -256,7 +507,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
           currentUser.id,
           note || undefined,
           photoUri || undefined,
-          false // is_verified = false
+          false
         );
         const newEvent: Event = {
           id: insertedId,
@@ -316,12 +567,12 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
 
   const handleVerifyEvent = (eventId: number) => {
     setPendingEventId(eventId);
-    setConfirmVerifyModalVisible(true); // Show confirmation modal
+    setConfirmVerifyModalVisible(true);
   };
 
   const handleConfirmVerification = () => {
     setConfirmVerifyModalVisible(false);
-    setVerifyEventModalVisible(true); // Proceed to password input
+    setVerifyEventModalVisible(true);
   };
 
   const handleConfirmVerifyEvent = async () => {
@@ -329,7 +580,6 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
     try {
       const isValid = await verifyUserCode(currentUser.id, inputCode);
       if (isValid) {
-        // Find the event to get its details
         const event = events.find((e) => e.id === pendingEventId);
         if (!event) {
           throw new Error("Event not found");
@@ -363,6 +613,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
       Alert.alert("Error", `${t("errorVerifyEvent")}: ${error.message}`);
     }
   };
+
   const openPhotoModal = (uri: string) => {
     setSelectedPhotoUri(uri);
     setPhotoModalVisible(true);
@@ -387,25 +638,22 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
   };
 
   const renderIconOption = (icon: string) => (
-    <TouchableOpacity
+    <IconOption
       key={icon}
-      style={[styles.iconOption, newIcon === icon && styles.selectedIconOption]}
+      selected={newIcon === icon}
       onPress={() => setNewIcon(icon)}
     >
       <MaterialIcons name={icon} size={24} color={newIconColor} />
-    </TouchableOpacity>
+    </IconOption>
   );
 
   const renderColorOption = (color: string) => (
-    <TouchableOpacity
+    <ColorOption
       key={color}
-      style={[
-        styles.colorOption,
-        { backgroundColor: color },
-        newIconColor === color && styles.selectedColorOption,
-      ]}
+      backgroundColor={color}
+      selected={newIconColor === color}
       onPress={() => setNewIconColor(color)}
-    ></TouchableOpacity>
+    />
   );
 
   const pinchGesture = Gesture.Pinch()
@@ -451,196 +699,186 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
     (availability === 0 || selectedDateEvents.length < availability) &&
     (currentUser?.id === eventTypeOwnerId || currentUser?.role_id === 1);
 
+  // Calendar theme dependent on current theme
+  const calendarTheme = {
+    calendarBackground: theme.background.val,
+    textSectionTitleColor: theme.text.val,
+    selectedDayBackgroundColor: theme.primary.val,
+    selectedDayTextColor: theme.modalBackground.val,
+    todayTextColor: theme.primary.val,
+    dayTextColor: theme.text.val,
+    textDisabledColor: theme.gray.val,
+    arrowColor: theme.primary.val,
+    monthTextColor: theme.text.val,
+  };
+
   if (!currentUser) {
     return (
-      <View style={styles.container}>
-        <Text>{t("loading")}</Text>
-      </View>
+      <Container>
+        <Text color="$text">{t("loading")}</Text>
+      </Container>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <TouchableOpacity
-        style={styles.titleContainer}
+    <Container>
+      <TitleContainer
         onPress={() => {
           if (currentUser.role_id === 1) {
             setEditModalVisible(true);
           }
         }}
       >
-        <View style={styles.leftContainer}>
+        <LeftContainer>
           <MaterialIcons
             name={icon}
             size={24}
             color={iconColor}
-            style={styles.icon}
+            style={{ marginRight: 10 }}
           />
-          <Text style={styles.weightText}>{weight}</Text>
-        </View>
-        <Text style={styles.title}>{eventType}</Text>
-        <Text style={styles.achievementCountText}>
-          {monthlyAchievementCount}
-        </Text>
-      </TouchableOpacity>
+          <WeightText>{weight}</WeightText>
+        </LeftContainer>
+        <Title>{eventType}</Title>
+        <AchievementCountText>{monthlyAchievementCount}</AchievementCountText>
+      </TitleContainer>
       <Calendar
+        key={colorScheme} // Force re-render on theme change
         onDayPress={handleDayPress}
         onMonthChange={handleMonthChange}
         markedDates={markedDates}
-        theme={{
-          selectedDayBackgroundColor: "#007AFF",
-          todayTextColor: "#007AFF",
-          arrowColor: "#007AFF",
-        }}
+        theme={calendarTheme}
       />
-      <View style={styles.eventDisplay}>
+      <EventDisplay>
         {selectedDateEvents.length > 0 ? (
-          <ScrollView style={styles.eventScrollView}>
-            <Text style={styles.eventTitle}>{t("achievementDetails")}</Text>
+          <ScrollView flexGrow={1}>
+            <EventTitle>{t("achievementDetails")}</EventTitle>
             {selectedDateEvents.map((event, index) => (
-              <View key={event.id || index} style={styles.eventItem}>
-                <View style={styles.eventHeader}>
-                  <Text style={styles.eventText}>
+              <EventItem key={event.id || index}>
+                <EventHeader>
+                  <EventText>
                     {t("achievement")} {index + 1}
-                  </Text>
+                  </EventText>
                   {event.is_verified ? (
                     <MaterialIcons
                       name="check-circle"
                       size={20}
-                      color="green"
+                      color={theme.verified.val}
                     />
                   ) : (
-                    <View style={styles.actionButtons}>
+                    <ActionButtons>
                       {currentUser.role_id === 1 && (
-                        <TouchableOpacity
-                          style={styles.actionButton}
+                        <ActionButton
                           onPress={() => handleVerifyEvent(event.id)}
                         >
-                          <Text style={styles.actionButtonText}>
-                            {t("verify")}
-                          </Text>
-                        </TouchableOpacity>
+                          <ActionButtonText>{t("verify")}</ActionButtonText>
+                        </ActionButton>
                       )}
-                      {(currentUser.id === event.created_by ||
+                      {(currentUser.id === eventTypeOwnerId ||
                         currentUser.role_id === 1) && (
-                        <TouchableOpacity
-                          style={styles.actionButton}
+                        <ActionButton
                           onPress={() => handleDeleteEvent(event.id)}
                         >
-                          <Text style={styles.actionButtonText}>
-                            {t("delete")}
-                          </Text>
-                        </TouchableOpacity>
+                          <ActionButtonText>{t("delete")}</ActionButtonText>
+                        </ActionButton>
                       )}
-                    </View>
+                    </ActionButtons>
                   )}
-                </View>
-                <Text style={styles.eventText}>
+                </EventHeader>
+                <EventText>
                   {t("date")}: {String(event.date)}
-                </Text>
-                <Text style={styles.eventText}>
+                </EventText>
+                <EventText>
                   {t("gotAt")}: {new Date(event.markedAt).toLocaleString()}
-                </Text>
-                <Text style={styles.eventText}>
+                </EventText>
+                <EventText>
                   {t("createdBy")}: {event.creatorName ?? "Unknown"}
-                </Text>
-                <Text style={styles.eventText}>
+                </EventText>
+                <EventText>
                   {t("verified")}: {event.is_verified ? t("yes") : t("no")}
-                </Text>
+                </EventText>
                 {event.note && (
-                  <Text style={styles.eventText}>
+                  <EventText>
                     {t("for")}: {String(event.note)}
-                  </Text>
+                  </EventText>
                 )}
                 {event.is_verified ? (
                   <>
-                    <Text style={styles.eventText}>
+                    <EventText>
                       {t("verifiedAt")}:{" "}
                       {new Date(event.verified_at!).toLocaleString()}
-                    </Text>
-                    <Text style={styles.eventText}>
+                    </EventText>
+                    <EventText>
                       {t("verifiedBy")}: {event.verifierName ?? t("unknown")}
-                    </Text>
+                    </EventText>
                   </>
                 ) : null}
                 {event.photoPath && (
-                  <TouchableOpacity
+                  <EventPhoto
+                    source={{ uri: resolvePhotoUri(event.photoPath)! }}
                     onPress={() => openPhotoModal(event.photoPath)}
-                  >
-                    <Image
-                      source={{ uri: resolvePhotoUri(event.photoPath)! }}
-                      style={styles.eventPhoto}
-                    />
-                  </TouchableOpacity>
+                  />
                 )}
-              </View>
+              </EventItem>
             ))}
           </ScrollView>
         ) : (
           <>
-            <Text style={styles.noEventText}>
+            <NoEventText>
               {selectedDate
                 ? `${t("noAchievement")} ${selectedDate}`
                 : t("noDateSelected")}
-            </Text>
-            <Text style={styles.maxAchievementsText}>
+            </NoEventText>
+            <MaxAchievementsText>
               {t("maxAchievements", {
                 availability:
                   availability === 0 ? t("unlimited") : availability,
               })}
-            </Text>
+            </MaxAchievementsText>
           </>
         )}
         {showAskStickerButton && (
-          <TouchableOpacity
-            style={styles.markButton}
-            onPress={handleAskSticker}
-          >
-            <Text style={styles.markButtonText}>
+          <MarkButton onPress={handleAskSticker}>
+            <MarkButtonText>
               {currentUser.role_id === 1 ? t("giveSticker") : t("askSticker")}
-            </Text>
-          </TouchableOpacity>
+            </MarkButtonText>
+          </MarkButton>
         )}
-      </View>
+      </EventDisplay>
       {/* Ask Sticker Modal */}
-      <Modal
+      <RNModal
         visible={verifyModalVisible}
         transparent
         animationType="slide"
         onRequestClose={() => setVerifyModalVisible(false)}
       >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>
+        <ModalContainer>
+          <ModalContent>
+            <ModalTitle>
               {currentUser.role_id === 1 ? t("giveSticker") : t("askSticker")}
-            </Text>
-            <TextInput
-              style={styles.input}
+            </ModalTitle>
+            <StyledInput
               placeholder={t("notePlaceholder")}
               maxLength={MAX_NOTE_LENGTH}
               value={note}
               onChangeText={setNote}
               multiline
             />
-            <Text style={styles.charCount}>
+            <CharCount>
               {note.length}/{MAX_NOTE_LENGTH}
-            </Text>
-            <View style={styles.photoButtonContainer}>
-              <TouchableOpacity
-                style={styles.photoButton}
-                onPress={captureImage}
-              >
-                <Text style={styles.photoButtonText}>{t("takePhoto")}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.photoButton} onPress={pickImage}>
-                <Text style={styles.photoButtonText}>{t("uploadPhoto")}</Text>
-              </TouchableOpacity>
-            </View>
+            </CharCount>
+            <PhotoButtonContainer>
+              <PhotoButton onPress={captureImage}>
+                <PhotoButtonText>{t("takePhoto")}</PhotoButtonText>
+              </PhotoButton>
+              <PhotoButton onPress={pickImage}>
+                <PhotoButtonText>{t("uploadPhoto")}</PhotoButtonText>
+              </PhotoButton>
+            </PhotoButtonContainer>
             {photoUri && (
-              <Image source={{ uri: resolvePhotoUri(photoUri)! }} style={styles.photoPreview} />
+              <PhotoPreview source={{ uri: resolvePhotoUri(photoUri)! }} />
             )}
-            <View style={styles.buttonContainer}>
-              <Button
+            <XStack jc="space-between" w="50%" gap="$3">
+              <CustomButton
                 title={t("cancel")}
                 onPress={() => {
                   setVerifyModalVisible(false);
@@ -649,23 +887,22 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
                   setPendingDate(null);
                 }}
               />
-              <Button title={t("confirm")} onPress={handleVerifyCode} />
-            </View>
-          </View>
-        </View>
-      </Modal>
+              <CustomButton title={t("confirm")} onPress={handleVerifyCode} />
+            </XStack>
+          </ModalContent>
+        </ModalContainer>
+      </RNModal>
       {/* Delete Event Verification Modal */}
-      <Modal
+      <RNModal
         visible={deleteModalVisible}
         transparent
         animationType="slide"
         onRequestClose={() => setDeleteModalVisible(false)}
       >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>{t("verifyDeleteEvent")}</Text>
-            <TextInput
-              style={styles.input}
+        <ModalContainer>
+          <ModalContent>
+            <ModalTitle>{t("verifyDeleteEvent")}</ModalTitle>
+            <StyledInput
               placeholder={t("codePlaceholder")}
               keyboardType="numeric"
               maxLength={4}
@@ -674,8 +911,8 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
               secureTextEntry
               autoFocus
             />
-            <View style={styles.buttonContainer}>
-              <Button
+            <XStack jc="space-between" w="50%" gap="$3">
+              <CustomButton
                 title={t("cancel")}
                 onPress={() => {
                   setDeleteModalVisible(false);
@@ -683,23 +920,22 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
                   setPendingEventId(null);
                 }}
               />
-              <Button title={t("confirm")} onPress={handleVerifyDelete} />
-            </View>
-          </View>
-        </View>
-      </Modal>
+              <CustomButton title={t("confirm")} onPress={handleVerifyDelete} />
+            </XStack>
+          </ModalContent>
+        </ModalContainer>
+      </RNModal>
       {/* Verify Event Verification Modal */}
-      <Modal
+      <RNModal
         visible={verifyEventModalVisible}
         transparent
         animationType="slide"
         onRequestClose={() => setVerifyEventModalVisible(false)}
       >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>{t("verifyEvent")}</Text>
-            <TextInput
-              style={styles.input}
+        <ModalContainer>
+          <ModalContent>
+            <ModalTitle>{t("verifyEvent")}</ModalTitle>
+            <StyledInput
               placeholder={t("codePlaceholder")}
               keyboardType="numeric"
               maxLength={4}
@@ -708,8 +944,8 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
               secureTextEntry
               autoFocus
             />
-            <View style={styles.buttonContainer}>
-              <Button
+            <XStack jc="space-between" w="50%" gap="$3">
+              <CustomButton
                 title={t("cancel")}
                 onPress={() => {
                   setVerifyEventModalVisible(false);
@@ -717,54 +953,67 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
                   setPendingEventId(null);
                 }}
               />
-              <Button title={t("confirm")} onPress={handleConfirmVerifyEvent} />
-            </View>
-          </View>
-        </View>
-      </Modal>
+              <CustomButton
+                title={t("confirm")}
+                onPress={handleConfirmVerifyEvent}
+              />
+            </XStack>
+          </ModalContent>
+        </ModalContainer>
+      </RNModal>
       {/* Photo Modal */}
-      <Modal
+      <RNModal
         visible={photoModalVisible}
         transparent
         animationType="fade"
         onRequestClose={() => setPhotoModalVisible(false)}
       >
-        <View style={styles.photoModalContainer}>
+        <PhotoModalContainer>
           <GestureDetector gesture={composedGestures}>
             <Animated.Image
               source={{ uri: resolvePhotoUri(selectedPhotoUri) || "" }}
-              style={[styles.fullScreenPhoto, animatedStyle]}
+              style={[
+                animatedStyle,
+                { width: SCREEN_WIDTH, height: SCREEN_HEIGHT },
+              ]}
               resizeMode="contain"
             />
           </GestureDetector>
-          <TouchableOpacity
-            style={styles.closeButton}
-            onPress={() => setPhotoModalVisible(false)}
-          >
-            <MaterialIcons name="close" size={30} color="#fff" />
-          </TouchableOpacity>
-        </View>
-      </Modal>
+          <CloseButton onPress={() => setPhotoModalVisible(false)}>
+            <MaterialIcons
+              name="close"
+              size={30}
+              color={theme.modalBackground.val}
+            />
+          </CloseButton>
+        </PhotoModalContainer>
+      </RNModal>
       {/* Edit Icon/Color Modal */}
-      <Modal
+      <RNModal
         visible={editModalVisible}
         transparent
         animationType="slide"
         onRequestClose={() => setEditModalVisible(false)}
       >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>{t("editIconColor")}</Text>
-            <Text style={styles.iconLabel}>{t("selectIcon")}</Text>
-            <ScrollView horizontal style={styles.iconPicker}>
+        <ModalContainer>
+          <ModalContent>
+            <ModalTitle>{t("editIconColor")}</ModalTitle>
+            <IconLabel>{t("selectIcon")}</IconLabel>
+            <ScrollView
+              horizontal
+              contentContainerStyle={{ flexGrow: 0, mb: "$2" }}
+            >
               {availableIcons.map(renderIconOption)}
             </ScrollView>
-            <Text style={styles.iconLabel}>{t("selectColor")}</Text>
-            <ScrollView horizontal style={styles.colorPicker}>
+            <IconLabel>{t("selectColor")}</IconLabel>
+            <ScrollView
+              horizontal
+              contentContainerStyle={{ flexGrow: 0, mb: "$2" }}
+            >
               {availableColors.map(renderColorOption)}
             </ScrollView>
-            <View style={styles.buttonContainer}>
-              <Button
+            <XStack jc="space-between" w="50%" gap="$3">
+              <CustomButton
                 title={t("cancel")}
                 onPress={() => {
                   setNewIcon(icon);
@@ -772,41 +1021,44 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
                   setEditModalVisible(false);
                 }}
               />
-              <Button title={t("save")} onPress={handleUpdateIconAndColor} />
-            </View>
-          </View>
-        </View>
-      </Modal>
+              <CustomButton
+                title={t("save")}
+                onPress={handleUpdateIconAndColor}
+              />
+            </XStack>
+          </ModalContent>
+        </ModalContainer>
+      </RNModal>
       {/* Verify Confirmation Modal */}
-      <Modal
+      <RNModal
         visible={confirmVerifyModalVisible}
         transparent
         animationType="slide"
         onRequestClose={() => setConfirmVerifyModalVisible(false)}
       >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>{t("verifyEvent")}</Text>
-            <Text style={styles.modalText}>
+        <ModalContainer>
+          <ModalContent>
+            <ModalTitle>{t("verifyEvent")}</ModalTitle>
+            <ModalText>
               {t("verifyConfirmation", { faceValue: weight })}
-            </Text>
-            <View style={styles.buttonContainer}>
-              <Button
+            </ModalText>
+            <XStack jc="space-between" w="50%" gap="$3">
+              <CustomButton
                 title={t("cancel")}
                 onPress={() => {
                   setConfirmVerifyModalVisible(false);
                   setPendingEventId(null);
                 }}
               />
-              <Button
+              <CustomButton
                 title={t("confirm")}
                 onPress={handleConfirmVerification}
               />
-            </View>
-          </View>
-        </View>
-      </Modal>
-    </View>
+            </XStack>
+          </ModalContent>
+        </ModalContainer>
+      </RNModal>
+    </Container>
   );
 };
 

@@ -1,8 +1,5 @@
-// Upload.tsx
 import React, { useState, useEffect } from "react";
 import {
-  View,
-  Text,
   Alert,
   FlatList,
   TouchableOpacity,
@@ -12,7 +9,7 @@ import * as FileSystem from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import { useLanguage } from "../contexts/LanguageContext";
 import { CustomButton } from "./SharedComponents";
-import { styles } from "../styles/uploadDataStyles";
+import { YStack, Text, useTheme } from "tamagui";
 
 interface UploadDataProps {
   onClose: () => void;
@@ -20,6 +17,7 @@ interface UploadDataProps {
 
 const UploadData: React.FC<UploadDataProps> = ({ onClose }) => {
   const { t } = useLanguage();
+  const theme = useTheme();
   const [backupFiles, setBackupFiles] = useState<string[]>([]);
   const [selectedBackup, setSelectedBackup] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -82,33 +80,42 @@ const UploadData: React.FC<UploadDataProps> = ({ onClose }) => {
 
   const renderBackupFile = ({ item }: { item: string }) => (
     <TouchableOpacity
-      style={[
-        styles.fileItem,
-        selectedBackup === item && styles.selectedFileItem,
-      ]}
       onPress={() => setSelectedBackup(item)}
       disabled={isUploading}
     >
-      <Text>{item}</Text>
+      <YStack
+        p="$2"
+        borderBottomWidth={1}
+        borderBottomColor="$border"
+        bg={selectedBackup === item ? "$selectedBackground" : undefined}
+      >
+        <Text color="$text">{item}</Text>
+      </YStack>
     </TouchableOpacity>
   );
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>{t("uploadBackup")}</Text>
-      {isLoading ? (
-        <ActivityIndicator size="large" color="#0000ff" style={styles.loader} />
-      ) : isUploading ? (
-        <ActivityIndicator size="large" color="#0000ff" style={styles.loader} />
+    <YStack p="$4" ai="center" bg="$modalBackground">
+      <Text fontSize="$5" fontWeight="bold" mb="$4" color="$text">
+        {t("uploadBackup")}
+      </Text>
+      {isLoading || isUploading ? (
+        <ActivityIndicator
+          size="large"
+          color="$primary"
+          style={{ marginVertical: 20 }}
+        />
       ) : backupFiles.length > 0 ? (
         <FlatList
           data={backupFiles}
           renderItem={renderBackupFile}
           keyExtractor={(item) => item}
-          style={styles.fileList}
+          style={{ width: "100%", maxHeight: 200, marginBottom: 20 }}
         />
       ) : (
-        <Text style={styles.noFilesText}>{t("noBackups")}</Text>
+        <Text fontSize="$3" color="$gray" mb="$4">
+          {t("noBackups")}
+        </Text>
       )}
       <CustomButton
         title={t("upload")}
@@ -120,9 +127,8 @@ const UploadData: React.FC<UploadDataProps> = ({ onClose }) => {
         onPress={onClose}
         disabled={isUploading}
       />
-    </View>
+    </YStack>
   );
 };
-
 
 export default UploadData;

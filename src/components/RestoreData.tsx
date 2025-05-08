@@ -1,12 +1,11 @@
 import React, { useState } from "react";
-import { View, Text, Alert, FlatList, TouchableOpacity } from "react-native";
+import { FlatList, TouchableOpacity, Alert } from "react-native";
+import { YStack, Text, useTheme } from "tamagui";
 import * as FileSystem from "expo-file-system";
 import JSZip from "jszip";
 import { useLanguage } from "../contexts/LanguageContext";
-import * as SQLite from "expo-sqlite";
 import { CustomButton } from "./SharedComponents";
 import DownloadData from "./DownloadData";
-import { styles } from "../styles/restoreDataStyles";
 import { DatabaseManager } from "../db/database";
 
 interface RestoreDataProps {
@@ -15,6 +14,7 @@ interface RestoreDataProps {
 
 const RestoreData: React.FC<RestoreDataProps> = ({ onClose }) => {
   const { t } = useLanguage();
+  const theme = useTheme();
   const [isRestoring, setIsRestoring] = useState(false);
   const [backupFiles, setBackupFiles] = useState<string[]>([]);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
@@ -293,29 +293,36 @@ const RestoreData: React.FC<RestoreDataProps> = ({ onClose }) => {
   };
 
   const renderBackupFile = ({ item }: { item: string }) => (
-    <TouchableOpacity
-      style={[
-        styles.fileItem,
-        selectedFile === item && styles.selectedFileItem,
-      ]}
-      onPress={() => setSelectedFile(item)}
-    >
-      <Text>{item}</Text>
+    <TouchableOpacity onPress={() => setSelectedFile(item)}>
+      <YStack
+        p="$2"
+        borderBottomWidth={1}
+        borderBottomColor="$border"
+        bg={selectedFile === item ? "$selectedBackground" : undefined}
+      >
+        <Text fontSize="$3" color="$text">
+          {item}
+        </Text>
+      </YStack>
     </TouchableOpacity>
   );
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>{t("restoreData")}</Text>
+    <YStack p="$4" ai="center" bg="$modalBackground" w="90%">
+      <Text fontSize="$5" fontWeight="bold" mb="$4" color="$text">
+        {t("restoreData")}
+      </Text>
       {backupFiles.length > 0 ? (
         <FlatList
           data={backupFiles}
           renderItem={renderBackupFile}
           keyExtractor={(item) => item}
-          style={styles.fileList}
+          style={{ width: "100%", maxHeight: 200, marginBottom: 20 }}
         />
       ) : (
-        <Text style={styles.noFilesText}>{t("noBackupFiles")}</Text>
+        <Text fontSize="$3" color="$gray" mb="$4">
+          {t("noBackupFiles")}
+        </Text>
       )}
       <CustomButton
         title={t("download")}
@@ -337,7 +344,7 @@ const RestoreData: React.FC<RestoreDataProps> = ({ onClose }) => {
         onClose={() => setDownloadModalVisible(false)}
         onDownloadComplete={loadBackupFiles}
       />
-    </View>
+    </YStack>
   );
 };
 

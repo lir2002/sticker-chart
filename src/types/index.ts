@@ -33,13 +33,13 @@ export interface User {
   id: number; // Unique user ID
   name: string; // User name
   role_id: number; // Role ID, references roles(role_id)
-  code: number; // User password/code
+  code: string; // User password/code
   is_active: number; // Active status (0 or 1)
   created_at: string; // Creation timestamp
   updated_at: string; // Last update timestamp
   icon?: string; // Optional path to user icon
-  email: string;
-  phone: string;
+  email?: string;
+  phone?: string;
 }
 
 // Role interface for roles table

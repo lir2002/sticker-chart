@@ -1,14 +1,32 @@
 import React, { useState } from "react";
-import { View, Text, TextInput, Button, Alert } from "react-native";
+import { Alert } from "react-native";
+import { YStack, Text, styled, useTheme } from "tamagui";
 import { useLanguage } from "../contexts/LanguageContext";
-import { styles } from "../styles/codeSetupStyles";
+import { CustomButton, StyledInput } from "./SharedComponents";
 
 interface CodeSetupProps {
   onCodeSet: (code: string) => void;
 }
 
+// Styled components for layout
+const Container = styled(YStack, {
+  flex: 1,
+  p: "$4",
+  jc: "center",
+  bg: "$modalBackground",
+});
+
+const Title = styled(Text, {
+  fontSize: "$5",
+  fontWeight: "bold",
+  ta: "center",
+  mb: "$4",
+  color: "$text",
+});
+
 const CodeSetup: React.FC<CodeSetupProps> = ({ onCodeSet }) => {
   const { t } = useLanguage();
+  const theme = useTheme();
   const [code, setCode] = useState("");
   const [confirmCode, setConfirmCode] = useState("");
 
@@ -31,28 +49,27 @@ const CodeSetup: React.FC<CodeSetupProps> = ({ onCodeSet }) => {
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>{t("setAdminPassword")}</Text>
-      <TextInput
-        style={styles.input}
+    <Container>
+      <Title>{t("setAdminPassword")}</Title>
+      <StyledInput
         placeholder={t("codePlaceholder")}
-        keyboardType="numeric"
-        maxLength={4}
         value={code}
         onChangeText={setCode}
-        secureTextEntry
-      />
-      <TextInput
-        style={styles.input}
-        placeholder={t("confirmCodePlaceholder")}
         keyboardType="numeric"
         maxLength={4}
+        secureTextEntry
+        autoFocus
+      />
+      <StyledInput
+        placeholder={t("confirmCodePlaceholder")}
         value={confirmCode}
         onChangeText={setConfirmCode}
+        keyboardType="numeric"
+        maxLength={4}
         secureTextEntry
       />
-      <Button title={t("setCode")} onPress={handleSetCode} />
-    </View>
+      <CustomButton onPress={handleSetCode} title={t("setCode")} />
+    </Container>
   );
 };
 
