@@ -1,9 +1,22 @@
 export const availableIcons = [
+  "sentiment-very-satisfied",
+  "sentiment-satisfied",
+  "sentiment-dissatisfied",
+  "sentiment-very-dissatisfied",
+  "mood",
+  "mood-bad",
+  "emoji-emotions",
+  "face",
+  "star",
+  "star-border",
+  "thumb-up",
+  "favorite",
+  "check-circle",
+  "verified",
   "cake",
   "celebration",
   "emoji-events",
   "event",
-  "favorite",
   "flight",
   "grade",
   "home",
@@ -12,20 +25,17 @@ export const availableIcons = [
   "restaurant",
   "school",
   "sports",
-  "star",
-  "thumb-up",
-  "verified",
   "work",
   "card-giftcard",
-  "military-tech"
-  ];
-  
-  export const availableColors = [
-    "#000000",
-    "#FF0000",
-    "#00FF00",
-    "#0000FF",
-    "#FFA500",
-    "#800080",
-    "#FFC0CB",
-  ];
+  "military-tech",
+];
+
+export const availableColors = [
+  "#000000",
+  "#FF0000",
+  "#00FF00",
+  "#0000FF",
+  "#FFA500",
+  "#800080",
+  "#FFC0CB",
+];

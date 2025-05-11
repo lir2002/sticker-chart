@@ -2,7 +2,7 @@ import * as SQLite from "expo-sqlite";
 import { Event, EventType, User, Role, DbVersion, Wallet } from "../types";
 
 // Current database version
-const CURRENT_DB_VERSION = 5;
+const CURRENT_DB_VERSION = 6; // Incremented from 5 to 6
 
 // Singleton Database Manager
 export class DatabaseManager {
@@ -126,12 +126,13 @@ export class DatabaseManager {
           );
 
           CREATE TABLE IF NOT EXISTS event_types (
-            name TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            owner INTEGER,
             icon TEXT NOT NULL,
             iconColor TEXT NOT NULL,
             availability INTEGER NOT NULL DEFAULT 0,
-            owner INTEGER,
             weight INTEGER NOT NULL DEFAULT 1 CHECK (weight >= 1),
+            PRIMARY KEY (name, owner),
             FOREIGN KEY (owner) REFERENCES users(id)
           );
 
@@ -140,13 +141,14 @@ export class DatabaseManager {
             date TEXT NOT NULL,
             markedAt TEXT NOT NULL,
             eventType TEXT NOT NULL,
+            owner INTEGER,  -- Added owner column
             note TEXT,
             photoPath TEXT,
             created_by INTEGER,
             is_verified INTEGER NOT NULL DEFAULT 0,
             verified_at TEXT,
             verified_by INTEGER,
-            FOREIGN KEY (eventType) REFERENCES event_types(name),
+            FOREIGN KEY (eventType, owner) REFERENCES event_types(name, owner),
             FOREIGN KEY (created_by) REFERENCES users(id),
             FOREIGN KEY (verified_by) REFERENCES users(id)
           );
@@ -189,8 +191,8 @@ export class DatabaseManager {
 
           if (tableNames.includes("event_types_old")) {
             await db.execAsync(`
-              INSERT INTO event_types (name, icon, iconColor, availability, owner, weight)
-              SELECT name, icon, iconColor, availability, ${adminId}, 1
+              INSERT INTO event_types (name, owner, icon, iconColor, availability, weight)
+              SELECT name, ${adminId}, icon, iconColor, availability, 1
               FROM event_types_old;
               DROP TABLE IF EXISTS event_types_old;
             `);
@@ -198,8 +200,8 @@ export class DatabaseManager {
 
           if (tableNames.includes("events_old")) {
             await db.execAsync(`
-              INSERT INTO events (id, date, markedAt, eventType, note, photoPath, created_by, is_verified, verified_at, verified_by)
-              SELECT id, date, markedAt, eventType, note, photoPath, ${adminId}, 0, NULL, NULL
+              INSERT INTO events (id, date, markedAt, eventType, owner, note, photoPath, created_by, is_verified, verified_at, verified_by)
+              SELECT id, date, markedAt, eventType, ${adminId}, note, photoPath, ${adminId}, 0, NULL, NULL
               FROM events_old;
               DROP TABLE IF EXISTS events_old;
             `);
@@ -281,7 +283,6 @@ export class DatabaseManager {
       }
 
       if (currentVersion === 4) {
-        // Version 4 to 5: Convert absolute paths to relative (no nested transaction)
         const events = await db.getAllAsync<{
           id: number;
           photoPath: string | null;
@@ -291,11 +292,11 @@ export class DatabaseManager {
           if (event.photoPath && event.photoPath.startsWith("file://")) {
             const relativePath = event.photoPath.includes("photos/")
               ? event.photoPath.substring(event.photoPath.indexOf("photos/"))
-              : null; // Preserve original if invalid
-            await db.runAsync(
-              "UPDATE events SET photoPath = ? WHERE id = ?;",
-              [relativePath, event.id]
-            );
+              : null;
+            await db.runAsync("UPDATE events SET photoPath = ? WHERE id = ?;", [
+              relativePath,
+              event.id,
+            ]);
           }
         }
 
@@ -308,13 +309,67 @@ export class DatabaseManager {
           if (user.icon && user.icon.startsWith("file://")) {
             const relativePath = user.icon.includes("icons/")
               ? user.icon.substring(user.icon.indexOf("icons/"))
-              : null; // Preserve original if invalid
+              : null;
             await db.runAsync("UPDATE users SET icon = ? WHERE id = ?;", [
               relativePath,
               user.id,
             ]);
           }
         }
+      }
+
+      if (currentVersion === 5) {
+        // Migration to composite primary key (name, owner)
+        await db.execAsync(`
+          -- Create new event_types table with composite primary key
+          CREATE TABLE IF NOT EXISTS event_types_new (
+            name TEXT NOT NULL,
+            owner INTEGER,
+            icon TEXT NOT NULL,
+            iconColor TEXT NOT NULL,
+            availability INTEGER NOT NULL DEFAULT 0,
+            weight INTEGER NOT NULL DEFAULT 1 CHECK (weight >= 1),
+            PRIMARY KEY (name, owner),
+            FOREIGN KEY (owner) REFERENCES users(id)
+          );
+
+          -- Migrate data from old event_types table
+          INSERT INTO event_types_new (name, owner, icon, iconColor, availability, weight)
+          SELECT name, owner, icon, iconColor, availability, weight
+          FROM event_types;
+
+          -- Create new events table with owner column
+          CREATE TABLE IF NOT EXISTS events_new (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            date TEXT NOT NULL,
+            markedAt TEXT NOT NULL,
+            eventType TEXT NOT NULL,
+            owner INTEGER,
+            note TEXT,
+            photoPath TEXT,
+            created_by INTEGER,
+            is_verified INTEGER NOT NULL DEFAULT 0,
+            verified_at TEXT,
+            verified_by INTEGER,
+            FOREIGN KEY (eventType, owner) REFERENCES event_types_new(name, owner),
+            FOREIGN KEY (created_by) REFERENCES users(id),
+            FOREIGN KEY (verified_by) REFERENCES users(id)
+          );
+
+          -- Migrate data from old events table, joining with event_types to get owner
+          INSERT INTO events_new (id, date, markedAt, eventType, owner, note, photoPath, created_by, is_verified, verified_at, verified_by)
+          SELECT e.id, e.date, e.markedAt, e.eventType, et.owner, e.note, e.photoPath, e.created_by, e.is_verified, e.verified_at, e.verified_by
+          FROM events e
+          LEFT JOIN event_types et ON e.eventType = et.name;
+
+          -- Drop old tables
+          DROP TABLE IF EXISTS events;
+          DROP TABLE IF EXISTS event_types;
+
+          -- Rename new tables to original names
+          ALTER TABLE events_new RENAME TO events;
+          ALTER TABLE event_types_new RENAME TO event_types;
+        `);
       }
 
       // Update version number
@@ -583,11 +638,10 @@ export const insertEventType = async (
   }
   const dbManager = DatabaseManager.getInstance();
   const db = dbManager.getDatabase();
-  const result = await db.runAsync(
-    "INSERT INTO event_types (name, icon, iconColor, availability, owner, weight) VALUES (?, ?, ?, ?, ?, ?);",
-    [name, icon, iconColor, availability, owner || null, weight]
+  await db.runAsync(
+    "INSERT INTO event_types (name, owner, icon, iconColor, availability, weight) VALUES (?, ?, ?, ?, ?, ?);",
+    [name, owner || null, icon, iconColor, availability, weight]
   );
-  return result.lastInsertRowId || 0;
 };
 
 // Insert event
@@ -595,6 +649,7 @@ export const insertEvent = async (
   date: string,
   markedAt: string,
   eventType: string,
+  owner: number | null, // Added owner parameter
   createdBy: number,
   note?: string,
   photoPath?: string,
@@ -603,15 +658,16 @@ export const insertEvent = async (
   const dbManager = DatabaseManager.getInstance();
   const db = dbManager.getDatabase();
   const result = await db.runAsync(
-    `INSERT INTO events (date, markedAt, eventType, created_by, note, photoPath, is_verified, verified_at, verified_by)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+    `INSERT INTO events (date, markedAt, eventType, owner, note, photoPath, created_by, is_verified, verified_at, verified_by)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
     [
       date,
       markedAt,
       eventType,
-      createdBy,
+      owner || null,
       note || null,
       photoPath || null,
+      createdBy,
       isVerified ? 1 : 0,
       null,
       null,
@@ -621,30 +677,33 @@ export const insertEvent = async (
 };
 
 // Fetch events
-export const fetchEvents = async (eventType: string) => {
+export const fetchEvents = async (eventType: string, owner: number | null) => {
   const dbManager = DatabaseManager.getInstance();
   const db = dbManager.getDatabase();
   const events = await db.getAllAsync<Event>(
-    `SELECT id, date, markedAt, eventType, note, photoPath, created_by, is_verified, verified_at, verified_by
-     FROM events WHERE eventType = ?;`,
-    [eventType]
+    `SELECT id, date, markedAt, eventType, owner, note, photoPath, created_by, is_verified, verified_at, verified_by
+     FROM events WHERE eventType = ? AND owner = ?;`,
+    [eventType, owner || null]
   );
   return events;
 };
 
 // Fetch events with creator
-export const fetchEventsWithCreator = async (eventType: string) => {
+export const fetchEventsWithCreator = async (
+  eventType: string,
+  owner: number | null
+) => {
   const dbManager = DatabaseManager.getInstance();
   const db = dbManager.getDatabase();
   const events = await db.getAllAsync<Event>(
-    `SELECT e.id, e.date, e.markedAt, e.eventType, e.note, e.photoPath, 
+    `SELECT e.id, e.date, e.markedAt, e.eventType, e.owner, e.note, e.photoPath, 
             e.created_by, e.is_verified, e.verified_at, e.verified_by, 
             u.name as creatorName, v.name as verifierName
      FROM events e
      LEFT JOIN users u ON e.created_by = u.id
      LEFT JOIN users v ON e.verified_by = v.id
-     WHERE e.eventType = ?;`,
-    [eventType]
+     WHERE e.eventType = ? AND e.owner = ?;`,
+    [eventType, owner || null]
   );
   return events;
 };
@@ -656,29 +715,29 @@ export async function fetchAllEventsWithDetails(): Promise<Event[]> {
   const events = await db.getAllAsync<Event>(
     `
     SELECT 
-      e.id, e.date, e.markedAt, e.eventType, e.note, e.photoPath, 
+      e.id, e.date, e.markedAt, e.eventType, e.owner, e.note, e.photoPath, 
       e.created_by, e.is_verified, e.verified_at, e.verified_by,
       uc.name AS creatorName,
       uv.name AS verifierName,
-      et.owner,
+      et.owner AS eventTypeOwner,
       uo.name AS ownerName
     FROM events e
     LEFT JOIN users uc ON e.created_by = uc.id
     LEFT JOIN users uv ON e.verified_by = uv.id
-    LEFT JOIN event_types et ON e.eventType = et.name
+    LEFT JOIN event_types et ON e.eventType = et.name AND e.owner = et.owner
     LEFT JOIN users uo ON et.owner = uo.id
     ORDER BY e.date DESC;
     `
   );
   return events;
-};
+}
 
 // Fetch all events
 export const fetchAllEvents = async () => {
   const dbManager = DatabaseManager.getInstance();
   const db = dbManager.getDatabase();
   const events = await db.getAllAsync<Event>(
-    `SELECT id, date, markedAt, eventType, note, photoPath, created_by, is_verified, verified_at, verified_by
+    `SELECT id, date, markedAt, eventType, owner, note, photoPath, created_by, is_verified, verified_at, verified_by
      FROM events;`
   );
   return events;
@@ -721,8 +780,8 @@ export const verifyEventWithTransaction = async (
   const db = dbManager.getDatabase();
   await db.withTransactionAsync(async () => {
     const eventTypeRecord = await db.getFirstAsync<{ weight: number }>(
-      "SELECT weight FROM event_types WHERE name = ?;",
-      [eventType]
+      "SELECT weight FROM event_types WHERE name = ? AND owner = ?;",
+      [eventType, ownerId || null]
     );
     if (!eventTypeRecord) {
       throw new Error("Event type not found");
@@ -797,7 +856,7 @@ export const getEventTypes = async () => {
   const dbManager = DatabaseManager.getInstance();
   const db = dbManager.getDatabase();
   const types = await db.getAllAsync<EventType>(
-    "SELECT name, icon, iconColor, availability, owner, weight FROM event_types;"
+    "SELECT name, owner, icon, iconColor, availability, weight FROM event_types;"
   );
   return types;
 };
@@ -807,7 +866,7 @@ export const getEventTypesWithOwner = async () => {
   const dbManager = DatabaseManager.getInstance();
   const db = dbManager.getDatabase();
   const types = await db.getAllAsync<EventType>(
-    `SELECT et.name, et.icon, et.iconColor, et.availability, et.owner, et.weight, u.name as ownerName
+    `SELECT et.name, et.owner, et.icon, et.iconColor, et.availability, et.weight, u.name as ownerName
      FROM event_types et
      LEFT JOIN users u ON et.owner = u.id;`
   );
@@ -817,9 +876,10 @@ export const getEventTypesWithOwner = async () => {
 // Update event type
 export const updateEventType = async (
   name: string,
+  owner: number | null,
   icon: string,
   iconColor: string,
-  owner?: number,
+  newOwner?: number,
   weight?: number
 ) => {
   const dbManager = DatabaseManager.getInstance();
@@ -829,12 +889,12 @@ export const updateEventType = async (
   }
   const query =
     weight !== undefined
-      ? "UPDATE event_types SET icon = ?, iconColor = ?, owner = ?, weight = ? WHERE name = ?;"
-      : "UPDATE event_types SET icon = ?, iconColor = ?, owner = ? WHERE name = ?;";
+      ? "UPDATE event_types SET icon = ?, iconColor = ?, owner = ?, weight = ? WHERE name = ? AND owner = ?;"
+      : "UPDATE event_types SET icon = ?, iconColor = ?, owner = ? WHERE name = ? AND owner = ?;";
   const params =
     weight !== undefined
-      ? [icon, iconColor, owner || null, weight, name]
-      : [icon, iconColor, owner || null, name];
+      ? [icon, iconColor, newOwner || null, weight, name, owner || null]
+      : [icon, iconColor, newOwner || null, name, owner || null];
   await db.runAsync(query, params);
 };
 
@@ -921,4 +981,23 @@ export const hasEventTypeOwner = async (userId: number): Promise<boolean> => {
     [userId]
   );
   return (count?.count || 0) > 0;
+};
+
+// Check if event type has associated achievements
+export const hasAssociatedAchievements = async (
+  eventTypeName: string,
+  owner: number | null
+): Promise<boolean> => {
+  try {
+    const dbManager = DatabaseManager.getInstance();
+    const db = dbManager.getDatabase();
+    const count = await db.getFirstAsync<{ count: number }>(
+      "SELECT COUNT(*) as count FROM events WHERE eventType = ? AND owner = ?;",
+      [eventTypeName, owner || null]
+    );
+    return (count?.count || 0) > 0;
+  } catch (error) {
+    console.error("Error checking associated achievements:", error);
+    throw error;
+  }
 };

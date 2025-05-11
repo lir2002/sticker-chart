@@ -71,37 +71,49 @@ const RestoreData: React.FC<RestoreDataProps> = ({ onClose }) => {
       const dbJsonContent = await dbJsonFile.async("string");
       const dbData = JSON.parse(dbJsonContent);
 
-      // Migrate absolute paths to relative paths if version < 5 or missing
+      // Migrate absolute paths to relative paths if version < 5
       const backupVersion = dbData.dbVersion?.version || 0;
       if (backupVersion < 5) {
-        // Migrate events.photoPath
         if (dbData.events) {
           dbData.events = dbData.events.map((event: any) => {
             if (event.photoPath && event.photoPath.startsWith("file://")) {
               const relativePath = event.photoPath.includes("photos/")
                 ? event.photoPath.substring(event.photoPath.indexOf("photos/"))
-                : null; // Fallback
+                : null;
               return { ...event, photoPath: relativePath };
             }
             return event;
           });
         }
-
-        // Migrate users.icon
         if (dbData.users) {
           dbData.users = dbData.users.map((user: any) => {
             if (user.icon && user.icon.startsWith("file://")) {
               const relativePath = user.icon.includes("icons/")
                 ? user.icon.substring(user.icon.indexOf("icons/"))
-                : null; // Fallback
+                : null;
               return { ...user, icon: relativePath };
             }
             return user;
           });
         }
-
-        // Update db_version to 5
         dbData.dbVersion = { version: 5 };
+      }
+
+      // Migrate events to include owner if version < 6
+      if (backupVersion < 6) {
+        if (dbData.events && dbData.eventTypes) {
+          dbData.events = dbData.events.map((event: any) => {
+            // Find matching eventType to get owner
+            const matchingType = dbData.eventTypes.find(
+              (type: any) => type.name === event.eventType
+            );
+            return {
+              ...event,
+              owner: matchingType?.owner || null, // Set owner from event_types or null
+            };
+          });
+        }
+        dbData.dbVersion = { version: 6 };
       }
 
       const dbManager = DatabaseManager.getInstance();
@@ -127,7 +139,7 @@ const RestoreData: React.FC<RestoreDataProps> = ({ onClose }) => {
           }
 
           // Insert roles
-          for (const role of dbData.roles) {
+          for (const role of dbData.roles || []) {
             await db.runAsync(
               "INSERT INTO roles (role_id, role_name) VALUES (?, ?);",
               [role.role_id, role.role_name]
@@ -135,7 +147,7 @@ const RestoreData: React.FC<RestoreDataProps> = ({ onClose }) => {
           }
 
           // Insert users
-          for (const user of dbData.users) {
+          for (const user of dbData.users || []) {
             await db.runAsync(
               `INSERT INTO users (id, name, role_id, code, is_active, created_at, updated_at, icon, email, phone)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
@@ -144,9 +156,9 @@ const RestoreData: React.FC<RestoreDataProps> = ({ onClose }) => {
                 user.name,
                 user.role_id,
                 user.code,
-                user.is_active,
-                user.created_at,
-                user.updated_at,
+                user.is_active ?? 1,
+                user.created_at || new Date().toISOString(),
+                user.updated_at || new Date().toISOString(),
                 user.icon || null,
                 user.email || "",
                 user.phone || "",
@@ -155,30 +167,32 @@ const RestoreData: React.FC<RestoreDataProps> = ({ onClose }) => {
           }
 
           // Insert event_types
-          for (const type of dbData.eventTypes) {
+          for (const type of dbData.eventTypes || []) {
             await db.runAsync(
-              "INSERT INTO event_types (name, icon, iconColor, availability, owner, weight) VALUES (?, ?, ?, ?, ?, ?);",
+              `INSERT INTO event_types (name, icon, iconColor, availability, owner, weight)
+               VALUES (?, ?, ?, ?, ?, ?);`,
               [
                 type.name,
-                type.icon,
-                type.iconColor,
-                type.availability,
+                type.icon || "event",
+                type.iconColor || "#000000",
+                type.availability || 0,
                 type.owner || null,
-                type.weight,
+                type.weight || 1,
               ]
             );
           }
 
           // Insert events
-          for (const event of dbData.events) {
+          for (const event of dbData.events || []) {
             await db.runAsync(
-              `INSERT INTO events (id, date, markedAt, eventType, note, photoPath, created_by, is_verified, verified_at, verified_by)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+              `INSERT INTO events (id, date, markedAt, eventType, owner, note, photoPath, created_by, is_verified, verified_at, verified_by)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
               [
                 event.id,
                 event.date,
                 event.markedAt,
-                event.eventType,
+                event.eventType || event.event_type,
+                event.owner || null,
                 event.note || null,
                 event.photoPath || null,
                 event.created_by,
@@ -189,18 +203,18 @@ const RestoreData: React.FC<RestoreDataProps> = ({ onClose }) => {
             );
           }
 
-          // Insert wallets (if present)
+          // Insert wallets
           if (dbData.wallets) {
             for (const wallet of dbData.wallets) {
               await db.runAsync(
-                "INSERT INTO wallets (owner, assets, credit) VALUES (?, ?, ?);",
-                [wallet.owner, wallet.assets, wallet.credit]
+                `INSERT INTO wallets (owner, assets, credit) VALUES (?, ?, ?);`,
+                [wallet.owner, wallet.assets || 5, wallet.credit || 100]
               );
             }
           }
 
           // Restore transactions_<userId> tables for non-Guest users
-          const nonGuestUsers = dbData.users.filter(
+          const nonGuestUsers = (dbData.users || []).filter(
             (user: any) => user.name !== "Guest"
           );
           for (const user of nonGuestUsers) {
@@ -236,12 +250,14 @@ const RestoreData: React.FC<RestoreDataProps> = ({ onClose }) => {
 
           // Insert db_version
           await db.runAsync(
-            "INSERT OR REPLACE INTO db_version (version) VALUES (?);",
-            [dbData.dbVersion?.version || 5]
+            `INSERT OR REPLACE INTO db_version (version) VALUES (?);`,
+            [dbData.dbVersion?.version || 6]
           );
         });
       } catch (error: any) {
-        Alert.alert("Failed to convert to Version 5", error.message);
+        console.error("Database restore error:", error);
+        Alert.alert("Error", `${t("errorRestoreDB")}: ${error.message}`);
+        throw error;
       }
 
       // Restore photos

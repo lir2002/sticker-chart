@@ -51,7 +51,7 @@ export interface Role {
 // Define navigation stack parameters
 export type RootStackParamList = {
   Home: undefined;
-  Calendar: { eventType: string; icon: string | null; iconColor: string | null };
+  Calendar: { eventType: string; owner: number | null; icon: string | null; iconColor: string | null };
   CalendarViewAll: undefined;
   CodeSetup: undefined;
   ChangeCode: { userId: number }; // Updated to pass user ID

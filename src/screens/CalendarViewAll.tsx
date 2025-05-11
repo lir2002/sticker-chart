@@ -17,6 +17,7 @@ import {
   Image,
   ScrollView,
   useTheme,
+  Separator,
 } from "tamagui";
 import { useNavigation } from "@react-navigation/native";
 import { useLanguage } from "../contexts/LanguageContext";
@@ -27,11 +28,11 @@ import {
   getUsers,
 } from "../db/database";
 import { resolvePhotoUri } from "../utils/fileUtils";
-import { CustomButton } from "../components/SharedComponents"; // Import CustomButton
+import { CustomButton } from "../components/SharedComponents";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
-// Styled components
+// Styled components (unchanged)
 const Container = styled(YStack, {
   flex: 1,
   p: "$4",
@@ -120,7 +121,7 @@ const ModalButtonContainer = styled(XStack, {
   jc: "space-between",
   mt: "$2",
   w: "50%",
-  gap: "$3"
+  gap: "$3",
 });
 
 const EventDisplay = styled(YStack, {
@@ -253,13 +254,15 @@ const CalendarViewAll: React.FC = () => {
         const types = await getEventTypes();
         setEventTypes(types);
         const loadedUsers = await getUsers();
-        const ownerIds = types
-          .map((t) => t.owner)
-          .filter((id): id is number => id !== null);
+        const ownerIds = [
+          ...new Set(
+            types.map((t) => t.owner).filter((id): id is number => id !== null)
+          ),
+        ];
         const ownerUsers = loadedUsers
           .filter((u) => ownerIds.includes(u.id))
           .map((u) => ({ id: u.id, name: u.name }));
-        setUsers(ownerUsers);
+        setUsers([{ id: 0, name: "All" }, ...ownerUsers]); // Add "All" option
         updateMarkedDates(loadedEvents, types);
       } catch (error) {
         console.error("Initialization error:", error);
@@ -282,16 +285,20 @@ const CalendarViewAll: React.FC = () => {
   const updateMarkedDates = (events: Event[], types: EventType[]) => {
     const marked: { [key: string]: any } = {};
     events.forEach((event) => {
-      const type = types.find((t) => t.name === event.eventType);
+      // Match eventType and owner for uniqueness
+      const type = types.find(
+        (t) => t.name === event.eventType && t.owner === event.owner
+      );
       const dotColor = type?.iconColor || "#000000";
+      const dotKey = `${event.eventType}-${event.owner || "null"}`; // Unique key for eventType and owner
       if (!marked[event.date]) {
         marked[event.date] = {
-          dots: [{ key: event.eventType, color: dotColor }],
+          dots: [{ key: dotKey, color: dotColor }],
         };
       } else if (
-        !marked[event.date].dots.some((dot: any) => dot.key === event.eventType)
+        !marked[event.date].dots.some((dot: any) => dot.key === dotKey)
       ) {
-        marked[event.date].dots.push({ key: event.eventType, color: dotColor });
+        marked[event.date].dots.push({ key: dotKey, color: dotColor });
       }
     });
     setMarkedDates(marked);
@@ -347,10 +354,13 @@ const CalendarViewAll: React.FC = () => {
     }
     if (!tempOwnerFilters.includes("All")) {
       filtered = filtered.filter((event) => {
-        const eventType = eventTypes.find((t) => t.name === event.eventType);
-        return eventType?.owner
-          ? tempOwnerFilters.includes(eventType.owner.toString())
-          : false;
+        const eventType = eventTypes.find(
+          (t) => t.name === event.eventType && t.owner === event.owner
+        );
+        return (
+          eventType &&
+          tempOwnerFilters.includes(eventType.owner?.toString() || "null")
+        );
       });
     }
     if (tempVerifiedFilter === "Verified") {
@@ -428,7 +438,10 @@ const CalendarViewAll: React.FC = () => {
       parts.push(t("allOwners"));
     } else {
       const ownerNames = selectedOwnerFilters
-        .map((id) => users.find((u) => u.id.toString() === id)?.name || id)
+        .map((id) => {
+          if (id === "0") return t("allOwners");
+          return users.find((u) => u.id.toString() === id)?.name || id;
+        })
         .join(", ");
       parts.push(ownerNames || t("none"));
     }
@@ -481,7 +494,7 @@ const CalendarViewAll: React.FC = () => {
     ],
   }));
 
-  // Calendar theme
+  // Calendar theme (unchanged)
   const calendarTheme = {
     calendarBackground: theme.background.val,
     textSectionTitleColor: theme.text.val,
@@ -518,7 +531,7 @@ const CalendarViewAll: React.FC = () => {
         </FilterButton>
       </FilterHeader>
       <Calendar
-        key={colorScheme} // Force re-render on theme change
+        key={colorScheme}
         onDayPress={handleDayPress}
         onMonthChange={handleMonthChange}
         markedDates={markedDates}
@@ -532,71 +545,89 @@ const CalendarViewAll: React.FC = () => {
             <EventTitle>
               {t("achievementsOn")} {selectedDate}
             </EventTitle>
-            {selectedDateEvents.map((event) => {
-              const type = eventTypes.find((t) => t.name === event.eventType);
+            {selectedDateEvents.map((event, index) => {
+              const type = eventTypes.find(
+                (t) => t.name === event.eventType && t.owner === event.owner
+              );
               return (
-                <EventItem key={event.id}>
-                  <MaterialIcons
-                    name={type?.icon || "event"}
-                    size={16}
-                    color={type?.iconColor || "#000000"}
-                    style={{ marginRight: 10 }}
-                  />
-                  <YStack>
-                    <EventText>
-                      {t("type")}: {event.eventType}
-                    </EventText>
-                    <EventText>
-                      {t("date")}: {event.date}
-                    </EventText>
-                    <EventText>
-                      {t("gotAt")}: {new Date(event.markedAt).toLocaleString()}
-                    </EventText>
-                    <VerifiedContainer>
-                      <EventText>
-                        {t("verified")}:{" "}
-                        {event.is_verified ? t("yes") : t("no")}
-                      </EventText>
-                      {event.is_verified ? (
+                <YStack
+                  key={`${event.id}-${event.eventType}-${
+                    event.owner || "null"
+                  }`}
+                >
+                  <EventItem>
+                    <YStack>
+                      <XStack ai="center">
+                        <EventText fontWeight={"bold"}>
+                          {t("type")}: {event.eventType}
+                        </EventText>
                         <MaterialIcons
-                          name="check-circle"
+                          name={type?.icon || "event"}
                           size={16}
-                          color={theme.verified.val}
+                          color={type?.iconColor || "#000000"}
                           style={{ marginLeft: 5 }}
                         />
-                      ) : null}
-                    </VerifiedContainer>
-                    {event.is_verified ? (
-                      <>
-                        <EventText>
-                          {t("verifiedAt")}:{" "}
-                          {new Date(event.verified_at!).toLocaleString()}
-                        </EventText>
-                        <EventText>
-                          {t("verifiedBy")}:{" "}
-                          {event.verifierName ?? t("unknown")}
-                        </EventText>
-                      </>
-                    ) : null}
-                    <EventText>
-                      {t("createdBy")}: {event.creatorName ?? t("unknown")}
-                    </EventText>
-                    <EventText>
-                      {t("owner")}: {type?.ownerName ?? t("unknown")}
-                    </EventText>
-                    {event.note && (
+                      </XStack>
                       <EventText>
-                        {t("for")}: {event.note}
+                        {t("date")}: {event.date}
                       </EventText>
-                    )}
-                    {event.photoPath && (
-                      <EventPhoto
-                        source={{ uri: resolvePhotoUri(event.photoPath)! }}
-                        onPress={() => openPhotoModal(event.photoPath!)}
-                      />
-                    )}
-                  </YStack>
-                </EventItem>
+                      <EventText>
+                        {t("gotAt")}:{" "}
+                        {new Date(event.markedAt).toLocaleString()}
+                      </EventText>
+                      <VerifiedContainer>
+                        <EventText>
+                          {t("verified")}:{" "}
+                          {event.is_verified ? t("yes") : t("no")}
+                        </EventText>
+                        {event.is_verified ? (
+                          <MaterialIcons
+                            name="check-circle"
+                            size={16}
+                            color={theme.verified.val}
+                            style={{ marginLeft: 5 }}
+                          />
+                        ) : null}
+                      </VerifiedContainer>
+                      {event.is_verified ? (
+                        <>
+                          <EventText>
+                            {t("verifiedAt")}:{" "}
+                            {new Date(event.verified_at!).toLocaleString()}
+                          </EventText>
+                          <EventText>
+                            {t("verifiedBy")}:{" "}
+                            {event.verifierName ?? t("unknown")}
+                          </EventText>
+                        </>
+                      ) : null}
+                      <EventText>
+                        {t("createdBy")}: {event.creatorName ?? t("unknown")}
+                      </EventText>
+                      <EventText>
+                        {t("owner")}: {event?.ownerName ?? t("unknown")}
+                      </EventText>
+                      {event.note && (
+                        <EventText>
+                          {t("for")}: {event.note}
+                        </EventText>
+                      )}
+                      {event.photoPath && (
+                        <EventPhoto
+                          source={{ uri: resolvePhotoUri(event.photoPath)! }}
+                          onPress={() => openPhotoModal(event.photoPath!)}
+                        />
+                      )}
+                    </YStack>
+                  </EventItem>
+                  {index < selectedDateEvents.length - 1 && (
+                    <Separator
+                      borderColor="$border"
+                      marginVertical="$2"
+                      alignSelf="stretch"
+                    />
+                  )}
+                </YStack>
               );
             })}
           </ScrollView>
@@ -619,8 +650,8 @@ const CalendarViewAll: React.FC = () => {
             <ModalTitle>{t("selectFilters")}</ModalTitle>
             <FilterSectionTitle>{t("achievementTypes")}</FilterSectionTitle>
             <ScrollView style={{ maxHeight: 150 }}>
-              {["All", ...eventTypes.map((type) => type.name)].map((item) =>
-                renderFilterItem({ item })
+              {["All", ...new Set(eventTypes.map((type) => type.name))].map(
+                (item) => renderFilterItem({ item })
               )}
             </ScrollView>
             <FilterSectionTitle>{t("owners")}</FilterSectionTitle>

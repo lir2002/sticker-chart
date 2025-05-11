@@ -7,6 +7,7 @@ import {
   ScrollView,
   Image,
   Button,
+  Dimensions,
 } from "react-native";
 import { Picker } from "@react-native-picker/picker";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -137,7 +138,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const [phone, setPhone] = useState(currentUser?.phone || "");
   const [wallet, setWallet] = useState<Wallet | null>(null);
   const [needsInitial, setNeedsInitial] = useState<true | false>(false);
-  const [cacheBuster, setCacheBuster] = useState(Date.now()); // Add cacheBuster
+  const [cacheBuster, setCacheBuster] = useState(Date.now());
 
   const modalTitleProps = {
     fontSize: "$4",
@@ -158,11 +159,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       try {
         const needsPasswordSetup = await forceAdminPasswordSetup();
         if (needsPasswordSetup) {
-          // Admin password not set, show CodeSetup
           setCurrentUser(null);
           setNeedsInitial(true);
         } else if (!currentUser) {
-          // Only set Guest if no user is currently set
           const guestUser = await getUserByName("Guest");
           if (guestUser) {
             setCurrentUser(guestUser);
@@ -195,7 +194,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     LocaleConfig.defaultLocale = language;
   }, [language]);
 
-  // Reset selectedOwnerId when users change
   useEffect(() => {
     const ordinaryUsers = users.filter((u) => u.role_id === 3);
     if (ordinaryUsers.length > 0 && !selectedOwnerId) {
@@ -212,7 +210,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     }
   }, [currentUser]);
 
-  // Fetch wallet when userProfileModalVisible or currentUser changes
   useEffect(() => {
     const fetchWallet = async () => {
       if (currentUser && userProfileModalVisible) {
@@ -228,7 +225,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     fetchWallet();
   }, [currentUser, userProfileModalVisible]);
 
-  // Handle adding new event type (admin only)
   const handleAddEventType = async () => {
     if (!currentUser || currentUser.role_id !== 1) {
       Alert.alert("Error", t("adminOnly"));
@@ -238,7 +234,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     setVerifyCodeModalVisible(true);
   };
 
-  // Handle submitting event type from AddType Modal
   const handleSubmitEventType = async () => {
     if (!currentUser || !newTypeName.trim()) {
       Alert.alert("Error", t("errorEmptyEventTypeName"));
@@ -271,7 +266,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     }
   };
 
-  // Verify admin password for adding event type or editing user
   const handleVerifyCode = async () => {
     if (!currentUser) return;
     const isValid = await verifyUserCode(currentUser.id, inputCode);
@@ -293,14 +287,12 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     }
   };
 
-  // Handle code input for verification
   const handleCodeInputChange = (text: string) => {
     if (text.match(/^\d*$/)) {
       setInputCode(text);
     }
   };
 
-  // Handle user icon selection
   const handleChangeIcon = async (user: User) => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
@@ -323,11 +315,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           user.icon
         );
 
-        // Update database
         await updateUserIcon(user.id, relativePath);
         const updatedUser = { ...user, icon: relativePath };
 
-        // Update state based on whether the user is currentUser or selectedUser
         if (user.id === currentUser?.id) {
           setCurrentUser(updatedUser);
         }
@@ -335,13 +325,12 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           setSelectedUser(updatedUser);
         }
 
-        // Update users array
         const updatedUsers = users.map((u) =>
           u.id === user.id ? updatedUser : u
         );
         setUsers(updatedUsers);
 
-        setCacheBuster(Date.now()); // Update cacheBuster to force Image reload
+        setCacheBuster(Date.now());
       } catch (error: any) {
         console.error("Error updating icon:", error);
         Alert.alert("Error", `${t("errorUpdateIcon")}: ${error.message}`);
@@ -349,7 +338,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     }
   };
 
-  // Handle switching user
   const handleSwitchUser = async (user: User) => {
     setUserProfileModalVisible(false);
     if (user.name === "Guest") {
@@ -361,7 +349,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     setVerifyCodeModalVisible(true);
   };
 
-  // Verify password for switching user
   const handleVerifySwitchUser = async () => {
     if (!selectedUser) return;
     const isValid = await verifyUserCode(selectedUser.id, inputCode);
@@ -377,7 +364,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     }
   };
 
-  // Handle creating new user (admin only)
   const handleCreateUser = async () => {
     if (!newUserName.trim()) {
       Alert.alert("Error", t("errorEmptyUsername"));
@@ -400,7 +386,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         setUsers([...users, newUser]);
         setNewUserName("");
         setNewUserRoleId(3);
-        setNewUserPassword("0000"); // Reset to default
+        setNewUserPassword("0000");
         setEditUserModalVisible(false);
         Alert.alert(t("success"), t("successCreateUser"));
       }
@@ -409,14 +395,13 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     }
   };
 
-  // Handle initiating user edit with password verification
   const handleEditUser = (user: User) => {
     if (!currentUser || currentUser.role_id !== 1) {
       Alert.alert("Error", t("adminOnly"));
       return;
     }
-    setPendingEditUser(user); // Store user to edit
-    setVerifyCodeModalVisible(true); // Prompt for admin password
+    setPendingEditUser(user);
+    setVerifyCodeModalVisible(true);
   };
 
   const handleResetPassword = async () => {
@@ -433,7 +418,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     }
   };
 
-  // Handle deleting user
   const handleDeleteUser = async () => {
     if (!selectedUser) return;
     const hasOwner = await hasEventTypeOwner(selectedUser.id);
@@ -460,35 +444,49 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       onPress={() =>
         navigation.navigate("Calendar", {
           eventType: item.name,
+          owner: item.owner, // Added owner parameter
           icon: item.icon,
           iconColor: item.iconColor,
         })
       }
+      style={{ margin: 5 }}
     >
-      <XStack
-        f={1}
-        p="$3"
+      <YStack
         bg="$lightGray"
         br="$2"
-        mb="$2"
+        p="$3"
         borderWidth={1}
         borderColor="$border"
-        jc="space-between"
         ai="center"
+        jc="space-between"
+        h={73}
+        width={73}
+        elevation={2}
       >
-        <XStack ai="center">
-          <MaterialIcons name={item.icon} size={24} color={item.iconColor} />
-          <Text fontSize="$4" fontWeight="bold" color="$primary" mx="$2">
+        <XStack ai="center" jc="center" f={1} flexWrap="wrap">
+          <MaterialIcons name={item.icon} size={20} color={item.iconColor} />
+          <Text fontSize="$3" fontWeight="bold" color="$primary" mx="$1">
             {item.weight}
           </Text>
-          <Text fontSize="$4" color="$text">
+          <Text
+            fontSize="$3"
+            color="$text"
+            numberOfLines={1}
+            ellipsizeMode="tail"
+          >
             {item.name}
           </Text>
         </XStack>
-        <Text fontSize="$3" color="$gray">
+        <Text
+          fontSize="$2"
+          color="$gray"
+          textAlign="center"
+          numberOfLines={1}
+          ellipsizeMode="tail"
+        >
           {item.ownerName ?? t("unknown")}
         </Text>
-      </XStack>
+      </YStack>
     </TouchableOpacity>
   );
 
@@ -539,6 +537,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     );
   }
 
+  const screenWidth = Dimensions.get("window").width;
+  const numColumns = Math.floor(screenWidth / 80);
+
   if (currentUser)
     return (
       <YStack f={1} p="$4" bg="$background">
@@ -565,7 +566,12 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         <FlatList
           data={eventTypes}
           renderItem={renderEventType}
-          keyExtractor={(item) => item.name}
+          keyExtractor={(item) => `${item.name}-${item.owner || "null"}`} // Updated to use composite key
+          numColumns={numColumns || 4}
+          contentContainerStyle={{
+            paddingBottom: 8,
+            alignItems: "flex-start",
+          }}
           ListEmptyComponent={
             <Text fontSize="$4" color="$gray" textAlign="center" mt="$4">
               {t("noEventTypes")}

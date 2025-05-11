@@ -48,7 +48,7 @@ interface CalendarViewProps {
 const MAX_NOTE_LENGTH = 200;
 const MAX_PHOTO_SIZE = 1_048_576;
 
-// Styled components (unchanged from previous response)
+// Styled components (unchanged)
 const Container = styled(YStack, {
   flex: 1,
   p: "$4",
@@ -293,6 +293,7 @@ const ActionButtonText = styled(Text, {
 const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
   const {
     eventType,
+    owner, // Added owner from route params
     icon: initialIcon,
     iconColor: initialIconColor,
   } = route.params;
@@ -367,11 +368,14 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
       try {
         const allUsers = await getUsers();
         setUsers(allUsers.map((u) => ({ id: u.id, name: u.name })));
-        const loadedEvents = await fetchEventsWithCreator(eventType);
+        // Updated to pass owner
+        const loadedEvents = await fetchEventsWithCreator(eventType, owner);
         setEvents(loadedEvents);
         calculateMonthlyAchievements(loadedEvents, currentYear, currentMonth);
         const eventTypes = await getEventTypes();
-        const type = eventTypes.find((t) => t.name === eventType);
+        const type = eventTypes.find(
+          (t) => t.name === eventType && t.owner === owner
+        );
         if (type?.icon) setIcon(type.icon);
         if (type?.iconColor) setIconColor(type.iconColor);
         setAvailability(type?.availability || 0);
@@ -386,7 +390,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
       }
     };
     initialize();
-  }, [eventType, t, currentYear, currentMonth]);
+  }, [eventType, owner, t, currentYear, currentMonth]);
 
   const handleMonthChange = (month: { year: number; month: number }) => {
     setCurrentYear(month.year);
@@ -500,10 +504,12 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
     try {
       if (pendingDate) {
         const markedAt = new Date().toISOString();
+        // Updated to pass owner
         const insertedId = await insertEvent(
           pendingDate,
           markedAt,
           eventType,
+          eventTypeOwnerId, // Pass owner from eventTypeOwnerId
           currentUser.id,
           note || undefined,
           photoUri || undefined,
@@ -514,6 +520,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
           date: pendingDate,
           markedAt,
           eventType,
+          owner: eventTypeOwnerId, // Include owner
           created_by: currentUser.id,
           is_verified: false,
           note: note || undefined,
@@ -598,8 +605,11 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
             createdAt: new Date(event.markedAt).toLocaleString(),
           })
         );
-        const updatedEvents = await fetchEventsWithCreator(eventType);
+        // Updated to pass owner
+        const updatedEvents = await fetchEventsWithCreator(eventType, owner);
         setEvents(updatedEvents);
+        calculateMonthlyAchievements(updatedEvents, currentYear, currentMonth);
+        updateMarkedDates(updatedEvents, iconColor);
         setVerifyEventModalVisible(false);
         setInputCode("");
         setPendingEventId(null);
@@ -627,12 +637,20 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
 
   const handleUpdateIconAndColor = async () => {
     try {
-      await updateEventType(eventType, newIcon, newIconColor, eventTypeOwnerId);
+      // Updated to pass owner
+      await updateEventType(
+        eventType,
+        eventTypeOwnerId,
+        newIcon,
+        newIconColor,
+        eventTypeOwnerId
+      );
       setIcon(newIcon);
       setIconColor(newIconColor);
       updateMarkedDates(events, newIconColor);
       setEditModalVisible(false);
     } catch (error) {
+      console.error("Error updating icon and color:", error);
       Alert.alert("Error", t("errorUpdateIconColor"));
     }
   };
@@ -742,7 +760,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
         <AchievementCountText>{monthlyAchievementCount}</AchievementCountText>
       </TitleContainer>
       <Calendar
-        key={colorScheme} // Force re-render on theme change
+        key={colorScheme}
         onDayPress={handleDayPress}
         onMonthChange={handleMonthChange}
         markedDates={markedDates}
