@@ -29,6 +29,9 @@ import {
   updateUserCode,
   updateUserContact,
   getWallet,
+  hasEventsForEventType, // New
+  deleteEventType, // New
+  updateEventType, // New
 } from "../db/database";
 import CodeSetup from "../components/CodeSetup";
 import ChangeCode from "../components/ChangeCode";
@@ -139,6 +142,12 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const [wallet, setWallet] = useState<Wallet | null>(null);
   const [needsInitial, setNeedsInitial] = useState<true | false>(false);
   const [cacheBuster, setCacheBuster] = useState(Date.now());
+  const [contextMenuVisible, setContextMenuVisible] = useState(false); // New
+  const [selectedEventType, setSelectedEventType] = useState<EventType | null>(
+    null
+  ); // New
+  const [isEditingEventType, setIsEditingEventType] = useState(false); // New
+  const [isDeletingEventType, setIsDeletingEventType] = useState(false); // New
 
   const modalTitleProps = {
     fontSize: "$4",
@@ -231,6 +240,13 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       return;
     }
     setIsAddingEventType(true);
+    setIsEditingEventType(false);
+    setNewTypeName("");
+    setSelectedIcon("event");
+    setSelectedColor("#000000");
+    setAvailability(0);
+    setSelectedOwnerId(users.filter((u) => u.role_id === 3)[0]?.id || null);
+    setNewFaceValue("1");
     setVerifyCodeModalVisible(true);
   };
 
@@ -244,14 +260,27 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       return;
     }
     try {
-      await insertEventType(
-        newTypeName,
-        selectedIcon,
-        selectedColor,
-        availability,
-        selectedOwnerId,
-        parseInt(newFaceValue)
-      );
+      if (isEditingEventType && selectedEventType) {
+        await updateEventType(
+          selectedEventType.name,
+          selectedEventType.owner!,
+          selectedIcon,
+          selectedColor,
+          availability,
+          newTypeName,
+          selectedOwnerId,
+          parseInt(newFaceValue)
+        );
+      } else {
+        await insertEventType(
+          newTypeName,
+          selectedIcon,
+          selectedColor,
+          availability,
+          selectedOwnerId,
+          parseInt(newFaceValue)
+        );
+      }
       const updatedTypes = await getEventTypesWithOwner();
       setEventTypes(updatedTypes);
       setNewTypeName("");
@@ -259,10 +288,24 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       setSelectedColor("#000000");
       setAvailability(0);
       setSelectedOwnerId(users.filter((u) => u.role_id === 3)[0]?.id || null);
+      setNewFaceValue("1");
       setAddTypeModalVisible(false);
-      Alert.alert(t("success"), t("successAddEventType"));
+      setIsEditingEventType(false);
+      Alert.alert(
+        t("success"),
+        isEditingEventType
+          ? t("successUpdateEventType")
+          : t("successAddEventType")
+      );
     } catch (error: any) {
-      Alert.alert("Error", `${t("errorAddEventType")}: ${error.message}`);
+      Alert.alert(
+        "Error",
+        `${
+          isEditingEventType
+            ? t("errorUpdateEventType")
+            : t("errorAddEventType")
+        }: ${error.message}`
+      );
     }
   };
 
@@ -273,6 +316,37 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       if (isAddingEventType) {
         setAddTypeModalVisible(true);
         setIsAddingEventType(false);
+      } else if (isDeletingEventType && selectedEventType) {
+        try {
+          if (selectedEventType.owner === null) {
+            Alert.alert("Error", t("errorInvalidOwner"));
+            return;
+          }
+          await deleteEventType(
+            selectedEventType.name,
+            selectedEventType.owner
+          );
+          const updatedTypes = await getEventTypesWithOwner();
+          setEventTypes(updatedTypes);
+          setContextMenuVisible(false);
+          setSelectedEventType(null);
+          setIsDeletingEventType(false);
+          Alert.alert(t("success"), t("successDeleteEventType"));
+        } catch (error: any) {
+          Alert.alert(
+            "Error",
+            `${t("errorDeleteEventType")}: ${error.message}`
+          );
+        }
+      } else if (isEditingEventType && selectedEventType) {
+        setNewTypeName(selectedEventType.name);
+        setSelectedIcon(selectedEventType.icon);
+        setSelectedColor(selectedEventType.iconColor);
+        setAvailability(selectedEventType.availability);
+        setSelectedOwnerId(selectedEventType.owner);
+        setNewFaceValue(selectedEventType.weight.toString());
+        setAddTypeModalVisible(true);
+        setContextMenuVisible(false);
       } else if (pendingEditUser) {
         setSelectedUser(pendingEditUser);
         setEditUserModalVisible(true);
@@ -285,6 +359,40 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       Alert.alert("Error", t("invalidPassword"));
       setInputCode("");
     }
+  };
+
+  const handleLongPressEventType = (item: EventType) => {
+    if (!currentUser || currentUser.role_id !== 1) return;
+    setSelectedEventType(item);
+    setContextMenuVisible(true);
+  };
+
+  const handleDeleteEventType = async () => {
+    if (!selectedEventType) return;
+    try {
+      const hasEvents = await hasEventsForEventType(
+        selectedEventType.name,
+        selectedEventType.owner
+      );
+      if (hasEvents) {
+        Alert.alert("Warning", t("cannotDeleteEventTypeWithEvents"));
+        setContextMenuVisible(false);
+        setSelectedEventType(null);
+        return;
+      }
+      setIsDeletingEventType(true);
+      setVerifyCodeModalVisible(true);
+    } catch (error: any) {
+      Alert.alert("Error", `${t("errorCheckEvents")}: ${error.message}`);
+      setContextMenuVisible(false);
+      setSelectedEventType(null);
+    }
+  };
+
+  const handleUpdateEventType = () => {
+    if (!selectedEventType) return;
+    setIsEditingEventType(true);
+    setVerifyCodeModalVisible(true);
   };
 
   const handleCodeInputChange = (text: string) => {
@@ -444,17 +552,19 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       onPress={() =>
         navigation.navigate("Calendar", {
           eventType: item.name,
-          owner: item.owner, // Added owner parameter
+          owner: item.owner,
           icon: item.icon,
           iconColor: item.iconColor,
         })
       }
+      onLongPress={() => handleLongPressEventType(item)}
+      delayLongPress={2000} // 2 seconds
       style={{ margin: 5 }}
     >
       <YStack
         bg="$lightGray"
         br="$2"
-        p="$3"
+        p="$1"
         borderWidth={1}
         borderColor="$border"
         ai="center"
@@ -464,7 +574,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         elevation={2}
       >
         <XStack ai="center" jc="center" f={1} flexWrap="wrap">
-          <MaterialIcons name={item.icon} size={20} color={item.iconColor} />
+          <MaterialIcons name={item.icon} size={30} color={item.iconColor} />
           <Text fontSize="$3" fontWeight="bold" color="$primary" mx="$1">
             {item.weight}
           </Text>
@@ -539,6 +649,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
   const screenWidth = Dimensions.get("window").width;
   const numColumns = Math.floor(screenWidth / 80);
+  const iconItemWidth = 80; // Approximate width per icon (including padding)
+  const nCols = Math.floor((screenWidth * 0.8) / iconItemWidth);
 
   if (currentUser)
     return (
@@ -566,7 +678,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         <FlatList
           data={eventTypes}
           renderItem={renderEventType}
-          keyExtractor={(item) => `${item.name}-${item.owner || "null"}`} // Updated to use composite key
+          keyExtractor={(item) => `${item.name}-${item.owner || "null"}`}
           numColumns={numColumns || 4}
           contentContainerStyle={{
             paddingBottom: 8,
@@ -603,7 +715,20 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           onPress={() => setLanguage(language === "en" ? "zh" : "en")}
         />
 
-        {/* AddType Modal */}
+        {/* Context Menu Modal */}
+        <ModalContainer
+          visible={contextMenuVisible}
+          onClose={() => {
+            setContextMenuVisible(false);
+            setSelectedEventType(null);
+          }}
+        >
+          <Text {...modalTitleProps}>{t("eventTypeOptions")}</Text>
+          <CustomButton title={t("update")} onPress={handleUpdateEventType} />
+          <CustomButton title={t("delete")} onPress={handleDeleteEventType} />
+        </ModalContainer>
+
+        {/* AddType/UpdateType Modal */}
         <ModalContainer
           visible={addTypeModalVisible}
           onClose={() => {
@@ -614,32 +739,44 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             setSelectedOwnerId(
               users.filter((u) => u.role_id === 3)[0]?.id || null
             );
+            setNewFaceValue("1");
             setAddTypeModalVisible(false);
+            setIsEditingEventType(false);
           }}
         >
-          <Text {...modalTitleProps}>{t("addNewEventType")}</Text>
+          <Text {...modalTitleProps}>
+            {isEditingEventType ? t("updateEventType") : t("addNewEventType")}
+          </Text>
           <StyledInput
+            editable={!isEditingEventType}
             placeholder={t("namePlaceholder")}
             value={newTypeName}
             onChangeText={setNewTypeName}
             maxLength={20}
-            autoFocus
+            autoFocus={!isEditingEventType}
           />
           <Text {...iconLabelProps}>{t("selectIcon")}</Text>
-          <ScrollView horizontal style={{ flexGrow: 0, marginBottom: 10 }}>
-            {availableIcons.map((icon) => (
+          <FlatList
+            data={availableIcons}
+            renderItem={({ item: icon }) => (
               <YStack
                 key={icon}
                 p="$2"
                 bg={selectedIcon === icon ? "$lightGray" : undefined}
                 br="$1"
+                width={iconItemWidth}
+                alignItems="center"
               >
                 <TouchableOpacity onPress={() => setSelectedIcon(icon)}>
-                  <MaterialIcons name={icon} size={24} color={selectedColor} />
+                  <MaterialIcons name={icon} size={40} color={selectedColor} />
                 </TouchableOpacity>
               </YStack>
-            ))}
-          </ScrollView>
+            )}
+            keyExtractor={(icon) => icon}
+            numColumns={nCols || 4} // Fallback to 4 columns if calculation fails
+            contentContainerStyle={{ paddingBottom: 10 }}
+            style={{ maxHeight: 200 }} // Limit height to prevent modal overflow
+          />
           <Text {...iconLabelProps}>{t("selectColor")}</Text>
           <ScrollView horizontal style={{ flexGrow: 0, marginBottom: 10 }}>
             {availableColors.map((color) => (
@@ -671,6 +808,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           />
           <Text {...iconLabelProps}>{t("faceValue")}</Text>
           <PickerField
+            enabled={!isEditingEventType}
             selectedValue={newFaceValue}
             onValueChange={setNewFaceValue}
             items={[1, 2, 3, 4, 5].map((value) => ({
@@ -689,7 +827,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                     .map((user) => ({ label: user.name, value: user.id }))
                 : [{ label: t("noOrdinaryUsers"), value: null }]
             }
-            enabled={users.filter((u) => u.role_id === 3).length > 0}
+            enabled={
+              !isEditingEventType &&
+              users.filter((u) => u.role_id === 3).length > 0
+            }
           />
           <XStack jc="space-between" w="100%" mt="$2">
             <Button
@@ -702,11 +843,13 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                 setSelectedOwnerId(
                   users.filter((u) => u.role_id === 3)[0]?.id || null
                 );
+                setNewFaceValue("1");
                 setAddTypeModalVisible(false);
+                setIsEditingEventType(false);
               }}
             />
             <Button
-              title={t("add")}
+              title={isEditingEventType ? t("update") : t("add")}
               onPress={handleSubmitEventType}
               disabled={!newTypeName.trim() || !selectedOwnerId}
             />
@@ -722,10 +865,16 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             setPendingEditUser(null);
             setSelectedUser(null);
             setIsAddingEventType(false);
+            setIsDeletingEventType(false);
+            setIsEditingEventType(false);
           }}
         >
           <Text {...modalTitleProps}>
-            {pendingEditUser
+            {isDeletingEventType
+              ? t("verifyAdminForDeleteEventType")
+              : isEditingEventType
+              ? t("verifyAdminForUpdateEventType")
+              : pendingEditUser
               ? t("verifyAdminForEdit")
               : isAddingEventType
               ? t("verifyAdminForAddEventType")
@@ -749,6 +898,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                 setPendingEditUser(null);
                 setSelectedUser(null);
                 setIsAddingEventType(false);
+                setIsDeletingEventType(false);
+                setIsEditingEventType(false);
               }}
             />
             <Button

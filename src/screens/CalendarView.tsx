@@ -640,10 +640,9 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
       // Updated to pass owner
       await updateEventType(
         eventType,
-        eventTypeOwnerId,
+        eventTypeOwnerId!,
         newIcon,
-        newIconColor,
-        eventTypeOwnerId
+        newIconColor
       );
       setIcon(newIcon);
       setIconColor(newIconColor);
@@ -661,7 +660,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
       selected={newIcon === icon}
       onPress={() => setNewIcon(icon)}
     >
-      <MaterialIcons name={icon} size={24} color={newIconColor} />
+      <MaterialIcons name={icon} size={40} color={newIconColor} />
     </IconOption>
   );
 
@@ -750,7 +749,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
         <LeftContainer>
           <MaterialIcons
             name={icon}
-            size={24}
+            size={40}
             color={iconColor}
             style={{ marginRight: 10 }}
           />

@@ -340,6 +340,41 @@ const translations: Translations = {
   errorLoadData: { en: "Failed to load data", zh: "加载数据失败" },
   confirmCodePlaceholder: { en: "Confirm 4-digit code", zh: "请确定4位数密码" },
   setCode: { en: "Set Admin Password", zh: "设置管理员密码" },
+  eventTypeOptions: { en: "Event Type Options", zh: "成就类型选项" },
+  update: { en: "Update", zh: "更新" },
+  updateEventType: { en: "Update Achievement Type", zh: "更新成就类型" },
+  successUpdateEventType: {
+    en: "Achievement type updated successfully",
+    zh: "成就类型更新成功",
+  },
+  successDeleteEventType: {
+    en: "Achievement type deleted successfully",
+    zh: "成就类型删除成功",
+  },
+  errorUpdateEventType: {
+    en: "Failed to update achievement type",
+    zh: "更新成就类型失败",
+  },
+  errorDeleteEventType: {
+    en: "Failed to delete achievement type",
+    zh: "删除成就类型失败",
+  },
+  errorCheckEvents: {
+    en: "Failed to check associated events",
+    zh: "检查关联事件失败",
+  },
+  cannotDeleteEventTypeWithEvents: {
+    en: "Cannot delete achievement type with associated events",
+    zh: "无法删除有关联事件的成就类型",
+  },
+  verifyAdminForDeleteEventType: {
+    en: "Enter Admin Password to Delete",
+    zh: "输入管理员密码以删除",
+  },
+  verifyAdminForUpdateEventType: {
+    en: "Enter Admin Password to Update",
+    zh: "输入管理员密码以更新",
+  },
 };
 
 const LanguageContext = createContext<LanguageContextType | undefined>(

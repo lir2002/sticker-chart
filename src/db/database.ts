@@ -875,27 +875,57 @@ export const getEventTypesWithOwner = async () => {
 
 // Update event type
 export const updateEventType = async (
-  name: string,
-  owner: number | null,
+  oldName: string,
+  oldOwner: number,
   icon: string,
   iconColor: string,
-  newOwner?: number,
+  availability?: number,
+  newName?: string,
+  owner?: number,
   weight?: number
-) => {
-  const dbManager = DatabaseManager.getInstance();
-  const db = dbManager.getDatabase();
-  if (weight !== undefined && weight < 1) {
-    throw new Error("Weight must be at least 1");
+): Promise<void> => {
+  try {
+    // Build the SET clause dynamically based on provided parameters
+    const setClauses: string[] = [];
+    const values: (string | number | null)[] = [];
+
+    // Always update icon and icon_color
+    setClauses.push("icon = ?", "iconColor = ?");
+    values.push(icon, iconColor);
+
+    // Add optional fields if provided
+    if (newName !== undefined) {
+      setClauses.push("name = ?");
+      values.push(newName);
+    }
+    if (owner !== undefined) {
+      setClauses.push("owner = ?");
+      values.push(owner ?? null);
+    }
+    if (availability !== undefined) {
+      setClauses.push("availability = ?");
+      values.push(availability);
+    }
+    if (weight !== undefined) {
+      setClauses.push("weight = ?");
+      values.push(weight);
+    }
+
+    // Construct the query
+    const query = `
+      UPDATE event_types
+      SET ${setClauses.join(", ")}
+      WHERE name = ? AND owner = ?;
+    `;
+    values.push(oldName, oldOwner);
+
+    const dbManager = DatabaseManager.getInstance();
+    const db = dbManager.getDatabase();
+    await db.runAsync(query, values);
+  } catch (error) {
+    console.error("Error updating event type:", error);
+    throw error;
   }
-  const query =
-    weight !== undefined
-      ? "UPDATE event_types SET icon = ?, iconColor = ?, owner = ?, weight = ? WHERE name = ? AND owner = ?;"
-      : "UPDATE event_types SET icon = ?, iconColor = ?, owner = ? WHERE name = ? AND owner = ?;";
-  const params =
-    weight !== undefined
-      ? [icon, iconColor, newOwner || null, weight, name, owner || null]
-      : [icon, iconColor, newOwner || null, name, owner || null];
-  await db.runAsync(query, params);
 };
 
 // Force admin password setup
@@ -998,6 +1028,36 @@ export const hasAssociatedAchievements = async (
     return (count?.count || 0) > 0;
   } catch (error) {
     console.error("Error checking associated achievements:", error);
+    throw error;
+  }
+};
+// Check if an EventType has associated events
+export const hasEventsForEventType = async (name: string, owner: number): Promise<boolean> => {
+  try {
+    const dbManager = DatabaseManager.getInstance();
+    const db = dbManager.getDatabase();
+    const result = await db.getFirstAsync(
+      `SELECT COUNT(*) as count FROM events WHERE eventType = ? AND owner = ?;`,
+      [name, owner]
+    );
+    return (result as any).count > 0;
+  } catch (error) {
+    console.error("Error checking events for event type:", error);
+    throw error;
+  }
+};
+
+// Delete an EventType
+export const deleteEventType = async (name: string, owner: number): Promise<void> => {
+  try {
+    const dbManager = DatabaseManager.getInstance();
+    const db = dbManager.getDatabase();
+    await db.runAsync(
+      `DELETE FROM event_types WHERE name = ? AND owner = ?;`,
+      [name, owner]
+    );
+  } catch (error) {
+    console.error("Error deleting event type:", error);
     throw error;
   }
 };
