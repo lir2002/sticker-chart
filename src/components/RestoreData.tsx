@@ -70,8 +70,10 @@ const RestoreData: React.FC<RestoreDataProps> = ({ onClose }) => {
       const dbJsonContent = await dbJsonFile.async("string");
       const dbData = JSON.parse(dbJsonContent);
 
-      // Migrate absolute paths to relative paths if version < 5
+      // Get backup version
       const backupVersion = dbData.dbVersion?.version || 0;
+
+      // Migrate absolute paths to relative paths if version < 5
       if (backupVersion < 5) {
         if (dbData.events) {
           dbData.events = dbData.events.map((event: any) => {
@@ -95,7 +97,6 @@ const RestoreData: React.FC<RestoreDataProps> = ({ onClose }) => {
             return user;
           });
         }
-        dbData.dbVersion = { version: 5 };
       }
 
       // Migrate events to include owner if version < 6
@@ -108,12 +109,34 @@ const RestoreData: React.FC<RestoreDataProps> = ({ onClose }) => {
             );
             return {
               ...event,
-              owner: matchingType?.owner || null, // Set owner from event_types or null
+              owner: matchingType?.owner || null,
             };
           });
         }
-        dbData.dbVersion = { version: 6 };
       }
+
+      // Migrate event_types to include expiration_date if version < 7
+      if (backupVersion < 7) {
+        if (dbData.eventTypes) {
+          dbData.eventTypes = dbData.eventTypes.map((type: any) => ({
+            ...type,
+            expiration_date: null,
+          }));
+        }
+      }
+
+      // Migrate event_types to include created_at if version < 8
+      if (backupVersion < 8) {
+        if (dbData.eventTypes) {
+          dbData.eventTypes = dbData.eventTypes.map((type: any) => ({
+            ...type,
+            created_at: null,
+          }));
+        }
+      }
+
+      // Set dbVersion to current version (8)
+      dbData.dbVersion = { version: 8 };
 
       const dbManager = DatabaseManager.getInstance();
       const db = dbManager.getDatabase();
@@ -165,11 +188,11 @@ const RestoreData: React.FC<RestoreDataProps> = ({ onClose }) => {
             );
           }
 
-          // Insert event_types
+          // Insert event_types (updated to include expiration_date and created_at)
           for (const type of dbData.eventTypes || []) {
             await db.runAsync(
-              `INSERT INTO event_types (name, icon, iconColor, availability, owner, weight)
-               VALUES (?, ?, ?, ?, ?, ?);`,
+              `INSERT INTO event_types (name, icon, iconColor, availability, owner, weight, expiration_date, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?);`,
               [
                 type.name,
                 type.icon || "event",
@@ -177,6 +200,8 @@ const RestoreData: React.FC<RestoreDataProps> = ({ onClose }) => {
                 type.availability || 0,
                 type.owner || null,
                 type.weight || 1,
+                type.expiration_date || null,
+                type.created_at || null,
               ]
             );
           }
@@ -247,10 +272,10 @@ const RestoreData: React.FC<RestoreDataProps> = ({ onClose }) => {
             }
           }
 
-          // Insert db_version
+          // Insert db_version (set to 8)
           await db.runAsync(
             `INSERT OR REPLACE INTO db_version (version) VALUES (?);`,
-            [dbData.dbVersion?.version || 6]
+            [8]
           );
         });
       } catch (error: any) {

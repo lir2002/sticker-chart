@@ -22,10 +22,11 @@ export interface EventType {
   name: string; // Max 20 characters
   icon: string; // Icon name from MaterialIcons (e.g., "event")
   iconColor: string; // Icon color (e.g., "#FF0000")
-  availability: number; // Availability status
+  availability: number; // Availability for one day
   owner?: number; // User ID of owner, references users(id)
-  weight: number; // Weight of event type, >= 1
-  expiration_date?: string | null; // Added
+  weight: number; // Face Value of achievement type, >= 1
+  expiration_date?: string | null;
+  created_at?: string | null;
   ownerName?: string | null;
 }
 
@@ -52,7 +53,7 @@ export interface Role {
 // Define navigation stack parameters
 export type RootStackParamList = {
   Home: undefined;
-  Calendar: { eventType: string; owner: number | null; icon: string | null; iconColor: string | null };
+  Calendar: { eventType: string; owner: number | null; ownerName: string; icon: string | null; iconColor: string | null };
   CalendarViewAll: undefined;
   CodeSetup: undefined;
   ChangeCode: { userId: number }; // Updated to pass user ID

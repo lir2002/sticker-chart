@@ -2,7 +2,7 @@ import * as SQLite from "expo-sqlite";
 import { Event, EventType, User, Role, DbVersion, Wallet } from "../types";
 
 // Current database version
-const CURRENT_DB_VERSION = 7; // Incremented from 5 to 6
+const CURRENT_DB_VERSION = 8; // Incremented from 7 to 8 for created_at column
 
 // Singleton Database Manager
 export class DatabaseManager {
@@ -132,7 +132,8 @@ export class DatabaseManager {
             iconColor TEXT NOT NULL,
             availability INTEGER NOT NULL DEFAULT 0,
             weight INTEGER NOT NULL DEFAULT 1 CHECK (weight >= 1),
-            expiration_date TEXT, -- Added nullable expiration_date column
+            expiration_date TEXT,
+            created_at TEXT, -- Added nullable created_at column
             PRIMARY KEY (name, owner),
             FOREIGN KEY (owner) REFERENCES users(id)
           );
@@ -192,8 +193,8 @@ export class DatabaseManager {
 
           if (tableNames.includes("event_types_old")) {
             await db.execAsync(`
-              INSERT INTO event_types (name, owner, icon, iconColor, availability, weight, expiration_date)
-              SELECT name, ${adminId}, icon, iconColor, availability, 1, NULL
+              INSERT INTO event_types (name, owner, icon, iconColor, availability, weight, expiration_date, created_at)
+              SELECT name, ${adminId}, icon, iconColor, availability, 1, NULL, NULL
               FROM event_types_old;
               DROP TABLE IF EXISTS event_types_old;
             `);
@@ -208,16 +209,22 @@ export class DatabaseManager {
             `);
           }
         }
+
+        // After version 0 initialization, set version to CURRENT_DB_VERSION and exit
+        await db.runAsync("INSERT INTO db_version (version) VALUES (?);", [
+          CURRENT_DB_VERSION,
+        ]);
+        return; // Exit to skip subsequent migrations
       }
 
-      if (currentVersion === 1) {
+      if (currentVersion < 2) {
         await db.execAsync(`
           ALTER TABLE events ADD COLUMN verified_at TEXT;
           ALTER TABLE events ADD COLUMN verified_by INTEGER;
         `);
       }
 
-      if (currentVersion === 2) {
+      if (currentVersion < 3) {
         await db.execAsync(`
           CREATE TABLE IF NOT EXISTS users_new (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -240,7 +247,7 @@ export class DatabaseManager {
         `);
       }
 
-      if (currentVersion === 3) {
+      if (currentVersion < 4) {
         await db.execAsync(`
           ALTER TABLE users ADD COLUMN email TEXT NOT NULL DEFAULT '';
           ALTER TABLE users ADD COLUMN phone TEXT NOT NULL DEFAULT '';
@@ -283,7 +290,7 @@ export class DatabaseManager {
         }
       }
 
-      if (currentVersion === 4) {
+      if (currentVersion < 5) {
         const events = await db.getAllAsync<{
           id: number;
           photoPath: string | null;
@@ -319,7 +326,7 @@ export class DatabaseManager {
         }
       }
 
-      if (currentVersion === 5) {
+      if (currentVersion < 6) {
         // Migration to composite primary key (name, owner)
         await db.execAsync(`
           -- Create new event_types table with composite primary key
@@ -373,10 +380,17 @@ export class DatabaseManager {
         `);
       }
 
-      if (currentVersion === 6) {
+      if (currentVersion < 7) {
         // Migration to add expiration_date column
         await db.execAsync(`
           ALTER TABLE event_types ADD COLUMN expiration_date TEXT;
+        `);
+      }
+
+      if (currentVersion < 8) {
+        // Migration to add created_at column
+        await db.execAsync(`
+          ALTER TABLE event_types ADD COLUMN created_at TEXT;
         `);
       }
 
@@ -640,7 +654,8 @@ export const insertEventType = async (
   availability: number,
   owner?: number,
   weight: number = 1,
-  expirationDate?: string // Added optional expiration_date parameter
+  expirationDate?: string,
+  createdAt: string = new Date().toISOString() // Added created_at with default to current time
 ) => {
   if (weight < 1) {
     throw new Error("Weight must be at least 1");
@@ -648,8 +663,17 @@ export const insertEventType = async (
   const dbManager = DatabaseManager.getInstance();
   const db = dbManager.getDatabase();
   await db.runAsync(
-    "INSERT INTO event_types (name, owner, icon, iconColor, availability, weight, expiration_date) VALUES (?, ?, ?, ?, ?, ?, ?);",
-    [name, owner || null, icon, iconColor, availability, weight, expirationDate || null]
+    "INSERT INTO event_types (name, owner, icon, iconColor, availability, weight, expiration_date, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?);",
+    [
+      name,
+      owner || null,
+      icon,
+      iconColor,
+      availability,
+      weight,
+      expirationDate || null,
+      createdAt,
+    ]
   );
 };
 
@@ -865,7 +889,7 @@ export const getEventTypes = async () => {
   const dbManager = DatabaseManager.getInstance();
   const db = dbManager.getDatabase();
   const types = await db.getAllAsync<EventType>(
-    "SELECT name, owner, icon, iconColor, availability, weight, expiration_date FROM event_types;"
+    "SELECT name, owner, icon, iconColor, availability, weight, expiration_date, created_at FROM event_types;"
   );
   return types;
 };
@@ -875,7 +899,7 @@ export const getEventTypesWithOwner = async () => {
   const dbManager = DatabaseManager.getInstance();
   const db = dbManager.getDatabase();
   const types = await db.getAllAsync<EventType>(
-    `SELECT et.name, et.owner, et.icon, et.iconColor, et.availability, et.weight, et.expiration_date, u.name as ownerName
+    `SELECT et.name, et.owner, et.icon, et.iconColor, et.availability, et.weight, et.expiration_date, et.created_at, u.name as ownerName
      FROM event_types et
      LEFT JOIN users u ON et.owner = u.id;`
   );
@@ -892,7 +916,7 @@ export const updateEventType = async (
   newName?: string,
   owner?: number,
   weight?: number,
-  expirationDate?: string, // Added optional expiration_date parameter
+  expirationDate?: string // Added optional expiration_date parameter
 ): Promise<void> => {
   try {
     // Build the SET clause dynamically based on provided parameters

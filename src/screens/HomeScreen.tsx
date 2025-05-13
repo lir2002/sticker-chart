@@ -593,6 +593,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         navigation.navigate("Calendar", {
           eventType: item.name,
           owner: item.owner,
+          ownerName: item.ownerName,
           icon: item.icon,
           iconColor: item.iconColor,
         })

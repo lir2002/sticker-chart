@@ -34,7 +34,6 @@ import {
   verifyUserCode,
   deleteEvent,
   verifyEventWithTransaction,
-  getUsers,
 } from "../db/database";
 import { availableColors, availableIcons } from "../icons";
 import { resolvePhotoUri } from "../utils/fileUtils";
@@ -62,9 +61,10 @@ const TitleContainer = styled(XStack, {
 });
 
 const Title = styled(Text, {
-  fontSize: "$6",
+  fontSize: "$5",
   fontWeight: "bold",
   color: "$text",
+  maxWidth: "60%",
 });
 
 const LeftContainer = styled(XStack, {
@@ -178,20 +178,20 @@ const EventHeader = styled(XStack, {
 });
 
 const EventText = styled(Text, {
-  fontSize: "$3",
+  fontSize: "$4",
   mb: "$1",
   color: "$text",
 });
 
 const NoEventText = styled(Text, {
-  fontSize: "$3",
+  fontSize: "$4",
   color: "$gray",
   ta: "center",
   mb: "$2",
 });
 
 const MaxAchievementsText = styled(Text, {
-  fontSize: "$3",
+  fontSize: "$4",
   color: "$gray",
   ta: "center",
   mt: "$2",
@@ -282,13 +282,14 @@ const ActionButton = styled(Button, {
 
 const ActionButtonText = styled(Text, {
   color: "$modalBackground",
-  fontSize: "$2",
+  fontSize: "$3",
 });
 
 const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
   const {
     eventType,
-    owner, // Added owner from route params
+    owner,
+    ownerName,
     icon: initialIcon,
     iconColor: initialIconColor,
   } = route.params;
@@ -328,6 +329,8 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
   const [pendingEventId, setPendingEventId] = useState<number | null>(null);
   const [confirmVerifyModalVisible, setConfirmVerifyModalVisible] =
     useState(false);
+  const [createdAt, setCreatedAt] = useState<string | null>(null);
+  const [expirationDate, setExpirationDate] = useState<string | null>(null);
   const [colorScheme, setColorScheme] = useState(Appearance.getColorScheme());
 
   const scale = useSharedValue(1);
@@ -360,10 +363,11 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
   useEffect(() => {
     const initialize = async () => {
       try {
-        // Updated to pass owner
+        // Fetch events with owner
         const loadedEvents = await fetchEventsWithCreator(eventType, owner);
         setEvents(loadedEvents);
         calculateMonthlyAchievements(loadedEvents, currentYear, currentMonth);
+        // Fetch event type details including created_at and expiration_date
         const eventTypes = await getEventTypes();
         const type = eventTypes.find(
           (t) => t.name === eventType && t.owner === owner
@@ -375,7 +379,21 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
         setEventTypeOwnerId(type?.owner || null);
         setNewIcon(type?.icon || "event");
         setNewIconColor(type?.iconColor || "#000000");
-        updateMarkedDates(loadedEvents, type?.iconColor || "#000000");
+        setCreatedAt(type?.created_at || null); // Set created_at
+        setExpirationDate(type?.expiration_date || null); // Set expiration_date
+        // Update markedDates with events and selected date
+        const marked: { [key: string]: any } = {};
+        loadedEvents.forEach((event) => {
+          marked[event.date] = { marked: true, dotColor: type?.iconColor || "#000000" };
+        });
+        if (selectedDate) {
+          marked[selectedDate] = {
+            ...marked[selectedDate],
+            selected: true,
+            selectedColor: theme.primary.val,
+          };
+        }
+        setMarkedDates(marked);
       } catch (error) {
         console.error("Initialization error:", error);
         Alert.alert("Error", t("errorInitCalendar"));
@@ -383,6 +401,34 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
     };
     initialize();
   }, [eventType, owner, t, currentYear, currentMonth]);
+
+  // Function to check if a date is valid (between created_at and expiration_date)
+  const isDateValid = (date: string): boolean => {
+    // Parse dates as local time by splitting YYYY-MM-DD and creating Date objects
+    const [year, month, day] = date.split("-").map(Number);
+    const selectedDate = new Date(year, month - 1, day); // Local time
+    if (createdAt) {
+      const [cYear, cMonth, cDay] = createdAt
+        .split("T")[0]
+        .split("-")
+        .map(Number);
+      const createdDate = new Date(cYear, cMonth - 1, cDay); // Local time
+      if (selectedDate < createdDate) {
+        return false;
+      }
+    }
+    if (expirationDate) {
+      const [eYear, eMonth, eDay] = expirationDate
+        .split("T")[0]
+        .split("-")
+        .map(Number);
+      const expiration = new Date(eYear, eMonth - 1, eDay); // Local time
+      if (selectedDate > expiration) {
+        return false;
+      }
+    }
+    return true;
+  };
 
   const handleMonthChange = (month: { year: number; month: number }) => {
     setCurrentYear(month.year);
@@ -401,10 +447,26 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
   const handleDayPress = (day: { dateString: string }) => {
     const date = day.dateString;
     setSelectedDate(date);
+    // Update markedDates to highlight selected date
+    const updatedMarkedDates = { ...markedDates };
+    // Clear previous selected styles
+    Object.keys(updatedMarkedDates).forEach((key) => {
+      if (updatedMarkedDates[key].selected) {
+        delete updatedMarkedDates[key].selected;
+        delete updatedMarkedDates[key].selectedColor;
+      }
+    });
+    // Add selected style for the pressed date
+    updatedMarkedDates[date] = {
+      ...updatedMarkedDates[date],
+      selected: true,
+      selectedColor: theme.primary.val, // Circle background color
+    };
+    setMarkedDates(updatedMarkedDates);
   };
 
   const handleAskSticker = () => {
-    if (selectedDate) {
+    if (selectedDate && isDateValid(selectedDate)) {
       setPendingDate(selectedDate);
       setVerifyModalVisible(true);
     }
@@ -705,8 +767,46 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
 
   const showAskStickerButton =
     selectedDate &&
+    isDateValid(selectedDate) &&
     (availability === 0 || selectedDateEvents.length < availability) &&
-    (currentUser?.id === eventTypeOwnerId || currentUser?.role_id === 1);
+    (currentUser?.id === eventTypeOwnerId || currentUser?.role_id === 1) &&
+    (() => {
+      const [year, month, day] = selectedDate.split("-").map(Number);
+      const selected = new Date(year, month - 1, day); // Local time
+      const today = new Date(); // Local time
+      // Set time to 00:00:00 for both to compare dates only
+      selected.setHours(0, 0, 0, 0);
+      today.setHours(0, 0, 0, 0);
+      return selected <= today; // Only show button for today or earlier
+    })();
+
+  // Added function to determine status message
+  const getDateStatusMessage = (): string | null => {
+    if (!selectedDate) return null;
+    const [year, month, day] = selectedDate.split("-").map(Number);
+    const selected = new Date(year, month - 1, day); // Local time
+    if (createdAt) {
+      const [cYear, cMonth, cDay] = createdAt
+        .split("T")[0]
+        .split("-")
+        .map(Number);
+      const created = new Date(cYear, cMonth - 1, cDay); // Local time
+      if (selected < created) {
+        return t("activityNotStarted");
+      }
+    }
+    if (expirationDate) {
+      const [eYear, eMonth, eDay] = expirationDate
+        .split("T")[0]
+        .split("-")
+        .map(Number);
+      const expiration = new Date(eYear, eMonth - 1, eDay); // Local time
+      if (selected > expiration) {
+        return t("activityEnded");
+      }
+    }
+    return null;
+  };
 
   // Calendar theme dependent on current theme
   const calendarTheme = {
@@ -747,8 +847,12 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
           />
           <WeightText>{weight}</WeightText>
         </LeftContainer>
-        <Title>{eventType}</Title>
-        <AchievementCountText>{monthlyAchievementCount}</AchievementCountText>
+        <Title>
+          {eventType} | {ownerName}
+        </Title>
+        <AchievementCountText>
+          {monthlyAchievementCount * weight}
+        </AchievementCountText>
       </TitleContainer>
       <Calendar
         key={colorScheme}
@@ -837,6 +941,10 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
                 ? `${t("noAchievement")} ${selectedDate}`
                 : t("noDateSelected")}
             </NoEventText>
+            {/* Added status message for invalid dates */}
+            {getDateStatusMessage() && (
+              <NoEventText>{getDateStatusMessage()}</NoEventText>
+            )}
             <MaxAchievementsText>
               {t("maxAchievements", {
                 availability:

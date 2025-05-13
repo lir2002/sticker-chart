@@ -382,7 +382,9 @@ const translations: Translations = {
   errorExpirationDateBeforeToday: {
     en: "Expiration date cannot be before today",
     zh: "到期日期不能早于今天"
-  }
+  },
+  activityNotStarted: { en: "Activity has not started", zh: "活动尚未开始" },
+  activityEnded: { en: "Activity has ended", zh: "活动已结束" },
 };
 
 const LanguageContext = createContext<LanguageContextType | undefined>(
