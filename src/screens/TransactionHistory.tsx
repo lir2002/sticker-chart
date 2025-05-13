@@ -34,7 +34,6 @@ const TransactionItem: React.FC<{
   item: Transaction;
   t: (key: string) => string;
 }> = ({ item, t }) => {
-  const theme = useTheme();
   const formatNumber = (num: number): string =>
     num.toLocaleString(undefined, { signDisplay: "always" });
 

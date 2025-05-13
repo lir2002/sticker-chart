@@ -375,6 +375,14 @@ const translations: Translations = {
     en: "Enter Admin Password to Update",
     zh: "输入管理员密码以更新",
   },
+  expirationDate: { en: "Expiration Date", zh: "到期日期" },
+  noExpiration: { en: "No Expiration", zh: "无到期日期" },
+  selectDate: { en: "Select Date", zh: "选择日期" },
+  clear: { en: "Clear", zh: "清除" },
+  errorExpirationDateBeforeToday: {
+    en: "Expiration date cannot be before today",
+    zh: "到期日期不能早于今天"
+  }
 };
 
 const LanguageContext = createContext<LanguageContextType | undefined>(

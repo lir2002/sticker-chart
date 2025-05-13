@@ -2,7 +2,7 @@ import * as SQLite from "expo-sqlite";
 import { Event, EventType, User, Role, DbVersion, Wallet } from "../types";
 
 // Current database version
-const CURRENT_DB_VERSION = 6; // Incremented from 5 to 6
+const CURRENT_DB_VERSION = 7; // Incremented from 5 to 6
 
 // Singleton Database Manager
 export class DatabaseManager {
@@ -132,6 +132,7 @@ export class DatabaseManager {
             iconColor TEXT NOT NULL,
             availability INTEGER NOT NULL DEFAULT 0,
             weight INTEGER NOT NULL DEFAULT 1 CHECK (weight >= 1),
+            expiration_date TEXT, -- Added nullable expiration_date column
             PRIMARY KEY (name, owner),
             FOREIGN KEY (owner) REFERENCES users(id)
           );
@@ -191,8 +192,8 @@ export class DatabaseManager {
 
           if (tableNames.includes("event_types_old")) {
             await db.execAsync(`
-              INSERT INTO event_types (name, owner, icon, iconColor, availability, weight)
-              SELECT name, ${adminId}, icon, iconColor, availability, 1
+              INSERT INTO event_types (name, owner, icon, iconColor, availability, weight, expiration_date)
+              SELECT name, ${adminId}, icon, iconColor, availability, 1, NULL
               FROM event_types_old;
               DROP TABLE IF EXISTS event_types_old;
             `);
@@ -372,6 +373,13 @@ export class DatabaseManager {
         `);
       }
 
+      if (currentVersion === 6) {
+        // Migration to add expiration_date column
+        await db.execAsync(`
+          ALTER TABLE event_types ADD COLUMN expiration_date TEXT;
+        `);
+      }
+
       // Update version number
       const versionExists = await db.getFirstAsync<{ version: number }>(
         "SELECT version FROM db_version;"
@@ -450,7 +458,7 @@ export const createUser = async (
 };
 
 // Get users
-export const getUsers = async (): Promise<User[]>  => {
+export const getUsers = async (): Promise<User[]> => {
   const dbManager = DatabaseManager.getInstance();
   const db = dbManager.getDatabase();
   const users = await db.getAllAsync<{
@@ -631,7 +639,8 @@ export const insertEventType = async (
   iconColor: string,
   availability: number,
   owner?: number,
-  weight: number = 1
+  weight: number = 1,
+  expirationDate?: string // Added optional expiration_date parameter
 ) => {
   if (weight < 1) {
     throw new Error("Weight must be at least 1");
@@ -639,8 +648,8 @@ export const insertEventType = async (
   const dbManager = DatabaseManager.getInstance();
   const db = dbManager.getDatabase();
   await db.runAsync(
-    "INSERT INTO event_types (name, owner, icon, iconColor, availability, weight) VALUES (?, ?, ?, ?, ?, ?);",
-    [name, owner || null, icon, iconColor, availability, weight]
+    "INSERT INTO event_types (name, owner, icon, iconColor, availability, weight, expiration_date) VALUES (?, ?, ?, ?, ?, ?, ?);",
+    [name, owner || null, icon, iconColor, availability, weight, expirationDate || null]
   );
 };
 
@@ -856,7 +865,7 @@ export const getEventTypes = async () => {
   const dbManager = DatabaseManager.getInstance();
   const db = dbManager.getDatabase();
   const types = await db.getAllAsync<EventType>(
-    "SELECT name, owner, icon, iconColor, availability, weight FROM event_types;"
+    "SELECT name, owner, icon, iconColor, availability, weight, expiration_date FROM event_types;"
   );
   return types;
 };
@@ -866,7 +875,7 @@ export const getEventTypesWithOwner = async () => {
   const dbManager = DatabaseManager.getInstance();
   const db = dbManager.getDatabase();
   const types = await db.getAllAsync<EventType>(
-    `SELECT et.name, et.owner, et.icon, et.iconColor, et.availability, et.weight, u.name as ownerName
+    `SELECT et.name, et.owner, et.icon, et.iconColor, et.availability, et.weight, et.expiration_date, u.name as ownerName
      FROM event_types et
      LEFT JOIN users u ON et.owner = u.id;`
   );
@@ -882,7 +891,8 @@ export const updateEventType = async (
   availability?: number,
   newName?: string,
   owner?: number,
-  weight?: number
+  weight?: number,
+  expirationDate?: string, // Added optional expiration_date parameter
 ): Promise<void> => {
   try {
     // Build the SET clause dynamically based on provided parameters
@@ -909,6 +919,10 @@ export const updateEventType = async (
     if (weight !== undefined) {
       setClauses.push("weight = ?");
       values.push(weight);
+    }
+    if (expirationDate !== undefined) {
+      setClauses.push("expiration_date = ?");
+      values.push(expirationDate || null);
     }
 
     // Construct the query
@@ -948,10 +962,11 @@ export const updateUserCode = async (userId: number, newCode: string) => {
   }
   const dbManager = DatabaseManager.getInstance();
   const db = dbManager.getDatabase();
-  await db.runAsync(
-    "UPDATE users SET code = ?, updated_at = ? WHERE id = ?;",
-    [newCode, new Date().toISOString(), userId]
-  );
+  await db.runAsync("UPDATE users SET code = ?, updated_at = ? WHERE id = ?;", [
+    newCode,
+    new Date().toISOString(),
+    userId,
+  ]);
 };
 
 // Verify user code
@@ -972,10 +987,11 @@ export const verifyUserCode = async (
 export const updateUserIcon = async (userId: number, icon: string) => {
   const dbManager = DatabaseManager.getInstance();
   const db = dbManager.getDatabase();
-  await db.runAsync(
-    "UPDATE users SET icon = ?, updated_at = ? WHERE id = ?;",
-    [icon, new Date().toISOString(), userId]
-  );
+  await db.runAsync("UPDATE users SET icon = ?, updated_at = ? WHERE id = ?;", [
+    icon,
+    new Date().toISOString(),
+    userId,
+  ]);
 };
 
 // Reset user code
@@ -985,10 +1001,11 @@ export const resetUserCode = async (userId: number, newCode: string) => {
   }
   const dbManager = DatabaseManager.getInstance();
   const db = dbManager.getDatabase();
-  await db.runAsync(
-    "UPDATE users SET code = ?, updated_at = ? WHERE id = ?;",
-    [newCode, new Date().toISOString(), userId]
-  );
+  await db.runAsync("UPDATE users SET code = ?, updated_at = ? WHERE id = ?;", [
+    newCode,
+    new Date().toISOString(),
+    userId,
+  ]);
 };
 
 // Delete user
@@ -1032,7 +1049,10 @@ export const hasAssociatedAchievements = async (
   }
 };
 // Check if an EventType has associated events
-export const hasEventsForEventType = async (name: string, owner: number): Promise<boolean> => {
+export const hasEventsForEventType = async (
+  name: string,
+  owner: number
+): Promise<boolean> => {
   try {
     const dbManager = DatabaseManager.getInstance();
     const db = dbManager.getDatabase();
@@ -1048,14 +1068,17 @@ export const hasEventsForEventType = async (name: string, owner: number): Promis
 };
 
 // Delete an EventType
-export const deleteEventType = async (name: string, owner: number): Promise<void> => {
+export const deleteEventType = async (
+  name: string,
+  owner: number
+): Promise<void> => {
   try {
     const dbManager = DatabaseManager.getInstance();
     const db = dbManager.getDatabase();
-    await db.runAsync(
-      `DELETE FROM event_types WHERE name = ? AND owner = ?;`,
-      [name, owner]
-    );
+    await db.runAsync(`DELETE FROM event_types WHERE name = ? AND owner = ?;`, [
+      name,
+      owner,
+    ]);
   } catch (error) {
     console.error("Error deleting event type:", error);
     throw error;

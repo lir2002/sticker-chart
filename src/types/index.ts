@@ -25,6 +25,7 @@ export interface EventType {
   availability: number; // Availability status
   owner?: number; // User ID of owner, references users(id)
   weight: number; // Weight of event type, >= 1
+  expiration_date?: string | null; // Added
   ownerName?: string | null;
 }
 

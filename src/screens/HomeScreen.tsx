@@ -8,11 +8,13 @@ import {
   Image,
   Button,
   Dimensions,
+  Platform,
 } from "react-native";
 import { Picker } from "@react-native-picker/picker";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 import * as ImagePicker from "expo-image-picker";
+import DateTimePicker from "@react-native-community/datetimepicker"; // Added for date picker
 import { RootStackParamList, EventType, User, Wallet } from "../types";
 import {
   getEventTypesWithOwner,
@@ -148,6 +150,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   ); // New
   const [isEditingEventType, setIsEditingEventType] = useState(false); // New
   const [isDeletingEventType, setIsDeletingEventType] = useState(false); // New
+  const [expirationDate, setExpirationDate] = useState<Date | null>(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   const modalTitleProps = {
     fontSize: "$4",
@@ -259,7 +263,25 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       Alert.alert("Error", t("errorNoOwnerSelected"));
       return;
     }
+    // Validate expiration date (must not be before today)
+    if (expirationDate) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const selected = new Date(expirationDate);
+      selected.setHours(0, 0, 0, 0);
+      if (selected < today) {
+        Alert.alert("Error", t("errorExpirationDateBeforeToday"));
+        return;
+      }
+    }
     try {
+      // Convert expiration date to ISO string with 23:59:59 local time
+      let expirationDateIso: string | undefined = undefined;
+      if (expirationDate) {
+        const localDate = new Date(expirationDate);
+        localDate.setHours(23, 59, 59, 0);
+        expirationDateIso = localDate.toISOString();
+      }
       if (isEditingEventType && selectedEventType) {
         await updateEventType(
           selectedEventType.name,
@@ -269,7 +291,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           availability,
           newTypeName,
           selectedOwnerId,
-          parseInt(newFaceValue)
+          parseInt(newFaceValue),
+          expirationDateIso, // Pass expiration date
         );
       } else {
         await insertEventType(
@@ -278,7 +301,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           selectedColor,
           availability,
           selectedOwnerId,
-          parseInt(newFaceValue)
+          parseInt(newFaceValue),
+          expirationDateIso, // Pass expiration date
         );
       }
       const updatedTypes = await getEventTypesWithOwner();
@@ -289,6 +313,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       setAvailability(0);
       setSelectedOwnerId(users.filter((u) => u.role_id === 3)[0]?.id || null);
       setNewFaceValue("1");
+      setExpirationDate(null); // Reset expiration date
       setAddTypeModalVisible(false);
       setIsEditingEventType(false);
       Alert.alert(
@@ -308,6 +333,16 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       );
     }
   };
+
+    // Helper to format date for display
+    const formatDate = (date: Date | null): string => {
+      if (!date) return t("noExpiration");
+      return date.toLocaleDateString(language === "en" ? "en-US" : "zh-CN", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      });
+    };
 
   const handleVerifyCode = async () => {
     if (!currentUser) return;
@@ -345,6 +380,11 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         setAvailability(selectedEventType.availability);
         setSelectedOwnerId(selectedEventType.owner);
         setNewFaceValue(selectedEventType.weight.toString());
+        setExpirationDate(
+          selectedEventType.expiration_date
+            ? new Date(selectedEventType.expiration_date)
+            : null
+        );
         setAddTypeModalVisible(true);
         setContextMenuVisible(false);
       } else if (pendingEditUser) {
@@ -522,7 +562,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       setUsers(updatedUsers);
       Alert.alert(t("success"), t("passwordReset"));
     } catch (error) {
-      Alert.alert("Error", t("errorResetPassword"));
+      Alert.alert("Error", `${t("errorResetPassword")}: ${error}`);
     }
   };
 
@@ -543,7 +583,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       setEditUserModalVisible(false);
       setSelectedUser(null);
     } catch (error) {
-      Alert.alert("Error", t("errorDeleteUser"));
+      Alert.alert("Error", `${t("errorDeleteUser")}: ${error}`);
     }
   };
 
@@ -640,7 +680,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               setNeedsInitial(false);
             }
           } catch (error) {
-            Alert.alert("Error", t("errorSetPassword"));
+            Alert.alert("Error", `${t("errorSetPassword")}: ${error}`);
           }
         }}
       />
@@ -740,6 +780,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               users.filter((u) => u.role_id === 3)[0]?.id || null
             );
             setNewFaceValue("1");
+            setExpirationDate(null); // Reset expiration date
             setAddTypeModalVisible(false);
             setIsEditingEventType(false);
           }}
@@ -832,6 +873,38 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               users.filter((u) => u.role_id === 3).length > 0
             }
           />
+          <Text {...iconLabelProps}>{t("expirationDate")}</Text>
+          <XStack ai="center" jc="space-between" w="100%" mb="$2">
+            <Text fontSize="$3" color="$text">
+              {formatDate(expirationDate)}
+            </Text>
+            <XStack>
+              <Button
+                title={t("selectDate")}
+                onPress={() => setShowDatePicker(true)}
+              />
+              {expirationDate && (
+                <Button
+                  title={t("clear")}
+                  onPress={() => setExpirationDate(null)}
+                />
+              )}
+            </XStack>
+          </XStack>
+          {showDatePicker && (
+            <DateTimePicker
+              value={expirationDate || new Date()}
+              mode="date"
+              display={Platform.OS === "ios" ? "inline" : "default"}
+              minimumDate={new Date()} // Prevent selecting dates before today
+              onChange={(event, date) => {
+                setShowDatePicker(Platform.OS === "ios"); // Keep picker open on iOS
+                if (date) {
+                  setExpirationDate(date);
+                }
+              }}
+            />
+          )}
           <XStack jc="space-between" w="100%" mt="$2">
             <Button
               title={t("cancel")}
@@ -1174,7 +1247,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                       setIsEditingContact(false);
                       Alert.alert(t("success"), t("contactUpdated"));
                     } catch (error) {
-                      Alert.alert("Error", t("errorUpdateContact"));
+                      Alert.alert("Error", `${t("errorUpdateContact")}: ${error}`);
                     }
                   }}
                 />

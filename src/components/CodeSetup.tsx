@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Alert } from "react-native";
-import { YStack, Text, styled, useTheme } from "tamagui";
+import { YStack, Text, styled } from "tamagui";
 import { useLanguage } from "../contexts/LanguageContext";
 import { CustomButton, StyledInput } from "./SharedComponents";
 
@@ -26,7 +26,6 @@ const Title = styled(Text, {
 
 const CodeSetup: React.FC<CodeSetupProps> = ({ onCodeSet }) => {
   const { t } = useLanguage();
-  const theme = useTheme();
   const [code, setCode] = useState("");
   const [confirmCode, setConfirmCode] = useState("");
 

@@ -9,7 +9,7 @@ import * as FileSystem from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import { useLanguage } from "../contexts/LanguageContext";
 import { CustomButton } from "./SharedComponents";
-import { YStack, Text, useTheme } from "tamagui";
+import { YStack, Text } from "tamagui";
 
 interface UploadDataProps {
   onClose: () => void;
@@ -17,32 +17,33 @@ interface UploadDataProps {
 
 const UploadData: React.FC<UploadDataProps> = ({ onClose }) => {
   const { t } = useLanguage();
-  const theme = useTheme();
   const [backupFiles, setBackupFiles] = useState<string[]>([]);
   const [selectedBackup, setSelectedBackup] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  const loadBackupFiles = async () => {
-    try {
-      setIsLoading(true);
-      const backupDir = `${FileSystem.documentDirectory}Sticker-Chart/`;
-      const dirInfo = await FileSystem.getInfoAsync(backupDir);
-      if (!dirInfo.exists) {
-        await FileSystem.makeDirectoryAsync(backupDir, { intermediates: true });
-      }
-      const files = await FileSystem.readDirectoryAsync(backupDir);
-      const zipFiles = files.filter((file) => file.endsWith(".zip"));
-      setBackupFiles(zipFiles);
-    } catch (error) {
-      console.error("Error loading backup files:", error);
-      Alert.alert("Error", `${t("errorLoadBackups")}: ${error.message}`);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   useEffect(() => {
+    const loadBackupFiles = async () => {
+      try {
+        setIsLoading(true);
+        const backupDir = `${FileSystem.documentDirectory}Sticker-Chart/`;
+        const dirInfo = await FileSystem.getInfoAsync(backupDir);
+        if (!dirInfo.exists) {
+          await FileSystem.makeDirectoryAsync(backupDir, {
+            intermediates: true,
+          });
+        }
+        const files = await FileSystem.readDirectoryAsync(backupDir);
+        const zipFiles = files.filter((file) => file.endsWith(".zip"));
+        setBackupFiles(zipFiles);
+      } catch (error) {
+        console.error("Error loading backup files:", error);
+        Alert.alert("Error", `${t("errorLoadBackups")}: ${error.message}`);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
     loadBackupFiles();
   }, []);
 

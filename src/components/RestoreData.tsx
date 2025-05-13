@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { FlatList, TouchableOpacity, Alert } from "react-native";
-import { YStack, Text, useTheme } from "tamagui";
+import { YStack, Text } from "tamagui";
 import * as FileSystem from "expo-file-system";
 import JSZip from "jszip";
 import { useLanguage } from "../contexts/LanguageContext";
@@ -14,7 +14,6 @@ interface RestoreDataProps {
 
 const RestoreData: React.FC<RestoreDataProps> = ({ onClose }) => {
   const { t } = useLanguage();
-  const theme = useTheme();
   const [isRestoring, setIsRestoring] = useState(false);
   const [backupFiles, setBackupFiles] = useState<string[]>([]);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);

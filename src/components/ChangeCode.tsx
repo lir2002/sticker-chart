@@ -1,6 +1,6 @@
 import React, { useState, useContext } from "react";
 import { Alert } from "react-native";
-import { YStack, Text, XStack, useTheme } from "tamagui";
+import { YStack, Text, XStack } from "tamagui";
 import { useLanguage } from "../contexts/LanguageContext";
 import { UserContext } from "../contexts/UserContext";
 import { verifyUserCode, updateUserCode } from "../db/database";
@@ -13,7 +13,6 @@ interface ChangeCodeProps {
 
 const ChangeCode: React.FC<ChangeCodeProps> = ({ onCodeChanged, onCancel }) => {
   const { t } = useLanguage();
-  const theme = useTheme();
   const { currentUser } = useContext(UserContext);
   const [oldCode, setOldCode] = useState("");
   const [newCode, setNewCode] = useState("");

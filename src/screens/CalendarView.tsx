@@ -225,11 +225,6 @@ const PhotoModalContainer = styled(YStack, {
   ai: "center",
 });
 
-const FullScreenPhoto = styled(Image, {
-  w: SCREEN_WIDTH,
-  h: SCREEN_HEIGHT,
-});
-
 const CloseButton = styled(Button, {
   position: "absolute",
   top: 40,
@@ -330,7 +325,6 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
     new Date().getMonth() + 1
   );
   const [eventTypeOwnerId, setEventTypeOwnerId] = useState<number | null>(null);
-  const [users, setUsers] = useState<{ id: number; name: string }[]>([]);
   const [pendingEventId, setPendingEventId] = useState<number | null>(null);
   const [confirmVerifyModalVisible, setConfirmVerifyModalVisible] =
     useState(false);
@@ -366,8 +360,6 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
   useEffect(() => {
     const initialize = async () => {
       try {
-        const allUsers = await getUsers();
-        setUsers(allUsers.map((u) => ({ id: u.id, name: u.name })));
         // Updated to pass owner
         const loadedEvents = await fetchEventsWithCreator(eventType, owner);
         setEvents(loadedEvents);
