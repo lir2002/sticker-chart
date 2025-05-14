@@ -1,5 +1,11 @@
 name: Build and Release Expo Android APK
 
+# Specify permissions for the GITHUB_TOKEN
+permissions:
+  contents: write # Required for pushing tags and creating releases
+  actions: read # Required for workflow execution
+  checks: write # Optional, for updating check statuses
+
 on:
   push:
     branches:
