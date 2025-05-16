@@ -192,12 +192,18 @@ const translations: Translations = {
   verifyDelete: { en: "Verify to Delete Achievement", zh: "认证以删除成就" },
   verifyEvent: { en: "Verify Achievement", zh: "认证成就" },
   eventDeleted: { en: "Achievement deleted successfully", zh: "成就删除成功" },
-  eventVerified: { en: "Achievement verified successfully", zh: "成就认证成功" },
+  eventVerified: {
+    en: "Achievement verified successfully",
+    zh: "成就认证成功",
+  },
   errorDeleteEvent: { en: "Failed to delete achievement", zh: "删除成就失败" },
   errorVerifyEvent: { en: "Failed to verify achievement", zh: "认证成就失败" },
   noCurrentUser: { en: "No current user", zh: "无当前用户" },
   verified: { en: "Verified", zh: "已认证" },
-  verifyDeleteEvent: { en: "Verify to Delete Achievement", zh: "认证以删除成就" },
+  verifyDeleteEvent: {
+    en: "Verify to Delete Achievement",
+    zh: "认证以删除成就",
+  },
   unknown: { en: "Unknown", zh: "未知" },
   owner: { en: "Owner", zh: "所有人" },
   owners: { en: "Owners", zh: "所有者" },
@@ -381,10 +387,16 @@ const translations: Translations = {
   clear: { en: "Clear", zh: "清除" },
   errorExpirationDateBeforeToday: {
     en: "Expiration date cannot be before today",
-    zh: "到期日期不能早于今天"
+    zh: "到期日期不能早于今天",
   },
   activityNotStarted: { en: "Activity has not started", zh: "活动尚未开始" },
   activityEnded: { en: "Activity has ended", zh: "活动已结束" },
+  filterAchievements: { en: "Filter achievements", zh: "过滤成就" },
+  noMatchingAchievements: {
+    en: "No matching achievements",
+    zh: "没有匹配的成就",
+  },
+  clearFilter: { en: "Clear filter", zh: "清除过滤" },
 };
 
 const LanguageContext = createContext<LanguageContextType | undefined>(

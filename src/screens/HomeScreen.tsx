@@ -32,9 +32,9 @@ import {
   updateUserCode,
   updateUserContact,
   getWallet,
-  hasEventsForEventType, // New
-  deleteEventType, // New
-  updateEventType, // New
+  hasEventsForEventType,
+  deleteEventType,
+  updateEventType,
 } from "../db/database";
 import CodeSetup from "../components/CodeSetup";
 import ChangeCode from "../components/ChangeCode";
@@ -117,6 +117,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const systemColorScheme = useColorScheme(); // Detect system theme (light/dark)
   const { themeMode, setThemeMode, effectiveTheme } = useThemeContext();
   const [eventTypes, setEventTypes] = useState<EventType[]>([]);
+  const [filterText, setFilterText] = useState("");
   const [newTypeName, setNewTypeName] = useState("");
   const [selectedIcon, setSelectedIcon] = useState<string>("event");
   const [selectedColor, setSelectedColor] = useState<string>("#000000");
@@ -148,14 +149,18 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const [wallet, setWallet] = useState<Wallet | null>(null);
   const [needsInitial, setNeedsInitial] = useState<true | false>(false);
   const [cacheBuster, setCacheBuster] = useState(Date.now());
-  const [contextMenuVisible, setContextMenuVisible] = useState(false); // New
+  const [contextMenuVisible, setContextMenuVisible] = useState(false);
   const [selectedEventType, setSelectedEventType] = useState<EventType | null>(
     null
-  ); // New
-  const [isEditingEventType, setIsEditingEventType] = useState(false); // New
-  const [isDeletingEventType, setIsDeletingEventType] = useState(false); // New
+  );
+  const [isEditingEventType, setIsEditingEventType] = useState(false);
+  const [isDeletingEventType, setIsDeletingEventType] = useState(false);
   const [expirationDate, setExpirationDate] = useState<Date | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
+
+  const filteredEventTypes = eventTypes.filter((eventType) =>
+    eventType.name.toLowerCase().includes(filterText.toLowerCase())
+  );
 
   const modalTitleProps = {
     fontSize: "$4",
@@ -786,11 +791,27 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             )}
           </TouchableOpacity>
         </XStack>
-        <Text fontSize="$5" fontWeight="bold" mt="$4" mb="$2" color="$text">
-          {t("achievements")}
-        </Text>
+        <XStack ai="center" mb="$2" space="$2">
+          <Text
+            fontSize="$5"
+            fontWeight="bold"
+            color="$text"
+            flex={2}
+            textAlign="left"
+          >
+            {t("achievements")}
+          </Text>
+          <StyledInput
+            placeholder={t("filterAchievements")}
+            value={filterText}
+            onChangeText={setFilterText}
+            autoCapitalize="none"
+            flex={4}
+            accessibilityLabel={t("filterAchievements")}
+          />
+        </XStack>
         <FlatList
-          data={eventTypes}
+          data={filteredEventTypes}
           renderItem={renderEventType}
           keyExtractor={(item) => `${item.name}-${item.owner || "null"}`}
           numColumns={numColumns || 4}
