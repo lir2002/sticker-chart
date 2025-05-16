@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "StickerChart",
-    "slug": "StickerChart",
+    "name": "Sticker Chart",
+    "slug": "sticker-chart",
     "version": "1.8.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",

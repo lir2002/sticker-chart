@@ -994,7 +994,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
             {photoUri && (
               <PhotoPreview source={{ uri: resolvePhotoUri(photoUri)! }} />
             )}
-            <XStack jc="space-between" w="50%" gap="$3">
+            <XStack jc="space-between" w="60%" gap="$3">
               <CustomButton
                 title={t("cancel")}
                 onPress={() => {
@@ -1061,7 +1061,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
               secureTextEntry
               autoFocus
             />
-            <XStack jc="space-between" w="50%" gap="$3">
+            <XStack jc="space-between" w="60%" gap="$3">
               <CustomButton
                 title={t("cancel")}
                 onPress={() => {
@@ -1159,7 +1159,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
             <ModalText>
               {t("verifyConfirmation", { faceValue: weight })}
             </ModalText>
-            <XStack jc="space-between" w="50%" gap="$3">
+            <XStack jc="space-between" w="60%" gap="$3">
               <CustomButton
                 title={t("cancel")}
                 onPress={() => {

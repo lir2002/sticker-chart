@@ -112,7 +112,24 @@ jobs:
           RELEASE_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           RELEASE_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
 
-      # Step 13: Upload Artifacts
+      # Step 13: Extract app name and version from app.json
+      - name: Extract app name and version
+        id: app-info
+        run: |
+          # Extract name and version from app.json
+          APP_NAME=$(node -p "require('./app.json').expo.name" | sed 's/[^a-zA-Z0-9]/-/g')
+          VERSION=$(node -p "require('./app.json').expo.version")
+          echo "APP_NAME=$APP_NAME" >> $GITHUB_OUTPUT
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+
+      # Step 14: Rename build outputs
+      - name: Rename build outputs
+        run: |
+          # Rename APK and AAB files
+          mv android/app/build/outputs/apk/release/app-release.apk android/app/build/outputs/apk/release/${{ steps.app-info.outputs.APP_NAME }}-${{ steps.app-info.outputs.VERSION }}.apk
+          mv android/app/build/outputs/bundle/release/app-release.aab android/app/build/outputs/bundle/release/${{ steps.app-info.outputs.APP_NAME }}-${{ steps.app-info.outputs.VERSION }}.aab
+
+      # Step 15: Upload Artifacts
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -121,7 +138,7 @@ jobs:
             android/app/build/outputs/apk/**/*.apk
             android/app/build/outputs/bundle/**/*.aab
 
-      # Step 14: Check app.json version
+      # Step 16: Check app.json version
       - name: Check app.json version
         id: check-version
         run: |
@@ -151,7 +168,7 @@ jobs:
             echo "SKIP_RELEASE=false" >> $GITHUB_OUTPUT
           fi
 
-      # Step 15: Create Git tag
+      # Step 17: Create Git tag
       - name: Create Git tag
         if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.check-version.outputs.SKIP_RELEASE == 'false'
         run: |
@@ -160,8 +177,10 @@ jobs:
           git config user.email "actions@github.com"
           git tag $TAG
           git push origin $TAG
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # Step 16: Create GitHub Release
+      # Step 18: Create GitHub Release
       - name: Create GitHub Release
         if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.check-version.outputs.SKIP_RELEASE == 'false'
         id: create-release
@@ -178,7 +197,7 @@ jobs:
           draft: false
           prerelease: false
 
-      # Step 17: Upload Release APK
+      # Step 19: Upload Release APK
       - name: Upload Release APK
         if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.check-version.outputs.SKIP_RELEASE == 'false'
         uses: actions/upload-release-asset@v1
@@ -186,11 +205,11 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create-release.outputs.upload_url }}
-          asset_path: android/app/build/outputs/apk/release/app-release.apk
-          asset_name: app-release.apk
+          asset_path: android/app/build/outputs/apk/release/${{ steps.app-info.outputs.APP_NAME }}-${{ steps.app-info.outputs.VERSION }}.apk
+          asset_name: ${{ steps.app-info.outputs.APP_NAME }}-${{ steps.app-info.outputs.VERSION }}.apk
           asset_content_type: application/vnd.android.package-archive
 
-      # Step 18: Upload Release AAB
+      # Step 20: Upload Release AAB
       - name: Upload Release AAB
         if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.check-version.outputs.SKIP_RELEASE == 'false'
         uses: actions/upload-release-asset@v1
@@ -198,6 +217,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create-release.outputs.upload_url }}
-          asset_path: android/app/build/outputs/bundle/release/app-release.aab
-          asset_name: app-release.aab
+          asset_path: android/app/build/outputs/bundle/release/${{ steps.app-info.outputs.APP_NAME }}-${{ steps.app-info.outputs.VERSION }}.aab
+          asset_name: ${{ steps.app-info.outputs.APP_NAME }}-${{ steps.app-info.outputs.VERSION }}.aab
           asset_content_type: application/x-android-app-bundle

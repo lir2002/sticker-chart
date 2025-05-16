@@ -7,7 +7,8 @@ import {
 } from "@react-navigation/native";
 import { createStackNavigator } from "@react-navigation/stack";
 import { TamaguiProvider, View, useTheme } from "tamagui";
-import { Appearance } from "react-native";
+import { Appearance, useColorScheme } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import HomeScreen from "./screens/HomeScreen";
 import CalendarView from "./screens/CalendarView";
 import CalendarViewAll from "./screens/CalendarViewAll";
@@ -17,6 +18,7 @@ import { LanguageProvider, useLanguage } from "./contexts/LanguageContext";
 import { UserProvider } from "./contexts/UserContext";
 import { initDatabase } from "./db/database";
 import tamaguiConfig from "./config/tamagui.config";
+import { ThemeContext } from "./contexts/ThemeContext";
 
 const Stack = createStackNavigator<RootStackParamList>();
 
@@ -25,7 +27,6 @@ const AppContent: React.FC = () => {
   const tamaguiTheme = useTheme();
   const isDarkMode = Appearance.getColorScheme() === "dark";
 
-  // Navigation theme based on system appearance and Tamagui tokens
   const navigationTheme = {
     ...(isDarkMode ? DarkTheme : DefaultTheme),
     colors: {
@@ -93,9 +94,47 @@ const AppContent: React.FC = () => {
 
 export default function App() {
   const [isDbInitialized, setIsDbInitialized] = useState(false);
-  const [theme, setTheme] = useState<"light" | "dark">(
-    Appearance.getColorScheme() ?? "light"
-  );
+  const systemColorScheme = useColorScheme();
+  const [themeMode, setThemeMode] = useState<"light" | "dark" | "auto">("auto");
+
+  // Compute effective theme based on themeMode and system color scheme
+  const effectiveTheme =
+    themeMode === "auto" ? systemColorScheme ?? "light" : themeMode;
+
+  // Load saved theme mode
+  useEffect(() => {
+    const loadTheme = async () => {
+      try {
+        const savedMode = await AsyncStorage.getItem("themeMode");
+        if (savedMode) {
+          setThemeMode(savedMode as "light" | "dark" | "auto");
+        }
+      } catch (error) {
+        console.error("Failed to load theme mode:", error);
+      }
+    };
+    loadTheme();
+  }, []);
+
+  // Save theme mode and update on system theme change
+  useEffect(() => {
+    const saveTheme = async () => {
+      try {
+        await AsyncStorage.setItem("themeMode", themeMode);
+      } catch (error) {
+        console.error("Failed to save theme mode:", error);
+      }
+    };
+    saveTheme();
+
+    const subscription = Appearance.addChangeListener(({ colorScheme }) => {
+      console.log("Appearance changed to:", colorScheme);
+      if (themeMode === "auto") {
+        // Trigger re-render by relying on useColorScheme
+      }
+    });
+    return () => subscription.remove();
+  }, [themeMode]);
 
   useEffect(() => {
     const initializeApp = async () => {
@@ -109,23 +148,19 @@ export default function App() {
     initializeApp();
   }, []);
 
-  useEffect(() => {
-    const subscription = Appearance.addChangeListener(({ colorScheme }) => {
-      console.log("Appearance changed to:", colorScheme);
-      setTheme(colorScheme === "dark" ? "dark" : "light");
-    });
-    return () => subscription.remove();
-  }, []);
-
   if (!isDbInitialized) {
     return null;
   }
 
   return (
-    <TamaguiProvider config={tamaguiConfig} defaultTheme={theme}>
+    <TamaguiProvider config={tamaguiConfig} defaultTheme={effectiveTheme}>
       <LanguageProvider>
         <UserProvider>
-          <AppContent />
+          <ThemeContext.Provider
+            value={{ themeMode, setThemeMode, effectiveTheme }}
+          >
+            <AppContent />
+          </ThemeContext.Provider>
         </UserProvider>
       </LanguageProvider>
     </TamaguiProvider>

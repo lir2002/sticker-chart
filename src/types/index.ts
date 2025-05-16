@@ -79,3 +79,9 @@ export interface Transaction {
 export interface DbVersion {
   version: number;
 }
+
+export interface ThemeContextType {
+  themeMode: "light" | "dark" | "auto";
+  setThemeMode: (mode: "light" | "dark" | "auto") => void;
+  effectiveTheme: "light" | "dark";
+}

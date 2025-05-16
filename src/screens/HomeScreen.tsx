@@ -9,6 +9,7 @@ import {
   Button,
   Dimensions,
   Platform,
+  useColorScheme,
 } from "react-native";
 import { Picker } from "@react-native-picker/picker";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -46,6 +47,7 @@ import BackupData from "../components/BackupData";
 import RestoreData from "../components/RestoreData";
 import { YStack, XStack, Text, useTheme } from "tamagui";
 import { processUserIcon, resolvePhotoUri } from "../utils/fileUtils";
+import { useThemeContext } from "../contexts/ThemeContext";
 
 type HomeScreenNavigationProp = NativeStackNavigationProp<
   RootStackParamList,
@@ -112,6 +114,8 @@ const PickerField: React.FC<{
 const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const theme = useTheme();
   const { language, setLanguage, t } = useLanguage();
+  const systemColorScheme = useColorScheme(); // Detect system theme (light/dark)
+  const { themeMode, setThemeMode, effectiveTheme } = useThemeContext();
   const [eventTypes, setEventTypes] = useState<EventType[]>([]);
   const [newTypeName, setNewTypeName] = useState("");
   const [selectedIcon, setSelectedIcon] = useState<string>("event");
@@ -238,6 +242,21 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     fetchWallet();
   }, [currentUser, userProfileModalVisible]);
 
+  // Handle click to toggle between light and dark
+  const handleThemeToggle = () => {
+    const newMode =
+      themeMode === "light" ||
+      (themeMode === "auto" && systemColorScheme === "light")
+        ? "dark"
+        : "light";
+    setThemeMode(newMode);
+  };
+
+  // Handle long press to set auto mode
+  const handleThemeAuto = () => {
+    setThemeMode("auto");
+  };
+
   const handleAddEventType = async () => {
     if (!currentUser || currentUser.role_id !== 1) {
       Alert.alert("Error", t("adminOnly"));
@@ -292,7 +311,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           newTypeName,
           selectedOwnerId,
           parseInt(newFaceValue),
-          expirationDateIso, // Pass expiration date
+          expirationDateIso // Pass expiration date
         );
       } else {
         await insertEventType(
@@ -302,7 +321,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           availability,
           selectedOwnerId,
           parseInt(newFaceValue),
-          expirationDateIso, // Pass expiration date
+          expirationDateIso // Pass expiration date
         );
       }
       const updatedTypes = await getEventTypesWithOwner();
@@ -334,15 +353,15 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     }
   };
 
-    // Helper to format date for display
-    const formatDate = (date: Date | null): string => {
-      if (!date) return t("noExpiration");
-      return date.toLocaleDateString(language === "en" ? "en-US" : "zh-CN", {
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-      });
-    };
+  // Helper to format date for display
+  const formatDate = (date: Date | null): string => {
+    if (!date) return t("noExpiration");
+    return date.toLocaleDateString(language === "en" ? "en-US" : "zh-CN", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
+  };
 
   const handleVerifyCode = async () => {
     if (!currentUser) return;
@@ -697,9 +716,63 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     return (
       <YStack f={1} p="$4" bg="$background">
         <XStack jc="space-between" ai="center" mb="$4">
-          <Text fontSize="$5" fontWeight="bold" color="$text">
-            {t("title")}
-          </Text>
+          <TouchableOpacity
+            onPress={() => setLanguage(language === "en" ? "zh" : "en")}
+            style={{
+              backgroundColor: theme.primary.val,
+              borderRadius: 12,
+              paddingVertical: 4,
+              width: 40,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Text
+              fontSize="$4"
+              fontWeight="bold"
+              color={theme.text.val}
+              textAlign="center"
+            >
+              {language === "zh" ? "En" : "中文"}
+            </Text>
+          </TouchableOpacity>
+
+          {/* Day/Night Toggle Icon */}
+          <TouchableOpacity
+            onPress={handleThemeToggle}
+            onLongPress={handleThemeAuto}
+            delayLongPress={1000} // 1 second long press
+            style={{
+              width: 30,
+              height: 30,
+              borderRadius: 15,
+              backgroundColor: theme.background.val,
+              alignItems: "center",
+              justifyContent: "center",
+              borderWidth: 1,
+              borderColor: theme.border.val,
+            }}
+            accessibilityLabel={
+              themeMode === "auto"
+                ? "Toggle theme, currently auto"
+                : `Switch to ${themeMode === "light" ? "dark" : "light"} mode`
+            }
+            accessibilityRole="button"
+            accessibilityHint="Long press to enable auto theme based on system settings"
+          >
+            <MaterialIcons
+              name={
+                themeMode === "auto"
+                  ? "brightness-auto"
+                  : themeMode === "light"
+                  ? "wb-sunny"
+                  : "nightlight"
+              }
+              size={20}
+              color={theme.icon.val}
+            />
+          </TouchableOpacity>
+
           <TouchableOpacity onPress={() => setUserProfileModalVisible(true)}>
             {currentUser.icon ? (
               <Image
@@ -751,10 +824,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             />
           </>
         )}
-        <CustomButton
-          title={language === "en" ? "切换到中文" : "Switch to English"}
-          onPress={() => setLanguage(language === "en" ? "zh" : "en")}
-        />
 
         {/* Context Menu Modal */}
         <ModalContainer
@@ -789,14 +858,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           <Text {...modalTitleProps}>
             {isEditingEventType ? t("updateEventType") : t("addNewEventType")}
           </Text>
-          <StyledInput
-            editable={!isEditingEventType}
-            placeholder={t("namePlaceholder")}
-            value={newTypeName}
-            onChangeText={setNewTypeName}
-            maxLength={20}
-            autoFocus={!isEditingEventType}
-          />
           <Text {...iconLabelProps}>{t("selectIcon")}</Text>
           <FlatList
             data={availableIcons}
@@ -839,6 +900,14 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               </YStack>
             ))}
           </ScrollView>
+          <StyledInput
+            editable={!isEditingEventType}
+            placeholder={t("namePlaceholder")}
+            value={newTypeName}
+            onChangeText={setNewTypeName}
+            maxLength={20}
+            autoFocus={!isEditingEventType}
+          />
           <Text {...iconLabelProps}>{t("selectAvailability")}</Text>
           <PickerField
             selectedValue={availability}
@@ -1248,7 +1317,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                       setIsEditingContact(false);
                       Alert.alert(t("success"), t("contactUpdated"));
                     } catch (error) {
-                      Alert.alert("Error", `${t("errorUpdateContact")}: ${error}`);
+                      Alert.alert(
+                        "Error",
+                        `${t("errorUpdateContact")}: ${error}`
+                      );
                     }
                   }}
                 />
