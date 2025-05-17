@@ -45,7 +45,7 @@ import { UserContext } from "../contexts/UserContext";
 import { CustomButton, StyledInput } from "../components/SharedComponents";
 import BackupData from "../components/BackupData";
 import RestoreData from "../components/RestoreData";
-import { YStack, XStack, Text, useTheme } from "tamagui";
+import { YStack, XStack, Text, useTheme, Separator } from "tamagui";
 import { processUserIcon, resolvePhotoUri } from "../utils/fileUtils";
 import { useThemeContext } from "../contexts/ThemeContext";
 
@@ -118,6 +118,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const { themeMode, setThemeMode, effectiveTheme } = useThemeContext();
   const [eventTypes, setEventTypes] = useState<EventType[]>([]);
   const [filterText, setFilterText] = useState("");
+  const [selectedUsers, setSelectedUsers] = useState<User[]>([]);
+  const [isUserModalVisible, setIsUserModalVisible] = useState(false);
   const [newTypeName, setNewTypeName] = useState("");
   const [selectedIcon, setSelectedIcon] = useState<string>("event");
   const [selectedColor, setSelectedColor] = useState<string>("#000000");
@@ -133,6 +135,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const [changeCodeModalVisible, setChangeCodeModalVisible] = useState(false);
   const [isEditingUsers, setIsEditingUsers] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
+  const [plaintUsers, setPlaintUsers] = useState<User[]>([]);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [pendingEditUser, setPendingEditUser] = useState<User | null>(null);
   const [newUserName, setNewUserName] = useState("");
@@ -158,9 +161,35 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const [expirationDate, setExpirationDate] = useState<Date | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
 
-  const filteredEventTypes = eventTypes.filter((eventType) =>
-    eventType.name.toLowerCase().includes(filterText.toLowerCase())
-  );
+  // Filter event types by text and selected users
+  const filteredEventTypes = eventTypes.filter((eventType) => {
+    const matchesText = eventType.name
+      .toLowerCase()
+      .includes(filterText.toLowerCase());
+    const matchesUser =
+      selectedUsers.length === 0 ||
+      selectedUsers.some((user) => user.id === eventType.owner);
+    return matchesText && matchesUser;
+  });
+
+  // Toggle user selection
+  const toggleUserSelection = (user: User) => {
+    setSelectedUsers((prev) =>
+      prev.some((u) => u.id === user.id)
+        ? prev.filter((u) => u.id !== user.id)
+        : [...prev, user]
+    );
+  };
+
+  // Clear selected users
+  const clearSelectedUsers = () => {
+    setSelectedUsers([]);
+  };
+
+  // Remove a single user
+  const removeUser = (userId: number) => {
+    setSelectedUsers((prev) => prev.filter((u) => u.id !== userId));
+  };
 
   const modalTitleProps = {
     fontSize: "$4",
@@ -193,6 +222,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         setEventTypes(types);
         const allUsers = await getUsers();
         setUsers(allUsers);
+        setPlaintUsers(allUsers.filter((u) => u.role_id === 3));
       } catch (error) {
         console.error("Initialization error:", error);
         Alert.alert("Error", t("errorInitialize"));
@@ -501,6 +531,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           u.id === user.id ? updatedUser : u
         );
         setUsers(updatedUsers);
+        setPlaintUsers(updatedUsers.filter((u) => u.role_id === 3));
 
         setCacheBuster(Date.now());
       } catch (error: any) {
@@ -556,6 +587,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       );
       if (newUser) {
         setUsers([...users, newUser]);
+        setPlaintUsers([...users, newUser].filter((u) => u.role_id === 3));
         setNewUserName("");
         setNewUserRoleId(3);
         setNewUserPassword("0000");
@@ -600,6 +632,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     try {
       await deleteUser(selectedUser.id);
       setUsers(users.filter((u) => u.id !== selectedUser.id));
+      setPlaintUsers(
+        users.filter((u) => u.role_id === 3 && u.id !== selectedUser.id)
+      );
       if (currentUser?.id === selectedUser.id) {
         const guestUser = await getUserByName("Guest");
         if (guestUser) setCurrentUser(guestUser);
@@ -624,7 +659,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       }
       onLongPress={() => handleLongPressEventType(item)}
       delayLongPress={2000} // 2 seconds
-      style={{ margin: 5 }}
+      style={{ marginHorizontal: marginHo, marginBottom: 10 }}
     >
       <YStack
         bg="$lightGray"
@@ -713,13 +748,15 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   }
 
   const screenWidth = Dimensions.get("window").width;
-  const numColumns = Math.floor(screenWidth / 80);
+  const numColumns = Math.floor((screenWidth - 32) / 80);
+  const paddingHo = 16;
+  const marginHo = ((screenWidth - paddingHo * 2) / numColumns - 73) / 2;
   const iconItemWidth = 80; // Approximate width per icon (including padding)
   const nCols = Math.floor((screenWidth * 0.8) / iconItemWidth);
 
   if (currentUser)
     return (
-      <YStack f={1} p="$4" bg="$background">
+      <YStack f={1} p={paddingHo} bg="$background">
         <XStack jc="space-between" ai="center" mb="$4">
           <TouchableOpacity
             onPress={() => setLanguage(language === "en" ? "zh" : "en")}
@@ -735,7 +772,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             <Text
               fontSize="$4"
               fontWeight="bold"
-              color={theme.text.val}
+              color="$background"
               textAlign="center"
             >
               {language === "zh" ? "En" : "中文"}
@@ -791,25 +828,70 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             )}
           </TouchableOpacity>
         </XStack>
-        <XStack ai="center" mb="$2" space="$2">
+        <XStack ai="center" mb="$1" gap="$2">
           <Text
-            fontSize="$5"
+            fontSize={language === "zh" ? "$5" : 20}
             fontWeight="bold"
             color="$text"
-            flex={2}
+            flex={5}
             textAlign="left"
           >
             {t("achievements")}
           </Text>
           <StyledInput
             placeholder={t("filterAchievements")}
+            borderRadius={25}
+            height={40}
             value={filterText}
             onChangeText={setFilterText}
             autoCapitalize="none"
-            flex={4}
+            flex={5}
             accessibilityLabel={t("filterAchievements")}
           />
+          <TouchableOpacity
+            onPress={() => setIsUserModalVisible(true)}
+            style={{
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+            accessibilityLabel={t("selectUsers")}
+            accessibilityRole="button"
+          >
+            <MaterialIcons
+              name="arrow-drop-down"
+              size={24}
+              color={theme.icon.val}
+            />
+          </TouchableOpacity>
         </XStack>
+
+        {/* Selected users display */}
+        {selectedUsers.length > 0 && (
+          <XStack gap="$2" mb="$2" flexWrap="wrap">
+            {selectedUsers.map((user) => (
+              <XStack
+                key={user.id}
+                ai="center"
+                bg={theme.primary.val}
+                borderRadius="$2"
+                px="$2"
+                py="$1"
+                gap="$1"
+              >
+                <Text fontSize="$3" color="$background">
+                  {user.name}
+                </Text>
+                <TouchableOpacity
+                  onPress={() => removeUser(user.id)}
+                  accessibilityLabel={t("removeUser", { name: user.name })}
+                >
+                  <MaterialIcons name="close" size={16} color="$white" />
+                </TouchableOpacity>
+              </XStack>
+            ))}
+          </XStack>
+        )}
+
         <FlatList
           data={filteredEventTypes}
           renderItem={renderEventType}
@@ -846,6 +928,103 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           </>
         )}
 
+        {/* User selection modal */}
+        <Modal
+          visible={isUserModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setIsUserModalVisible(false)}
+        >
+          <YStack
+            f={1}
+            bg="rgba(0, 0, 0, 0.5)"
+            jc="center"
+            ai="flex-end"
+            paddingRight="$4"
+          >
+            <YStack
+              bg="$background"
+              borderRadius="$4"
+              p="$4"
+              width={200}
+              maxHeight="80%"
+              elevation={4}
+            >
+              {plaintUsers.length === 0 ? (
+                <Text fontSize="$4" color="$text" mb="$4">
+                  {t("noUsers")}
+                </Text>
+              ) : (
+                <>
+                  <Text
+                    fontSize="$5"
+                    fontWeight="bold"
+                    color="$text"
+                    textAlign="center"
+                    mb="$4"
+                  >
+                    {t("filterUsers")}
+                  </Text>
+                  <ScrollView showsVerticalScrollIndicator={true}>
+                    <YStack>
+                      {plaintUsers.map((user, index) => (
+                        <YStack key={user.id}>
+                          <TouchableOpacity
+                            onPress={() => toggleUserSelection(user)}
+                            style={{
+                              flexDirection: "row",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              paddingVertical: 8,
+                            }}
+                            accessibilityLabel={t("selectUser", {
+                              name: user.name,
+                            })}
+                            accessibilityRole="button"
+                          >
+                            <Text fontSize="$4" color="$text" flex={1}>
+                              {user.name}
+                            </Text>
+                            {selectedUsers.some((u) => u.id === user.id) && (
+                              <MaterialIcons
+                                name="check"
+                                size={20}
+                                color={theme.primary.val}
+                              />
+                            )}
+                          </TouchableOpacity>
+                          {index < plaintUsers.length - 1 && (
+                            <Separator
+                              borderColor={theme.border.val}
+                              marginVertical="$2"
+                            />
+                          )}
+                        </YStack>
+                      ))}
+                    </YStack>
+                  </ScrollView>
+                  <XStack gap="$2" mt="$4" jc="flex-end">
+                    <Button
+                      onPress={() => {
+                        clearSelectedUsers();
+                        setIsUserModalVisible(false);
+                      }}
+                      color="$white"
+                      accessibilityLabel={t("clearUsers")}
+                      title={t("clear")}
+                    />
+                    <Button
+                      onPress={() => setIsUserModalVisible(false)}
+                      color="$white"
+                      accessibilityLabel={t("close")}
+                      title={t("close")}
+                    />
+                  </XStack>
+                </>
+              )}
+            </YStack>
+          </YStack>
+        </Modal>
         {/* Context Menu Modal */}
         <ModalContainer
           visible={contextMenuVisible}
@@ -908,7 +1087,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                 key={color}
                 w={30}
                 h={30}
-                br="$10"
+                br={50}
                 m="$1"
                 bg={color}
                 borderWidth={selectedColor === color ? 2 : 0}
@@ -1334,6 +1513,13 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                         users.map((u) =>
                           u.id === currentUser.id ? updatedUser : u
                         )
+                      );
+                      setPlaintUsers(
+                        users
+                          .filter((u) => u.role_id === 3)
+                          .map((u) =>
+                            u.id === currentUser.id ? updatedUser : u
+                          )
                       );
                       setIsEditingContact(false);
                       Alert.alert(t("success"), t("contactUpdated"));

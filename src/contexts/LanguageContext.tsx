@@ -397,6 +397,10 @@ const translations: Translations = {
     zh: "没有匹配的成就",
   },
   clearFilter: { en: "Clear filter", zh: "清除过滤" },
+  selectUsers: { en: "Select users", zh: "选择用户" },
+  noUsers: { en: "No users available", zh: "没有可用用户" },
+  close: { en: "Close", zh: "关闭" },
+  filterUsers: { en: "Filter Users", zh: "过滤用户" },
 };
 
 const LanguageContext = createContext<LanguageContextType | undefined>(

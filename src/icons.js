@@ -28,6 +28,7 @@ export const availableIcons = [
   "work",
   "card-giftcard",
   "military-tech",
+  "coffee",
 ];
 
 export const availableColors = [
