@@ -28,6 +28,7 @@ export interface EventType {
   expiration_date?: string | null;
   created_at?: string | null;
   ownerName?: string | null;
+  eventCount?: number;
 }
 
 // User interface for users table

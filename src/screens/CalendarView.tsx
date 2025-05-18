@@ -1,5 +1,5 @@
-import React, { useEffect, useState, useContext } from "react";
-import { Alert, Dimensions, Modal as RNModal, Appearance } from "react-native";
+import React, { useEffect, useState, useContext, useMemo } from "react";
+import { Alert, Dimensions, Modal as RNModal, Appearance, FlatList, TouchableOpacity } from "react-native";
 import { Calendar } from "react-native-calendars";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 import * as ImagePicker from "expo-image-picker";
@@ -35,7 +35,7 @@ import {
   deleteEvent,
   verifyEventWithTransaction,
 } from "../db/database";
-import { availableColors, availableIcons } from "../icons";
+import { availableColors } from "../icons";
 import { resolvePhotoUri } from "../utils/fileUtils";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
@@ -308,6 +308,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
   const [inputCode, setInputCode] = useState("");
   const [pendingDate, setPendingDate] = useState<string | null>(null);
   const [note, setNote] = useState("");
+  const [filterIcon, setFilterIcon] = useState("");
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [photoModalVisible, setPhotoModalVisible] = useState(false);
@@ -339,6 +340,14 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
   const translateY = useSharedValue(0);
   const savedTranslateX = useSharedValue(0);
   const savedTranslateY = useSharedValue(0);
+
+  const allIcons = Object.keys(MaterialIcons.getRawGlyphMap());
+  const filteredIcons = useMemo(() => {
+    if (!filterIcon) return allIcons;
+    return allIcons.filter((icon) =>
+      icon.toLowerCase().includes(filterIcon.toLowerCase())
+    );
+  }, [filterIcon, allIcons]);
 
   // Listen for system theme changes
   useEffect(() => {
@@ -384,7 +393,10 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
         // Update markedDates with events and selected date
         const marked: { [key: string]: any } = {};
         loadedEvents.forEach((event) => {
-          marked[event.date] = { marked: true, dotColor: type?.iconColor || "#000000" };
+          marked[event.date] = {
+            marked: true,
+            dotColor: type?.iconColor || "#000000",
+          };
         });
         if (selectedDate) {
           marked[selectedDate] = {
@@ -1115,13 +1127,45 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
         <ModalContainer>
           <ModalContent>
             <ModalTitle>{t("editIconColor")}</ModalTitle>
-            <IconLabel>{t("selectIcon")}</IconLabel>
-            <ScrollView
-              horizontal
-              contentContainerStyle={{ flexGrow: 0, mb: "$2" }}
-            >
-              {availableIcons.map(renderIconOption)}
-            </ScrollView>
+            <XStack>
+              <IconLabel flex={2}>{t("selectIcon")}</IconLabel>
+              <StyledInput
+                my={2}
+                fontSize={"$3"}
+                flex={4}
+                placeholder={t("filterIcons")}
+                borderRadius={15}
+                height={35}
+                value={filterIcon}
+                onChangeText={setFilterIcon}
+                autoCapitalize="none"
+                accessibilityLabel={t("filterIcons")}
+              />
+            </XStack>
+            <FlatList
+              data={filteredIcons}
+              renderItem={({ item: icon }) => (
+                <YStack
+                  key={icon}
+                  p="$2"
+                  bg={newIcon === icon ? "$lightGray" : undefined}
+                  br="$1"
+                  alignItems="center"
+                >
+                  <TouchableOpacity onPress={() => setNewIcon(icon)}>
+                    <MaterialIcons
+                      name={icon}
+                      size={40}
+                      color={newIconColor}
+                    />
+                  </TouchableOpacity>
+                </YStack>
+              )}
+              keyExtractor={(icon) => icon}
+              numColumns={4}
+              contentContainerStyle={{ paddingBottom: 10 }}
+              style={{ maxHeight: 180 }}
+            />
             <IconLabel>{t("selectColor")}</IconLabel>
             <ScrollView
               horizontal

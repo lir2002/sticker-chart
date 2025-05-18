@@ -899,9 +899,12 @@ export const getEventTypesWithOwner = async () => {
   const dbManager = DatabaseManager.getInstance();
   const db = dbManager.getDatabase();
   const types = await db.getAllAsync<EventType>(
-    `SELECT et.name, et.owner, et.icon, et.iconColor, et.availability, et.weight, et.expiration_date, et.created_at, u.name as ownerName
+    `SELECT et.name, et.owner, et.icon, et.iconColor, et.availability, et.weight, et.expiration_date, et.created_at, u.name as ownerName, COUNT(e.id) as eventCount
      FROM event_types et
-     LEFT JOIN users u ON et.owner = u.id;`
+     LEFT JOIN users u ON et.owner = u.id
+     LEFT JOIN events e ON et.name = e.eventType AND et.owner = e.owner
+     GROUP BY et.name, et.owner
+     ORDER BY et.created_at;`
   );
   return types;
 };

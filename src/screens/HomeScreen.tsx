@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect, useContext, useMemo } from "react";
 import {
   Alert,
   FlatList,
@@ -32,7 +32,6 @@ import {
   updateUserCode,
   updateUserContact,
   getWallet,
-  hasEventsForEventType,
   deleteEventType,
   updateEventType,
 } from "../db/database";
@@ -40,7 +39,7 @@ import CodeSetup from "../components/CodeSetup";
 import ChangeCode from "../components/ChangeCode";
 import { useLanguage } from "../contexts/LanguageContext";
 import LocaleConfig from "../config/calendarConfig";
-import { availableColors, availableIcons } from "../icons";
+import { availableColors } from "../icons";
 import { UserContext } from "../contexts/UserContext";
 import { CustomButton, StyledInput } from "../components/SharedComponents";
 import BackupData from "../components/BackupData";
@@ -98,11 +97,12 @@ const PickerField: React.FC<{
   onValueChange: (value: any) => void;
   items: { label: string; value: any }[];
   enabled?: boolean;
-}> = ({ selectedValue, onValueChange, items, enabled }) => (
+  width?: any;
+}> = ({ selectedValue, onValueChange, items, enabled, width }) => (
   <Picker
     selectedValue={selectedValue}
     onValueChange={onValueChange}
-    style={{ width: "100%", marginBottom: 10 }}
+    style={{ width: width ?? "100%", marginBottom: 1 }}
     enabled={enabled}
   >
     {items.map((item) => (
@@ -118,6 +118,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const { themeMode, setThemeMode, effectiveTheme } = useThemeContext();
   const [eventTypes, setEventTypes] = useState<EventType[]>([]);
   const [filterText, setFilterText] = useState("");
+  const [filterIcon, setFilterIcon] = useState("");
   const [selectedUsers, setSelectedUsers] = useState<User[]>([]);
   const [isUserModalVisible, setIsUserModalVisible] = useState(false);
   const [newTypeName, setNewTypeName] = useState("");
@@ -160,6 +161,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const [isDeletingEventType, setIsDeletingEventType] = useState(false);
   const [expirationDate, setExpirationDate] = useState<Date | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [activeTab, setActiveTab] = useState<"basic" | "appearance">("basic");
 
   // Filter event types by text and selected users
   const filteredEventTypes = eventTypes.filter((eventType) => {
@@ -172,6 +174,13 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     return matchesText && matchesUser;
   });
 
+  const allIcons = Object.keys(MaterialIcons.getRawGlyphMap());
+  const filteredIcons = useMemo(() => {
+    if (!filterIcon) return allIcons;
+    return allIcons.filter((icon) =>
+      icon.toLowerCase().includes(filterIcon.toLowerCase())
+    );
+  }, [filterIcon, allIcons]);
   // Toggle user selection
   const toggleUserSelection = (user: User) => {
     setSelectedUsers((prev) =>
@@ -370,6 +379,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       setExpirationDate(null); // Reset expiration date
       setAddTypeModalVisible(false);
       setIsEditingEventType(false);
+      setActiveTab("basic");
+      setFilterIcon("");
       Alert.alert(
         t("success"),
         isEditingEventType
@@ -464,10 +475,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const handleDeleteEventType = async () => {
     if (!selectedEventType) return;
     try {
-      const hasEvents = await hasEventsForEventType(
-        selectedEventType.name,
-        selectedEventType.owner
-      );
+      const hasEvents = (selectedEventType.eventCount ?? 0) > 0;
       if (hasEvents) {
         Alert.alert("Warning", t("cannotDeleteEventTypeWithEvents"));
         setContextMenuVisible(false);
@@ -496,49 +504,130 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   };
 
   const handleChangeIcon = async (user: User) => {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      Alert.alert("Error", t("selectImagePermission"));
+    // Request permissions for both media library and camera
+    const mediaPermission =
+      await ImagePicker.requestMediaLibraryPermissionsAsync();
+    const cameraPermission = await ImagePicker.requestCameraPermissionsAsync();
+
+    if (!mediaPermission.granted && !cameraPermission.granted) {
+      Alert.alert("Error", t("selectImageAndCameraPermission"));
       return;
     }
 
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: "images",
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 1,
-    });
+    // Show action sheet to choose between camera and gallery
+    Alert.alert(
+      t("changeIcon"),
+      t("selectImageSource"),
+      [
+        {
+          text: t("takePhoto"),
+          onPress: async () => {
+            if (!cameraPermission.granted) {
+              Alert.alert("Error", t("cameraPermission"));
+              return;
+            }
+            const result = await ImagePicker.launchCameraAsync({
+              mediaTypes: "images",
+              allowsEditing: true,
+              aspect: [1, 1],
+              quality: 1,
+            });
 
-    if (!result.canceled && result.assets[0].uri) {
-      try {
-        const relativePath = await processUserIcon(
-          result.assets[0].uri,
-          user.id,
-          user.icon
-        );
+            if (!result.canceled && result.assets[0].uri) {
+              try {
+                const relativePath = await processUserIcon(
+                  result.assets[0].uri,
+                  user.id,
+                  user.icon
+                );
 
-        await updateUserIcon(user.id, relativePath);
-        const updatedUser = { ...user, icon: relativePath };
+                await updateUserIcon(user.id, relativePath);
+                const updatedUser = { ...user, icon: relativePath };
 
-        if (user.id === currentUser?.id) {
-          setCurrentUser(updatedUser);
-        }
-        if (user.id === selectedUser?.id) {
-          setSelectedUser(updatedUser);
-        }
+                if (user.id === currentUser?.id) {
+                  setCurrentUser(updatedUser);
+                }
+                if (user.id === selectedUser?.id) {
+                  setSelectedUser(updatedUser);
+                }
 
-        const updatedUsers = users.map((u) =>
-          u.id === user.id ? updatedUser : u
-        );
-        setUsers(updatedUsers);
-        setPlaintUsers(updatedUsers.filter((u) => u.role_id === 3));
+                const updatedUsers = users.map((u) =>
+                  u.id === user.id ? updatedUser : u
+                );
+                setUsers(updatedUsers);
+                setPlaintUsers(updatedUsers.filter((u) => u.role_id === 3));
 
-        setCacheBuster(Date.now());
-      } catch (error: any) {
-        console.error("Error updating icon:", error);
-        Alert.alert("Error", `${t("errorUpdateIcon")}: ${error.message}`);
-      }
-    }
+                setCacheBuster(Date.now());
+                Alert.alert(t("success"), t("iconUpdated"));
+              } catch (error: any) {
+                console.error("Error updating icon from camera:", error);
+                Alert.alert(
+                  "Error",
+                  `${t("errorUpdateIcon")}: ${error.message}`
+                );
+              }
+            }
+          },
+          isDisabled: !cameraPermission.granted,
+        },
+        {
+          text: t("chooseFromGallery"),
+          onPress: async () => {
+            if (!mediaPermission.granted) {
+              Alert.alert("Error", t("selectImagePermission"));
+              return;
+            }
+            const result = await ImagePicker.launchImageLibraryAsync({
+              mediaTypes: "images",
+              allowsEditing: true,
+              aspect: [1, 1],
+              quality: 1,
+            });
+
+            if (!result.canceled && result.assets[0].uri) {
+              try {
+                const relativePath = await processUserIcon(
+                  result.assets[0].uri,
+                  user.id,
+                  user.icon
+                );
+
+                await updateUserIcon(user.id, relativePath);
+                const updatedUser = { ...user, icon: relativePath };
+
+                if (user.id === currentUser?.id) {
+                  setCurrentUser(updatedUser);
+                }
+                if (user.id === selectedUser?.id) {
+                  setSelectedUser(updatedUser);
+                }
+
+                const updatedUsers = users.map((u) =>
+                  u.id === user.id ? updatedUser : u
+                );
+                setUsers(updatedUsers);
+                setPlaintUsers(updatedUsers.filter((u) => u.role_id === 3));
+
+                setCacheBuster(Date.now());
+                Alert.alert(t("success"), t("iconUpdated"));
+              } catch (error: any) {
+                console.error("Error updating icon from gallery:", error);
+                Alert.alert(
+                  "Error",
+                  `${t("errorUpdateIcon")}: ${error.message}`
+                );
+              }
+            }
+          },
+          isDisabled: !mediaPermission.granted,
+        },
+        {
+          text: t("cancel"),
+          style: "cancel",
+        },
+      ],
+      { cancelable: true }
+    );
   };
 
   const handleSwitchUser = async (user: User) => {
@@ -658,7 +747,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         })
       }
       onLongPress={() => handleLongPressEventType(item)}
-      delayLongPress={2000} // 2 seconds
+      delayLongPress={1000} // 1 seconds
       style={{ marginHorizontal: marginHo, marginBottom: 10 }}
     >
       <YStack
@@ -676,7 +765,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         <XStack ai="center" jc="center" f={1} flexWrap="wrap">
           <MaterialIcons name={item.icon} size={30} color={item.iconColor} />
           <Text fontSize="$3" fontWeight="bold" color="$primary" mx="$1">
-            {item.weight}
+            {item.eventCount}
           </Text>
           <Text
             fontSize="$3"
@@ -830,7 +919,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         </XStack>
         <XStack ai="center" mb="$1" gap="$2">
           <Text
-            fontSize={language === "zh" ? "$5" : 20}
+            fontSize={language === "zh" ? "$5" : "$4"}
             fontWeight="bold"
             color="$text"
             flex={5}
@@ -1053,150 +1142,201 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             setExpirationDate(null); // Reset expiration date
             setAddTypeModalVisible(false);
             setIsEditingEventType(false);
+            setActiveTab("basic");
+            setFilterIcon("");
           }}
         >
           <Text {...modalTitleProps}>
             {isEditingEventType ? t("updateEventType") : t("addNewEventType")}
           </Text>
-          <Text {...iconLabelProps}>{t("selectIcon")}</Text>
-          <FlatList
-            data={availableIcons}
-            renderItem={({ item: icon }) => (
-              <YStack
-                key={icon}
-                p="$2"
-                bg={selectedIcon === icon ? "$lightGray" : undefined}
-                br="$1"
-                width={iconItemWidth}
-                alignItems="center"
-              >
-                <TouchableOpacity onPress={() => setSelectedIcon(icon)}>
-                  <MaterialIcons name={icon} size={40} color={selectedColor} />
-                </TouchableOpacity>
-              </YStack>
-            )}
-            keyExtractor={(icon) => icon}
-            numColumns={nCols || 4} // Fallback to 4 columns if calculation fails
-            contentContainerStyle={{ paddingBottom: 10 }}
-            style={{ maxHeight: 200 }} // Limit height to prevent modal overflow
-          />
-          <Text {...iconLabelProps}>{t("selectColor")}</Text>
-          <ScrollView horizontal style={{ flexGrow: 0, marginBottom: 10 }}>
-            {availableColors.map((color) => (
-              <YStack
-                key={color}
-                w={30}
-                h={30}
-                br={50}
-                m="$1"
-                bg={color}
-                borderWidth={selectedColor === color ? 2 : 0}
-                borderColor="$primary"
-              >
-                <TouchableOpacity
-                  onPress={() => setSelectedColor(color)}
-                  style={{ flex: 1 }}
+          {activeTab === "basic" ? (
+            <YStack w="100%">
+              <XStack>
+                <Text {...iconLabelProps} flex={2} alignSelf="center">
+                  {t("selectIcon")}
+                </Text>
+                <StyledInput
+                  my={2}
+                  fontSize={"$3"}
+                  flex={4}
+                  placeholder={t("filterIcons")}
+                  borderRadius={15}
+                  height={35}
+                  value={filterIcon}
+                  onChangeText={setFilterIcon}
+                  autoCapitalize="none"
+                  accessibilityLabel={t("filterIcons")}
                 />
-              </YStack>
-            ))}
-          </ScrollView>
-          <StyledInput
-            editable={!isEditingEventType}
-            placeholder={t("namePlaceholder")}
-            value={newTypeName}
-            onChangeText={setNewTypeName}
-            maxLength={20}
-            autoFocus={!isEditingEventType}
-          />
-          <Text {...iconLabelProps}>{t("selectAvailability")}</Text>
-          <PickerField
-            selectedValue={availability}
-            onValueChange={setAvailability}
-            items={Array.from({ length: 101 }, (_, i) => ({
-              label: `${i}`,
-              value: i,
-            }))}
-          />
-          <Text {...iconLabelProps}>{t("faceValue")}</Text>
-          <PickerField
-            enabled={!isEditingEventType}
-            selectedValue={newFaceValue}
-            onValueChange={setNewFaceValue}
-            items={[1, 2, 3, 4, 5].map((value) => ({
-              label: value.toString(),
-              value: value.toString(),
-            }))}
-          />
-          <Text {...iconLabelProps}>{t("selectOwner")}</Text>
-          <PickerField
-            selectedValue={selectedOwnerId}
-            onValueChange={setSelectedOwnerId}
-            items={
-              users.filter((u) => u.role_id === 3).length > 0
-                ? users
-                    .filter((u) => u.role_id === 3)
-                    .map((user) => ({ label: user.name, value: user.id }))
-                : [{ label: t("noOrdinaryUsers"), value: null }]
-            }
-            enabled={
-              !isEditingEventType &&
-              users.filter((u) => u.role_id === 3).length > 0
-            }
-          />
-          <Text {...iconLabelProps}>{t("expirationDate")}</Text>
-          <XStack ai="center" jc="space-between" w="100%" mb="$2">
-            <Text fontSize="$3" color="$text">
-              {formatDate(expirationDate)}
-            </Text>
-            <XStack>
-              <Button
-                title={t("selectDate")}
-                onPress={() => setShowDatePicker(true)}
+              </XStack>
+              <FlatList
+                data={filteredIcons}
+                renderItem={({ item: icon }) => (
+                  <YStack
+                    key={icon}
+                    p="$2"
+                    bg={selectedIcon === icon ? "$lightGray" : undefined}
+                    br="$1"
+                    width={iconItemWidth}
+                    alignItems="center"
+                  >
+                    <TouchableOpacity onPress={() => setSelectedIcon(icon)}>
+                      <MaterialIcons
+                        name={icon}
+                        size={40}
+                        color={selectedColor}
+                      />
+                    </TouchableOpacity>
+                  </YStack>
+                )}
+                keyExtractor={(icon) => icon}
+                numColumns={nCols || 4} // Fallback to 4 columns if calculation fails
+                contentContainerStyle={{ paddingBottom: 10 }}
+                style={{ maxHeight: 180 }} // Limit height to prevent modal overflow
               />
-              {expirationDate && (
+              <Text {...iconLabelProps}>{t("selectColor")}</Text>
+              <ScrollView horizontal style={{ flexGrow: 0, marginBottom: 10 }}>
+                {availableColors.map((color) => (
+                  <YStack
+                    key={color}
+                    w={30}
+                    h={30}
+                    br={50}
+                    m="$1"
+                    bg={color}
+                    borderWidth={selectedColor === color ? 2 : 0}
+                    borderColor="$primary"
+                  >
+                    <TouchableOpacity
+                      onPress={() => setSelectedColor(color)}
+                      style={{ flex: 1 }}
+                    />
+                  </YStack>
+                ))}
+              </ScrollView>
+              <XStack jc="flex-end" w="100%" mt="$2">
                 <Button
-                  title={t("clear")}
-                  onPress={() => setExpirationDate(null)}
+                  title={t("nextStep")}
+                  onPress={() => setActiveTab("appearance")}
+                />
+              </XStack>
+            </YStack>
+          ) : (
+            <YStack w="100%">
+              <StyledInput
+                editable={!isEditingEventType}
+                placeholder={t("namePlaceholder")}
+                value={newTypeName}
+                onChangeText={setNewTypeName}
+                maxLength={20}
+                autoFocus={!isEditingEventType}
+              />
+              <Text {...iconLabelProps}>{t("selectAvailability")}</Text>
+              <PickerField
+                selectedValue={availability}
+                onValueChange={setAvailability}
+                items={Array.from({ length: 101 }, (_, i) => ({
+                  label: `${i}`,
+                  value: i,
+                }))}
+              />
+              <XStack ai="center">
+                <Text {...iconLabelProps} flex={1} alignSelf="center">
+                  {t("faceValue")}
+                </Text>
+                <PickerField
+                  width="50%"
+                  enabled={!isEditingEventType}
+                  selectedValue={newFaceValue}
+                  onValueChange={setNewFaceValue}
+                  items={[1, 2, 3, 4, 5].map((value) => ({
+                    label: value.toString(),
+                    value: value.toString(),
+                  }))}
+                />
+              </XStack>
+              <XStack ai="center">
+                <Text {...iconLabelProps} flex={1} alignSelf="center">
+                  {t("selectOwner")}
+                </Text>
+                <PickerField
+                  width="50%"
+                  selectedValue={selectedOwnerId}
+                  onValueChange={setSelectedOwnerId}
+                  items={
+                    users.filter((u) => u.role_id === 3).length > 0
+                      ? users
+                          .filter((u) => u.role_id === 3)
+                          .map((user) => ({ label: user.name, value: user.id }))
+                      : [{ label: t("noOrdinaryUsers"), value: null }]
+                  }
+                  enabled={
+                    !isEditingEventType &&
+                    users.filter((u) => u.role_id === 3).length > 0
+                  }
+                />
+              </XStack>
+              <Text {...iconLabelProps}>{t("expirationDate")}</Text>
+              <XStack ai="center" jc="space-between" w="100%" mb="$2">
+                <Text fontSize="$3" color="$text">
+                  {formatDate(expirationDate)}
+                </Text>
+                <XStack>
+                  <Button
+                    title={t("selectDate")}
+                    onPress={() => setShowDatePicker(true)}
+                  />
+                  {expirationDate && (
+                    <Button
+                      title={t("clear")}
+                      onPress={() => setExpirationDate(null)}
+                    />
+                  )}
+                </XStack>
+              </XStack>
+              {showDatePicker && (
+                <DateTimePicker
+                  value={expirationDate || new Date()}
+                  mode="date"
+                  display={Platform.OS === "ios" ? "inline" : "default"}
+                  minimumDate={new Date()} // Prevent selecting dates before today
+                  onChange={(event, date) => {
+                    setShowDatePicker(Platform.OS === "ios"); // Keep picker open on iOS
+                    if (date) {
+                      setExpirationDate(date);
+                    }
+                  }}
                 />
               )}
-            </XStack>
-          </XStack>
-          {showDatePicker && (
-            <DateTimePicker
-              value={expirationDate || new Date()}
-              mode="date"
-              display={Platform.OS === "ios" ? "inline" : "default"}
-              minimumDate={new Date()} // Prevent selecting dates before today
-              onChange={(event, date) => {
-                setShowDatePicker(Platform.OS === "ios"); // Keep picker open on iOS
-                if (date) {
-                  setExpirationDate(date);
-                }
-              }}
-            />
+              <XStack jc="space-between" w="100%" mt="$2">
+                <Button
+                  title={t("prevStep")}
+                  onPress={() => setActiveTab("basic")}
+                />
+                <Button
+                  title={t("cancel")}
+                  onPress={() => {
+                    setNewTypeName("");
+                    setSelectedIcon("event");
+                    setSelectedColor("#000000");
+                    setAvailability(0);
+                    setSelectedOwnerId(
+                      users.filter((u) => u.role_id === 3)[0]?.id || null
+                    );
+                    setNewFaceValue("1");
+                    setAddTypeModalVisible(false);
+                    setIsEditingEventType(false);
+                    setActiveTab("basic");
+                    setFilterIcon("");
+                  }}
+                />
+                <Button
+                  title={isEditingEventType ? t("update") : t("add")}
+                  onPress={handleSubmitEventType}
+                  disabled={!newTypeName.trim() || !selectedOwnerId}
+                />
+              </XStack>
+            </YStack>
           )}
-          <XStack jc="space-between" w="100%" mt="$2">
-            <Button
-              title={t("cancel")}
-              onPress={() => {
-                setNewTypeName("");
-                setSelectedIcon("event");
-                setSelectedColor("#000000");
-                setAvailability(0);
-                setSelectedOwnerId(
-                  users.filter((u) => u.role_id === 3)[0]?.id || null
-                );
-                setNewFaceValue("1");
-                setAddTypeModalVisible(false);
-                setIsEditingEventType(false);
-              }}
-            />
-            <Button
-              title={isEditingEventType ? t("update") : t("add")}
-              onPress={handleSubmitEventType}
-              disabled={!newTypeName.trim() || !selectedOwnerId}
-            />
-          </XStack>
         </ModalContainer>
 
         {/* VerifyCode Modal */}

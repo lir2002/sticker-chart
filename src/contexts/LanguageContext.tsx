@@ -401,6 +401,20 @@ const translations: Translations = {
   noUsers: { en: "No users available", zh: "没有可用用户" },
   close: { en: "Close", zh: "关闭" },
   filterUsers: { en: "Filter Users", zh: "过滤用户" },
+  filterIcons: { en: "Filter Icons", zh: "过滤图标（英文）" },
+  nextStep: { en: "Next >>", zh: "下一步 >>" },
+  prevStep: { en: "<< Back", zh: "<< 上一步" },
+  selectImageAndCameraPermission: {
+    en: "Camera and gallery permissions are required.",
+    zh: "需要相机和图库权限。",
+  },
+  cameraPermission: {
+    en: "Camera permission is required.",
+    zh: "需要相机权限。",
+  },
+  selectImageSource: { en: "Select an image source", zh: "选择图片来源" },
+  chooseFromGallery: { en: "Choose from Gallery", zh: "从图库选择" },
+  iconUpdated: { en: "Profile icon updated successfully", zh: "头像更新成功" },
 };
 
 const LanguageContext = createContext<LanguageContextType | undefined>(
