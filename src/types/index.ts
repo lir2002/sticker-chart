@@ -54,11 +54,28 @@ export interface Role {
 // Define navigation stack parameters
 export type RootStackParamList = {
   Home: undefined;
-  Calendar: { eventType: string; owner: number | null; ownerName: string; icon: string | null; iconColor: string | null };
+  Calendar: {
+    eventType: string;
+    owner: number | null;
+    ownerName: string;
+    icon: string | null;
+    iconColor: string | null;
+  };
   CalendarViewAll: undefined;
   CodeSetup: undefined;
   ChangeCode: { userId: number }; // Updated to pass user ID
   TransactionHistory: { userId: number };
+  EditItem: { productId?: number } | undefined;
+  ManageProducts: undefined;
+  BrowseStore: undefined;
+  ProductPreview: {
+    productName: string;
+    description?: string;
+    price: number;
+    quantity: number;
+    images: string[];
+    online: number;
+  };
 };
 
 export interface Wallet {
@@ -85,4 +102,31 @@ export interface ThemeContextType {
   themeMode: "light" | "dark" | "auto";
   setThemeMode: (mode: "light" | "dark" | "auto") => void;
   effectiveTheme: "light" | "dark";
+}
+
+export interface Product {
+  id: number;
+  name: string;
+  description?: string;
+  images?: string;
+  price: number;
+  creator: number;
+  online: number; // 0 or 1
+  quantity: number;
+  creatorName?: string;
+  createdAt?: string;
+  updated_at?: string;
+}
+
+export interface Purchase {
+  order_number: number;
+  product_id: number;
+  owner: number;
+  price: number;
+  quantity: number;
+  fullfilled: number; // 0 or 1
+  ownerName: string;
+  productName?: string;
+  created_at?: string;
+  fullfilled_at?: string;
 }

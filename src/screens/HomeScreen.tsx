@@ -10,12 +10,13 @@ import {
   Dimensions,
   Platform,
   useColorScheme,
+  SafeAreaView,
 } from "react-native";
 import { Picker } from "@react-native-picker/picker";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 import * as ImagePicker from "expo-image-picker";
-import DateTimePicker from "@react-native-community/datetimepicker"; // Added for date picker
+import DateTimePicker from "@react-native-community/datetimepicker";
 import { RootStackParamList, EventType, User, Wallet } from "../types";
 import {
   getEventTypesWithOwner,
@@ -57,6 +58,7 @@ interface HomeScreenProps {
   navigation: HomeScreenNavigationProp;
 }
 
+// Modal container for various modals
 const ModalContainer: React.FC<{
   visible: boolean;
   onClose: () => void;
@@ -92,6 +94,51 @@ const ModalContainer: React.FC<{
   );
 };
 
+// Menu modal for Tools and Services
+const MenuModal: React.FC<{
+  visible: boolean;
+  onClose: () => void;
+  children: React.ReactNode;
+  tab: "tools" | "services";
+}> = ({ visible, onClose, children, tab }) => {
+  const theme = useTheme();
+  const screenWidth = Dimensions.get("window").width;
+  const tabWidth = screenWidth / 2;
+  const modalWidth = 200;
+  const tabBarHeight = 75; // Adjust based on actual tab bar height
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="none"
+      onRequestClose={onClose}
+    >
+      <TouchableOpacity
+        style={{ flex: 1, backgroundColor: "transparent" }}
+        onPress={onClose}
+        activeOpacity={1}
+      >
+        <YStack
+          position="absolute"
+          bottom={tabBarHeight}
+          {...(tab === "tools" ? { left: 0 } : { right: 0 })}
+          width={modalWidth}
+          bg="$modalBackground"
+          p="$4"
+          borderRadius={0}
+          borderWidth={1}
+          borderColor="$border"
+          onPress={(e) => e.stopPropagation()}
+        >
+          {children}
+        </YStack>
+      </TouchableOpacity>
+    </Modal>
+  );
+};
+
+// Picker field component
 const PickerField: React.FC<{
   selectedValue: any;
   onValueChange: (value: any) => void;
@@ -114,7 +161,7 @@ const PickerField: React.FC<{
 const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const theme = useTheme();
   const { language, setLanguage, t } = useLanguage();
-  const systemColorScheme = useColorScheme(); // Detect system theme (light/dark)
+  const systemColorScheme = useColorScheme();
   const { themeMode, setThemeMode, effectiveTheme } = useThemeContext();
   const [eventTypes, setEventTypes] = useState<EventType[]>([]);
   const [filterText, setFilterText] = useState("");
@@ -162,6 +209,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const [expirationDate, setExpirationDate] = useState<Date | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [activeTab, setActiveTab] = useState<"basic" | "appearance">("basic");
+  const [toolsMenuVisible, setToolsMenuVisible] = useState(false);
+  const [servicesMenuVisible, setServicesMenuVisible] = useState(false);
 
   // Filter event types by text and selected users
   const filteredEventTypes = eventTypes.filter((eventType) => {
@@ -181,6 +230,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       icon.toLowerCase().includes(filterIcon.toLowerCase())
     );
   }, [filterIcon, allIcons]);
+
   // Toggle user selection
   const toggleUserSelection = (user: User) => {
     setSelectedUsers((prev) =>
@@ -209,9 +259,16 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
   const iconLabelProps = {
     fontSize: "$3",
+    fontWeight: "600",
     my: "$2",
     alignSelf: "flex-start" as const,
     color: "$text",
+  };
+
+  // Close all menus
+  const closeMenus = () => {
+    setToolsMenuVisible(false);
+    setServicesMenuVisible(false);
   };
 
   useEffect(() => {
@@ -355,7 +412,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           newTypeName,
           selectedOwnerId,
           parseInt(newFaceValue),
-          expirationDateIso // Pass expiration date
+          expirationDateIso
         );
       } else {
         await insertEventType(
@@ -365,7 +422,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           availability,
           selectedOwnerId,
           parseInt(newFaceValue),
-          expirationDateIso // Pass expiration date
+          expirationDateIso
         );
       }
       const updatedTypes = await getEventTypesWithOwner();
@@ -376,7 +433,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       setAvailability(0);
       setSelectedOwnerId(users.filter((u) => u.role_id === 3)[0]?.id || null);
       setNewFaceValue("1");
-      setExpirationDate(null); // Reset expiration date
+      setExpirationDate(null);
       setAddTypeModalVisible(false);
       setIsEditingEventType(false);
       setActiveTab("basic");
@@ -845,177 +902,338 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
   if (currentUser)
     return (
-      <YStack f={1} p={paddingHo} bg="$background">
-        <XStack jc="space-between" ai="center" mb="$4">
-          <TouchableOpacity
-            onPress={() => setLanguage(language === "en" ? "zh" : "en")}
-            style={{
-              backgroundColor: theme.primary.val,
-              borderRadius: 12,
-              paddingVertical: 4,
-              width: 40,
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <Text
-              fontSize="$4"
-              fontWeight="bold"
-              color="$background"
-              textAlign="center"
+      <SafeAreaView style={{ flex: 1 }}>
+        <YStack f={1} p={paddingHo} bg="$background">
+          <XStack jc="space-between" ai="center" mb="$4">
+            <TouchableOpacity
+              onPress={() => setLanguage(language === "en" ? "zh" : "en")}
+              style={{
+                backgroundColor: theme.primary.val,
+                borderRadius: 12,
+                paddingVertical: 4,
+                width: 40,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
             >
-              {language === "zh" ? "En" : "中文"}
-            </Text>
-          </TouchableOpacity>
-
-          {/* Day/Night Toggle Icon */}
-          <TouchableOpacity
-            onPress={handleThemeToggle}
-            onLongPress={handleThemeAuto}
-            delayLongPress={1000} // 1 second long press
-            style={{
-              width: 30,
-              height: 30,
-              borderRadius: 15,
-              backgroundColor: theme.background.val,
-              alignItems: "center",
-              justifyContent: "center",
-              borderWidth: 1,
-              borderColor: theme.border.val,
-            }}
-            accessibilityLabel={
-              themeMode === "auto"
-                ? "Toggle theme, currently auto"
-                : `Switch to ${themeMode === "light" ? "dark" : "light"} mode`
-            }
-            accessibilityRole="button"
-            accessibilityHint="Long press to enable auto theme based on system settings"
-          >
-            <MaterialIcons
-              name={
-                themeMode === "auto"
-                  ? "brightness-auto"
-                  : themeMode === "light"
-                  ? "wb-sunny"
-                  : "nightlight"
-              }
-              size={20}
-              color={theme.icon.val}
-            />
-          </TouchableOpacity>
-
-          <TouchableOpacity onPress={() => setUserProfileModalVisible(true)}>
-            {currentUser.icon ? (
-              <Image
-                source={{
-                  uri: `${resolvePhotoUri(currentUser.icon)}?t=${cacheBuster}`,
-                }}
-                style={{ width: 30, height: 30, borderRadius: 15 }}
-              />
-            ) : (
-              <MaterialIcons name="person" size={30} color={theme.icon.val} />
-            )}
-          </TouchableOpacity>
-        </XStack>
-        <XStack ai="center" mb="$1" gap="$2">
-          <Text
-            fontSize={language === "zh" ? "$5" : "$4"}
-            fontWeight="bold"
-            color="$text"
-            flex={5}
-            textAlign="left"
-          >
-            {t("achievements")}
-          </Text>
-          <StyledInput
-            placeholder={t("filterAchievements")}
-            borderRadius={25}
-            height={40}
-            value={filterText}
-            onChangeText={setFilterText}
-            autoCapitalize="none"
-            flex={5}
-            accessibilityLabel={t("filterAchievements")}
-          />
-          <TouchableOpacity
-            onPress={() => setIsUserModalVisible(true)}
-            style={{
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-            accessibilityLabel={t("selectUsers")}
-            accessibilityRole="button"
-          >
-            <MaterialIcons
-              name="arrow-drop-down"
-              size={24}
-              color={theme.icon.val}
-            />
-          </TouchableOpacity>
-        </XStack>
-
-        {/* Selected users display */}
-        {selectedUsers.length > 0 && (
-          <XStack gap="$2" mb="$2" flexWrap="wrap">
-            {selectedUsers.map((user) => (
-              <XStack
-                key={user.id}
-                ai="center"
-                bg={theme.primary.val}
-                borderRadius="$2"
-                px="$2"
-                py="$1"
-                gap="$1"
+              <Text
+                fontSize="$4"
+                fontWeight="bold"
+                color="$background"
+                textAlign="center"
               >
-                <Text fontSize="$3" color="$background">
-                  {user.name}
-                </Text>
-                <TouchableOpacity
-                  onPress={() => removeUser(user.id)}
-                  accessibilityLabel={t("removeUser", { name: user.name })}
-                >
-                  <MaterialIcons name="close" size={16} color="$white" />
-                </TouchableOpacity>
-              </XStack>
-            ))}
-          </XStack>
-        )}
+                {language === "zh" ? "En" : "中文"}
+              </Text>
+            </TouchableOpacity>
 
-        <FlatList
-          data={filteredEventTypes}
-          renderItem={renderEventType}
-          keyExtractor={(item) => `${item.name}-${item.owner || "null"}`}
-          numColumns={numColumns || 4}
-          contentContainerStyle={{
-            paddingBottom: 8,
-            alignItems: "flex-start",
-          }}
-          ListEmptyComponent={
-            <Text fontSize="$4" color="$gray" textAlign="center" mt="$4">
-              {t("noEventTypes")}
+            {/* Day/Night Toggle Icon */}
+            <TouchableOpacity
+              onPress={handleThemeToggle}
+              onLongPress={handleThemeAuto}
+              delayLongPress={1000}
+              style={{
+                width: 30,
+                height: 30,
+                borderRadius: 15,
+                backgroundColor: theme.background.val,
+                alignItems: "center",
+                justifyContent: "center",
+                borderWidth: 1,
+                borderColor: theme.border.val,
+              }}
+              accessibilityLabel={
+                themeMode === "auto"
+                  ? "Toggle theme, currently auto"
+                  : `Switch to ${themeMode === "light" ? "dark" : "light"} mode`
+              }
+              accessibilityRole="button"
+              accessibilityHint="Long press to enable auto theme based on system settings"
+            >
+              <MaterialIcons
+                name={
+                  themeMode === "auto"
+                    ? "brightness-auto"
+                    : themeMode === "light"
+                    ? "wb-sunny"
+                    : "nightlight"
+                }
+                size={20}
+                color={theme.icon.val}
+              />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setUserProfileModalVisible(true)}>
+              {currentUser.icon ? (
+                <Image
+                  source={{
+                    uri: `${resolvePhotoUri(
+                      currentUser.icon
+                    )}?t=${cacheBuster}`,
+                  }}
+                  style={{ width: 30, height: 30, borderRadius: 15 }}
+                />
+              ) : (
+                <MaterialIcons name="person" size={30} color={theme.icon.val} />
+              )}
+            </TouchableOpacity>
+          </XStack>
+          <XStack ai="center" mb="$1" gap="$2">
+            <Text
+              fontSize={language === "zh" ? "$5" : "$4"}
+              fontWeight="bold"
+              color="$text"
+              flex={5}
+              textAlign="left"
+            >
+              {t("achievements")}
             </Text>
-          }
-        />
-        <CustomButton
-          title={t("viewAllStickers")}
-          onPress={() => navigation.navigate("CalendarViewAll")}
-        />
-        {currentUser.role_id === 1 && (
-          <>
-            <CustomButton
-              title={t("newAchievementType")}
-              onPress={handleAddEventType}
+            <StyledInput
+              placeholder={t("filterTypes")}
+              borderRadius={25}
+              height={40}
+              value={filterText}
+              onChangeText={setFilterText}
+              autoCapitalize="none"
+              flex={5}
+              accessibilityLabel={t("filterTypes")}
             />
-            <CustomButton
-              title={t("backupData")}
-              onPress={() => setBackupModalVisible(true)}
-            />
-            <CustomButton
-              title={t("restoreData")}
-              onPress={() => setRestoreModalVisible(true)}
-            />
-          </>
-        )}
+            <TouchableOpacity
+              onPress={() => setIsUserModalVisible(true)}
+              style={{
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+              accessibilityLabel={t("selectUsers")}
+              accessibilityRole="button"
+            >
+              <MaterialIcons
+                name="arrow-drop-down"
+                size={24}
+                color={theme.icon.val}
+              />
+            </TouchableOpacity>
+          </XStack>
+
+          {/* Selected users display */}
+          {selectedUsers.length > 0 && (
+            <XStack gap="$2" mb="$2" flexWrap="wrap">
+              {selectedUsers.map((user) => (
+                <XStack
+                  key={user.id}
+                  ai="center"
+                  bg={theme.primary.val}
+                  borderRadius="$2"
+                  px="$2"
+                  py="$1"
+                  gap="$1"
+                >
+                  <Text fontSize="$3" color="$background">
+                    {user.name}
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => removeUser(user.id)}
+                    accessibilityLabel={t("removeUser", { name: user.name })}
+                  >
+                    <MaterialIcons name="close" size={16} color="$white" />
+                  </TouchableOpacity>
+                </XStack>
+              ))}
+            </XStack>
+          )}
+          <FlatList
+            data={filteredEventTypes}
+            renderItem={renderEventType}
+            keyExtractor={(item) => `${item.name}-${item.owner || "null"}`}
+            numColumns={numColumns || 4}
+            contentContainerStyle={{
+              paddingBottom: 60,
+              alignItems: "flex-start",
+            }}
+            ListEmptyComponent={
+              <Text fontSize="$4" color="$gray" textAlign="center" mt="$4">
+                {t("noEventTypes")}
+              </Text>
+            }
+          />
+        </YStack>
+
+        {/* Tab Bar */}
+        <XStack
+          position="absolute"
+          bottom={0}
+          left={0}
+          right={0}
+          bg="$background"
+          borderTopWidth={1}
+          borderTopColor="$border"
+          elevation={4}
+        >
+          <TouchableOpacity
+            onPress={() => {
+              closeMenus();
+              setToolsMenuVisible(true);
+            }}
+            style={{
+              flex: 1,
+              alignItems: "center",
+              justifyContent: "center",
+              padding: 10,
+            }}
+          >
+            <YStack
+              ai="center"
+              bg={toolsMenuVisible ? "$lightGray" : "$background"}
+              p="$2"
+            >
+              <MaterialIcons name="build" size={24} color={theme.icon.val} />
+              <Text fontSize="$3" color="$text">
+                {t("tools")}
+              </Text>
+            </YStack>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => {
+              closeMenus();
+              setServicesMenuVisible(true);
+            }}
+            style={{
+              flex: 1,
+              alignItems: "center",
+              justifyContent: "center",
+              padding: 10,
+            }}
+          >
+            <YStack
+              ai="center"
+              bg={servicesMenuVisible ? "$lightGray" : "$background"}
+              p="$2"
+            >
+              <MaterialIcons name="store" size={24} color={theme.icon.val} />
+              <Text fontSize="$3" color="$text">
+                {t("services")}
+              </Text>
+            </YStack>
+          </TouchableOpacity>
+        </XStack>
+        <MenuModal
+          visible={toolsMenuVisible}
+          onClose={() => setToolsMenuVisible(false)}
+          tab="tools"
+        >
+          <YStack w="100%">
+            {currentUser.role_id === 1 && (
+              <>
+                <TouchableOpacity
+                  onPress={() => {
+                    setBackupModalVisible(true);
+                    setToolsMenuVisible(false);
+                  }}
+                  style={{ paddingVertical: 8 }}
+                >
+                  <Text fontSize="$4" color="$text">
+                    {t("backupData")}
+                  </Text>
+                </TouchableOpacity>
+                <Separator borderColor={theme.border.val} marginVertical="$2" />
+                <TouchableOpacity
+                  onPress={() => {
+                    setRestoreModalVisible(true);
+                    setToolsMenuVisible(false);
+                  }}
+                  style={{ paddingVertical: 8 }}
+                >
+                  <Text fontSize="$4" color="$text">
+                    {t("restoreData")}
+                  </Text>
+                </TouchableOpacity>
+                <Separator borderColor={theme.border.val} marginVertical="$2" />
+                <TouchableOpacity
+                  onPress={() => {
+                    handleAddEventType();
+                    setToolsMenuVisible(false);
+                  }}
+                  style={{ paddingVertical: 8 }}
+                >
+                  <Text fontSize="$4" color="$text">
+                    {t("newAchievementType")}
+                  </Text>
+                </TouchableOpacity>
+                <Separator borderColor={theme.border.val} marginVertical="$2" />
+                <TouchableOpacity
+                  onPress={() => {
+                    navigation.navigate("ManageProducts");
+                    setToolsMenuVisible(false);
+                  }}
+                  style={{ paddingVertical: 8 }}
+                >
+                  <Text fontSize="$4" color={theme.text.val}>
+                    {t("manageProducts")}
+                  </Text>
+                </TouchableOpacity>
+                <Separator borderColor={theme.border.val} marginVertical="$2" />
+                <TouchableOpacity
+                  onPress={() => {
+                    navigation.navigate("EditItem");
+                    setToolsMenuVisible(false);
+                  }}
+                  style={{ paddingVertical: 8 }}
+                >
+                  <Text fontSize="$4" color="$text">
+                    {t("createItem")}
+                  </Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </YStack>
+        </MenuModal>
+        <MenuModal
+          visible={servicesMenuVisible}
+          onClose={() => setServicesMenuVisible(false)}
+          tab="services"
+        >
+          <YStack w="100%">
+            <TouchableOpacity
+              onPress={() => {
+                navigation.navigate("CalendarViewAll");
+                setServicesMenuVisible(false);
+              }}
+              style={{ paddingVertical: 8 }}
+            >
+              <Text fontSize="$4" color="$text">
+                {t("viewAllStickers")}
+              </Text>
+            </TouchableOpacity>
+            {currentUser.role_id !== 2 && (
+              <>
+                <Separator borderColor={theme.border.val} marginVertical="$2" />
+                <TouchableOpacity
+                  onPress={() => {
+                    navigation.navigate("TransactionHistory", {
+                      userId: currentUser.id,
+                    });
+                    setServicesMenuVisible(false);
+                  }}
+                  style={{ paddingVertical: 8 }}
+                >
+                  <Text fontSize="$4" color="$text">
+                    {t("transactionHistory")}
+                  </Text>
+                </TouchableOpacity>
+              </>
+            )}
+            <Separator borderColor={theme.border.val} marginVertical="$2" />
+            <TouchableOpacity
+              onPress={() => {
+                navigation.navigate("BrowseStore");
+                setServicesMenuVisible(false);
+              }}
+              style={{ paddingVertical: 8 }}
+            >
+              <Text fontSize="$4" color="$text">
+                {t("browseStore")}
+              </Text>
+            </TouchableOpacity>
+          </YStack>
+        </MenuModal>
 
         {/* User selection modal */}
         <Modal
@@ -1116,7 +1334,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         </Modal>
         {/* Context Menu Modal */}
         <ModalContainer
-          visible={contextMenuVisible}
+          visible={contextMenuVisible && !verifyCodeModalVisible}
           onClose={() => {
             setContextMenuVisible(false);
             setSelectedEventType(null);
@@ -1221,93 +1439,105 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               </XStack>
             </YStack>
           ) : (
-            <YStack w="100%">
-              <StyledInput
-                editable={!isEditingEventType}
-                placeholder={t("namePlaceholder")}
-                value={newTypeName}
-                onChangeText={setNewTypeName}
-                maxLength={20}
-                autoFocus={!isEditingEventType}
-              />
-              <Text {...iconLabelProps}>{t("selectAvailability")}</Text>
-              <PickerField
-                selectedValue={availability}
-                onValueChange={setAvailability}
-                items={Array.from({ length: 101 }, (_, i) => ({
-                  label: `${i}`,
-                  value: i,
-                }))}
-              />
-              <XStack ai="center">
-                <Text {...iconLabelProps} flex={1} alignSelf="center">
-                  {t("faceValue")}
-                </Text>
-                <PickerField
-                  width="50%"
-                  enabled={!isEditingEventType}
-                  selectedValue={newFaceValue}
-                  onValueChange={setNewFaceValue}
-                  items={[1, 2, 3, 4, 5].map((value) => ({
-                    label: value.toString(),
-                    value: value.toString(),
-                  }))}
-                />
-              </XStack>
-              <XStack ai="center">
-                <Text {...iconLabelProps} flex={1} alignSelf="center">
-                  {t("selectOwner")}
-                </Text>
-                <PickerField
-                  width="50%"
-                  selectedValue={selectedOwnerId}
-                  onValueChange={setSelectedOwnerId}
-                  items={
-                    users.filter((u) => u.role_id === 3).length > 0
-                      ? users
-                          .filter((u) => u.role_id === 3)
-                          .map((user) => ({ label: user.name, value: user.id }))
-                      : [{ label: t("noOrdinaryUsers"), value: null }]
-                  }
-                  enabled={
-                    !isEditingEventType &&
-                    users.filter((u) => u.role_id === 3).length > 0
-                  }
-                />
-              </XStack>
-              <Text {...iconLabelProps}>{t("expirationDate")}</Text>
-              <XStack ai="center" jc="space-between" w="100%" mb="$2">
-                <Text fontSize="$3" color="$text">
-                  {formatDate(expirationDate)}
-                </Text>
-                <XStack>
-                  <Button
-                    title={t("selectDate")}
-                    onPress={() => setShowDatePicker(true)}
+            <YStack maxHeight="80%">
+              <ScrollView>
+                <YStack w="100%">
+                  <StyledInput
+                    editable={!isEditingEventType}
+                    placeholder={t("namePlaceholder")}
+                    value={newTypeName}
+                    onChangeText={setNewTypeName}
+                    maxLength={20}
+                    autoFocus={!isEditingEventType}
                   />
-                  {expirationDate && (
-                    <Button
-                      title={t("clear")}
-                      onPress={() => setExpirationDate(null)}
+                  <XStack ai="center">
+                    <Text {...iconLabelProps} flex={1} alignSelf="center">
+                      {t("selectAvailability")}
+                    </Text>
+                    <PickerField
+                      width="50%"
+                      selectedValue={availability}
+                      onValueChange={setAvailability}
+                      items={Array.from({ length: 101 }, (_, i) => ({
+                        label: `${i}`,
+                        value: i,
+                      }))}
+                    />
+                  </XStack>
+                  <XStack ai="center">
+                    <Text {...iconLabelProps} flex={1} alignSelf="center">
+                      {t("faceValue")}
+                    </Text>
+                    <PickerField
+                      width="50%"
+                      enabled={!isEditingEventType}
+                      selectedValue={newFaceValue}
+                      onValueChange={setNewFaceValue}
+                      items={[1, 2, 3, 4, 5].map((value) => ({
+                        label: value.toString(),
+                        value: value.toString(),
+                      }))}
+                    />
+                  </XStack>
+                  <XStack ai="center">
+                    <Text {...iconLabelProps} flex={1} alignSelf="center">
+                      {t("selectOwner")}
+                    </Text>
+                    <PickerField
+                      width="50%"
+                      selectedValue={selectedOwnerId}
+                      onValueChange={setSelectedOwnerId}
+                      items={
+                        users.filter((u) => u.role_id === 3).length > 0
+                          ? users
+                              .filter((u) => u.role_id === 3)
+                              .map((user) => ({
+                                label: user.name,
+                                value: user.id,
+                              }))
+                          : [{ label: t("noOrdinaryUsers"), value: null }]
+                      }
+                      enabled={
+                        !isEditingEventType &&
+                        users.filter((u) => u.role_id === 3).length > 0
+                      }
+                    />
+                  </XStack>
+                  <Text {...iconLabelProps}>{t("expirationDate")}</Text>
+                  <XStack ai="center" jc="space-between" w="100%" mb="$2">
+                    <Text fontSize="$3" color="$text">
+                      {formatDate(expirationDate)}
+                    </Text>
+                    <XStack>
+                      <Button
+                        title={t("selectDate")}
+                        onPress={() => setShowDatePicker(true)}
+                      />
+                      {expirationDate && (
+                        <Button
+                          title={t("clear")}
+                          onPress={() => setExpirationDate(null)}
+                        />
+                      )}
+                    </XStack>
+                  </XStack>
+                  {showDatePicker && (
+                    <DateTimePicker
+                      value={expirationDate || new Date()}
+                      mode="date"
+                      display={Platform.OS === "ios" ? "inline" : "default"}
+                      minimumDate={new Date()} // Prevent selecting dates before today
+                      onChange={(event, date) => {
+                        setShowDatePicker(Platform.OS === "ios"); // Keep picker open on iOS
+                        if (date) {
+                          setExpirationDate(date);
+                        }
+                      }}
                     />
                   )}
-                </XStack>
-              </XStack>
-              {showDatePicker && (
-                <DateTimePicker
-                  value={expirationDate || new Date()}
-                  mode="date"
-                  display={Platform.OS === "ios" ? "inline" : "default"}
-                  minimumDate={new Date()} // Prevent selecting dates before today
-                  onChange={(event, date) => {
-                    setShowDatePicker(Platform.OS === "ios"); // Keep picker open on iOS
-                    if (date) {
-                      setExpirationDate(date);
-                    }
-                  }}
-                />
-              )}
-              <XStack jc="space-between" w="100%" mt="$2">
+                </YStack>
+              </ScrollView>
+              <XStack jc="space-between" w="100%" mt="$2" bottom={-50}>
                 <Button
                   title={t("prevStep")}
                   onPress={() => setActiveTab("basic")}
@@ -1399,82 +1629,88 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
         {/* UserProfile Modal */}
         <ModalContainer
-          visible={userProfileModalVisible}
+          visible={
+            userProfileModalVisible &&
+            !switchUserModalVisible &&
+            !editUserModalVisible &&
+            !contactModalVisible &&
+            !changeCodeModalVisible
+          }
           onClose={() => setUserProfileModalVisible(false)}
         >
-          {currentUser.icon ? (
-            <Image
-              source={{
-                uri: `${resolvePhotoUri(currentUser.icon)}?t=${cacheBuster}`,
-              }}
-              style={{
-                width: 100,
-                height: 100,
-                borderRadius: 50,
-                marginBottom: 10,
-              }}
-            />
-          ) : (
-            <MaterialIcons name="person" size={100} color={theme.icon.val} />
-          )}
-          <Text {...modalTitleProps}>{currentUser.name}</Text>
-          {wallet ? (
-            <Text fontSize="$4" color="$text" mb="$2">
-              {t("assets")}: {wallet.assets} | {t("credit")}: {wallet.credit}
-            </Text>
-          ) : null}
-          {currentUser.name === "Guest" ? (
-            <CustomButton
-              title={t("login")}
-              onPress={() => setSwitchUserModalVisible(true)}
-            />
-          ) : (
-            <YStack w="100%" mt="$2">
-              <CustomButton
-                title={t("transactionHistory")}
-                onPress={() => {
-                  setUserProfileModalVisible(false);
-                  navigation.navigate("TransactionHistory", {
-                    userId: currentUser.id,
-                  });
+          <YStack maxHeight="90%" ai="center" mt="$3">
+            {currentUser.icon ? (
+              <Image
+                source={{
+                  uri: `${resolvePhotoUri(currentUser.icon)}?t=${cacheBuster}`,
+                }}
+                style={{
+                  width: 100,
+                  height: 100,
+                  borderRadius: 50,
+                  marginBottom: 10,
                 }}
               />
-              <CustomButton
-                title={t("changeIcon")}
-                onPress={() => currentUser && handleChangeIcon(currentUser)}
-              />
-              <CustomButton
-                title={t("switchUser")}
-                onPress={() => {
-                  setIsEditingUsers(false);
-                  setSwitchUserModalVisible(true);
-                }}
-              />
-              <CustomButton
-                title={t("modifyPassword")}
-                onPress={() => setChangeCodeModalVisible(true)}
-              />
-              <CustomButton
-                title={t("contactInfo")}
-                onPress={() => setContactModalVisible(true)}
-              />
-              {currentUser.role_id === 1 && (
-                <>
+            ) : (
+              <MaterialIcons name="person" size={100} color={theme.icon.val} />
+            )}
+            <Text {...modalTitleProps}>{currentUser.name}</Text>
+            {wallet ? (
+              <Text fontSize="$4" color="$text" mb="$2">
+                {t("assets")}: {wallet.assets} | {t("credit")}: {wallet.credit}
+              </Text>
+            ) : null}
+            {currentUser.name === "Guest" ? (
+              <XStack jc="center">
+                <CustomButton
+                  title={t("login")}
+                  onPress={() => {
+                    setSwitchUserModalVisible(true);
+                    setUserProfileModalVisible(false);
+                  }}
+                />
+              </XStack>
+            ) : (
+              <ScrollView>
+                <YStack w="100%" mt="$2">
                   <CustomButton
-                    title={t("createUser")}
-                    onPress={() => setEditUserModalVisible(true)}
+                    title={t("changeIcon")}
+                    onPress={() => currentUser && handleChangeIcon(currentUser)}
                   />
                   <CustomButton
-                    title={t("editUser")}
+                    title={t("switchUser")}
                     onPress={() => {
-                      setIsEditingUsers(true);
+                      setIsEditingUsers(false);
                       setSwitchUserModalVisible(true);
                     }}
                   />
-                </>
-              )}
-            </YStack>
-          )}
+                  <CustomButton
+                    title={t("modifyPassword")}
+                    onPress={() => setChangeCodeModalVisible(true)}
+                  />
+                  <CustomButton
+                    title={t("contactInfo")}
+                    onPress={() => setContactModalVisible(true)}
+                  />
+                  {currentUser.role_id === 1 && (
+                    <>
+                      <CustomButton
+                        title={t("createUser")}
+                        onPress={() => setEditUserModalVisible(true)}
+                      />
+                      <CustomButton
+                        title={t("editUser")}
+                        onPress={() => {
+                          setIsEditingUsers(true);
+                          setSwitchUserModalVisible(true);
+                        }}
+                      />
+                    </>
+                  )}
+                </YStack>
+              </ScrollView>
+            )}
+          </YStack>
         </ModalContainer>
 
         {/* ChangeCode Modal */}
@@ -1493,7 +1729,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
         {/* SwitchUser Modal */}
         <ModalContainer
-          visible={switchUserModalVisible}
+          visible={switchUserModalVisible && !selectedUser && !pendingEditUser}
           onClose={() => {
             setSwitchUserModalVisible(false);
             setIsEditingUsers(false);
@@ -1593,7 +1829,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           visible={backupModalVisible}
           onClose={() => setBackupModalVisible(false)}
         >
-          <BackupData onClose={() => setBackupModalVisible(false)} />
+          <YStack jc="center">
+            <BackupData onClose={() => setBackupModalVisible(false)} />
+          </YStack>
         </ModalContainer>
 
         {/* Restore Data Modal */}
@@ -1680,7 +1918,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             )}
           </YStack>
         </ModalContainer>
-      </YStack>
+      </SafeAreaView>
     );
 };
 

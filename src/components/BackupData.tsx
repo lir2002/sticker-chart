@@ -322,6 +322,7 @@ const BackupData: React.FC<BackupDataProps> = ({ onClose }) => {
             maxHeight="80%"
             ai="center"
             position="relative"
+            jc="center"
           >
             <TouchableOpacity
               onPress={() => setUploadModalVisible(false)}

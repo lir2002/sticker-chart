@@ -1,6 +1,6 @@
 {
   "name": "stickerchart",
-  "version": "1.8.1",
+  "version": "1.9.0",
   "license": "MIT",
   "author": {
     "name": "Ethan Li",
@@ -43,13 +43,15 @@
     "react-dom": "19.0.0",
     "react-native": "0.79.2",
     "react-native-calendars": "^1.1311.0",
+    "react-native-draggable-flatlist": "^4.0.3",
     "react-native-gesture-handler": "~2.24.0",
     "react-native-reanimated": "~3.17.4",
     "react-native-safe-area-context": "5.4.0",
     "react-native-screens": "~4.10.0",
     "react-native-vector-icons": "^10.2.0",
     "react-native-web": "^0.20.0",
-    "tamagui": "^1.126.5"
+    "tamagui": "^1.126.5",
+    "react-native-pager-view": "6.7.1"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

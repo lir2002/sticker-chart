@@ -1,5 +1,12 @@
 import React, { useEffect, useState, useContext, useMemo } from "react";
-import { Alert, Dimensions, Modal as RNModal, Appearance, FlatList, TouchableOpacity } from "react-native";
+import {
+  Alert,
+  Dimensions,
+  Modal as RNModal,
+  Appearance,
+  FlatList,
+  TouchableOpacity,
+} from "react-native";
 import { Calendar } from "react-native-calendars";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 import * as ImagePicker from "expo-image-picker";
@@ -57,11 +64,11 @@ const Container = styled(YStack, {
 const TitleContainer = styled(XStack, {
   ai: "center",
   jc: "space-between",
-  mb: "$4",
+  mb: "$1",
 });
 
 const Title = styled(Text, {
-  fontSize: "$5",
+  fontSize: "$4",
   fontWeight: "bold",
   color: "$text",
   maxWidth: "60%",
@@ -230,8 +237,10 @@ const CloseButton = styled(Button, {
   top: 40,
   right: 20,
   bg: "$overlay",
-  br: 20,
-  p: "$1",
+  br: 10,
+  p: "$1", // Increase padding
+  width: 50, // Set explicit width
+  height: 50, // Set explicit height
 });
 
 const IconLabel = styled(Text, {
@@ -1006,7 +1015,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
             {photoUri && (
               <PhotoPreview source={{ uri: resolvePhotoUri(photoUri)! }} />
             )}
-            <XStack jc="space-between" w="60%" gap="$3">
+            <XStack jc="center" w="60%" gap="$3">
               <CustomButton
                 title={t("cancel")}
                 onPress={() => {
@@ -1040,7 +1049,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
               secureTextEntry
               autoFocus
             />
-            <XStack jc="space-between" w="50%" gap="$3">
+            <XStack jc="center" w="60%" gap="$3">
               <CustomButton
                 title={t("cancel")}
                 onPress={() => {
@@ -1073,7 +1082,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
               secureTextEntry
               autoFocus
             />
-            <XStack jc="space-between" w="60%" gap="$3">
+            <XStack jc="center" w="60%" gap="$3">
               <CustomButton
                 title={t("cancel")}
                 onPress={() => {
@@ -1153,11 +1162,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
                   alignItems="center"
                 >
                   <TouchableOpacity onPress={() => setNewIcon(icon)}>
-                    <MaterialIcons
-                      name={icon}
-                      size={40}
-                      color={newIconColor}
-                    />
+                    <MaterialIcons name={icon} size={40} color={newIconColor} />
                   </TouchableOpacity>
                 </YStack>
               )}
@@ -1203,7 +1208,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
             <ModalText>
               {t("verifyConfirmation", { faceValue: weight })}
             </ModalText>
-            <XStack jc="space-between" w="60%" gap="$3">
+            <XStack jc="center" w="60%" gap="$3">
               <CustomButton
                 title={t("cancel")}
                 onPress={() => {

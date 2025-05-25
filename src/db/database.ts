@@ -1,8 +1,17 @@
 import * as SQLite from "expo-sqlite";
-import { Event, EventType, User, Role, DbVersion, Wallet } from "../types";
+import {
+  Event,
+  EventType,
+  User,
+  Role,
+  DbVersion,
+  Wallet,
+  Product,
+  Purchase,
+} from "../types"; // Updated import to include Product and Purchase
 
 // Current database version
-const CURRENT_DB_VERSION = 8; // Incremented from 7 to 8 for created_at column
+const CURRENT_DB_VERSION = 9; // Incremented from 8 to 9 for Product and Purchase tables
 
 // Singleton Database Manager
 export class DatabaseManager {
@@ -133,7 +142,7 @@ export class DatabaseManager {
             availability INTEGER NOT NULL DEFAULT 0,
             weight INTEGER NOT NULL DEFAULT 1 CHECK (weight >= 1),
             expiration_date TEXT,
-            created_at TEXT, -- Added nullable created_at column
+            created_at TEXT,
             PRIMARY KEY (name, owner),
             FOREIGN KEY (owner) REFERENCES users(id)
           );
@@ -143,7 +152,7 @@ export class DatabaseManager {
             date TEXT NOT NULL,
             markedAt TEXT NOT NULL,
             eventType TEXT NOT NULL,
-            owner INTEGER,  -- Added owner column
+            owner INTEGER,
             note TEXT,
             photoPath TEXT,
             created_by INTEGER,
@@ -153,6 +162,35 @@ export class DatabaseManager {
             FOREIGN KEY (eventType, owner) REFERENCES event_types(name, owner),
             FOREIGN KEY (created_by) REFERENCES users(id),
             FOREIGN KEY (verified_by) REFERENCES users(id)
+          );
+
+          -- New Product table
+          CREATE TABLE IF NOT EXISTS products (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL CHECK (length(name) <= 20),
+            description TEXT CHECK (length(description) <= 200),
+            images TEXT,
+            price REAL NOT NULL,
+            creator INTEGER NOT NULL,
+            online INTEGER NOT NULL DEFAULT 0,
+            quantity INTEGER NOT NULL DEFAULT 0,
+            createdAt TEXT NOT NULL,
+            updatedAt TEXT,
+            FOREIGN KEY (creator) REFERENCES users(id)
+          );
+
+          -- New Purchase table
+          CREATE TABLE IF NOT EXISTS purchases (
+            order_number INTEGER PRIMARY KEY AUTOINCREMENT,
+            product_id INTEGER NOT NULL,
+            owner INTEGER NOT NULL,
+            price REAL NOT NULL,
+            quantity INTEGER NOT NULL,
+            fullfilled INTEGER NOT NULL DEFAULT 0,
+            createdAt TEXT NOT NULL,
+            fullfilledAt TEXT,
+            FOREIGN KEY (product_id) REFERENCES products(id),
+            FOREIGN KEY (owner) REFERENCES users(id)
           );
         `);
 
@@ -327,9 +365,7 @@ export class DatabaseManager {
       }
 
       if (currentVersion < 6) {
-        // Migration to composite primary key (name, owner)
         await db.execAsync(`
-          -- Create new event_types table with composite primary key
           CREATE TABLE IF NOT EXISTS event_types_new (
             name TEXT NOT NULL,
             owner INTEGER,
@@ -341,12 +377,10 @@ export class DatabaseManager {
             FOREIGN KEY (owner) REFERENCES users(id)
           );
 
-          -- Migrate data from old event_types table
           INSERT INTO event_types_new (name, owner, icon, iconColor, availability, weight)
           SELECT name, owner, icon, iconColor, availability, weight
           FROM event_types;
 
-          -- Create new events table with owner column
           CREATE TABLE IF NOT EXISTS events_new (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             date TEXT NOT NULL,
@@ -364,33 +398,60 @@ export class DatabaseManager {
             FOREIGN KEY (verified_by) REFERENCES users(id)
           );
 
-          -- Migrate data from old events table, joining with event_types to get owner
           INSERT INTO events_new (id, date, markedAt, eventType, owner, note, photoPath, created_by, is_verified, verified_at, verified_by)
           SELECT e.id, e.date, e.markedAt, e.eventType, et.owner, e.note, e.photoPath, e.created_by, e.is_verified, e.verified_at, e.verified_by
           FROM events e
           LEFT JOIN event_types et ON e.eventType = et.name;
 
-          -- Drop old tables
           DROP TABLE IF EXISTS events;
           DROP TABLE IF EXISTS event_types;
 
-          -- Rename new tables to original names
           ALTER TABLE events_new RENAME TO events;
           ALTER TABLE event_types_new RENAME TO event_types;
         `);
       }
 
       if (currentVersion < 7) {
-        // Migration to add expiration_date column
         await db.execAsync(`
           ALTER TABLE event_types ADD COLUMN expiration_date TEXT;
         `);
       }
 
       if (currentVersion < 8) {
-        // Migration to add created_at column
         await db.execAsync(`
           ALTER TABLE event_types ADD COLUMN created_at TEXT;
+        `);
+      }
+
+      if (currentVersion < 9) {
+        // Migration to add Product and Purchase tables
+        await db.execAsync(`
+          CREATE TABLE IF NOT EXISTS products (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL CHECK (length(name) <= 20),
+            description TEXT CHECK (length(description) <= 200),
+            images TEXT,
+            price REAL NOT NULL,
+            creator INTEGER NOT NULL,
+            online INTEGER NOT NULL DEFAULT 0,
+            quantity INTEGER NOT NULL DEFAULT 0,
+            createdAt TEXT NOT NULL,
+            updatedAt TEXT,
+            FOREIGN KEY (creator) REFERENCES users(id)
+          );
+
+          CREATE TABLE IF NOT EXISTS purchases (
+            order_number INTEGER PRIMARY KEY AUTOINCREMENT,
+            product_id INTEGER NOT NULL,
+            owner INTEGER NOT NULL,
+            price REAL NOT NULL,
+            quantity INTEGER NOT NULL,
+            fullfilled INTEGER NOT NULL DEFAULT 0,
+            createdAt TEXT NOT NULL,
+            fullfilledAt TEXT,
+            FOREIGN KEY (product_id) REFERENCES products(id),
+            FOREIGN KEY (owner) REFERENCES users(id)
+          );
         `);
       }
 
@@ -514,7 +575,7 @@ export const getUserByName = async (name: string): Promise<User | null> => {
   return user || null;
 };
 
-// In database.ts
+// Get user by id
 export const getUserById = async (userId: number): Promise<User | null> => {
   const dbManager = DatabaseManager.getInstance();
   const db = dbManager.getDatabase();
@@ -655,7 +716,7 @@ export const insertEventType = async (
   owner?: number,
   weight: number = 1,
   expirationDate?: string,
-  createdAt: string = new Date().toISOString() // Added created_at with default to current time
+  createdAt: string = new Date().toISOString()
 ) => {
   if (weight < 1) {
     throw new Error("Weight must be at least 1");
@@ -682,7 +743,7 @@ export const insertEvent = async (
   date: string,
   markedAt: string,
   eventType: string,
-  owner: number | null, // Added owner parameter
+  owner: number | null,
   createdBy: number,
   note?: string,
   photoPath?: string,
@@ -919,18 +980,15 @@ export const updateEventType = async (
   newName?: string,
   owner?: number,
   weight?: number,
-  expirationDate?: string // Added optional expiration_date parameter
+  expirationDate?: string
 ): Promise<void> => {
   try {
-    // Build the SET clause dynamically based on provided parameters
     const setClauses: string[] = [];
     const values: (string | number | null)[] = [];
 
-    // Always update icon and icon_color
     setClauses.push("icon = ?", "iconColor = ?");
     values.push(icon, iconColor);
 
-    // Add optional fields if provided
     if (newName !== undefined) {
       setClauses.push("name = ?");
       values.push(newName);
@@ -952,7 +1010,6 @@ export const updateEventType = async (
       values.push(expirationDate || null);
     }
 
-    // Construct the query
     const query = `
       UPDATE event_types
       SET ${setClauses.join(", ")}
@@ -1075,6 +1132,7 @@ export const hasAssociatedAchievements = async (
     throw error;
   }
 };
+
 // Check if an EventType has associated events
 export const hasEventsForEventType = async (
   name: string,
@@ -1110,4 +1168,318 @@ export const deleteEventType = async (
     console.error("Error deleting event type:", error);
     throw error;
   }
+};
+
+// Create a product
+export const createProduct = async (
+  name: string,
+  price: number,
+  creator: number,
+  description?: string,
+  images?: string,
+  online: boolean = false,
+  quantity: number = 0,
+  createdAt: string = new Date().toISOString() // Added createdAt parameter
+): Promise<number> => {
+  if (name.length > 20) {
+    throw new Error("Product name must not exceed 20 characters");
+  }
+  if (description && description.length > 200) {
+    throw new Error("Product description must not exceed 200 characters");
+  }
+  const dbManager = DatabaseManager.getInstance();
+  const db = dbManager.getDatabase();
+  const result = await db.runAsync(
+    `INSERT INTO products (name, description, images, price, creator, online, quantity, createdAt, updatedAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+    [
+      name,
+      description || null,
+      images || null,
+      price,
+      creator,
+      online ? 1 : 0,
+      quantity,
+      createdAt,
+      createdAt, // Set updatedAt to createdAt initially
+    ]
+  );
+  return result.lastInsertRowId || 0;
+};
+
+// Get all products
+export const getProducts = async (): Promise<Product[]> => {
+  const dbManager = DatabaseManager.getInstance();
+  const db = dbManager.getDatabase();
+  const products = await db.getAllAsync<Product>(
+    `SELECT p.id, p.name, p.description, p.images, p.price, p.creator, p.online, p.quantity, p.createdAt, p.updatedAt, u.name as creatorName
+     FROM products p
+     LEFT JOIN users u ON p.creator = u.id;`
+  );
+  return products;
+};
+
+// Get product by ID
+export const getProductById = async (
+  productId: number
+): Promise<Product | null> => {
+  const dbManager = DatabaseManager.getInstance();
+  const db = dbManager.getDatabase();
+  const product = await db.getFirstAsync<Product>(
+    `SELECT p.id, p.name, p.description, p.images, p.price, p.creator, p.online, p.quantity, p.createdAt, p.updatedAt, u.name as creatorName
+     FROM products p
+     LEFT JOIN users u ON p.creator = u.id
+     WHERE p.id = ?;`,
+    [productId]
+  );
+  return product || null;
+};
+
+// Update a product
+export const updateProduct = async (
+  productId: number,
+  name?: string,
+  description?: string,
+  images?: string,
+  price?: number,
+  online?: boolean,
+  quantity?: number
+): Promise<void> => {
+  if (name && name.length > 20) {
+    throw new Error("Product name must not exceed 20 characters");
+  }
+  if (description && description.length > 200) {
+    throw new Error("Product description must not exceed 200 characters");
+  }
+  const setClauses: string[] = [];
+  const values: (string | number | null | undefined)[] = [];
+
+  if (name !== undefined) {
+    setClauses.push("name = ?");
+    values.push(name);
+  }
+  if (description !== undefined) {
+    setClauses.push("description = ?");
+    values.push(description || null);
+  }
+  if (images !== undefined) {
+    setClauses.push("images = ?");
+    values.push(images || null);
+  }
+  if (price !== undefined) {
+    setClauses.push("price = ?");
+    values.push(price);
+  }
+  if (online !== undefined) {
+    setClauses.push("online = ?");
+    values.push(online ? 1 : 0);
+  }
+  if (quantity !== undefined) {
+    setClauses.push("quantity = ?");
+    values.push(quantity);
+  }
+  // Always update updatedAt
+  setClauses.push("updatedAt = ?");
+  values.push(new Date().toISOString());
+
+  if (setClauses.length === 1) {
+    return; // Only updatedAt, no actual changes
+  }
+
+  const query = `UPDATE products SET ${setClauses.join(", ")} WHERE id = ?;`;
+  values.push(productId);
+
+  const dbManager = DatabaseManager.getInstance();
+  const db = dbManager.getDatabase();
+  await db.runAsync(query, values);
+};
+
+// Delete a product
+export const deleteProduct = async (productId: number): Promise<void> => {
+  const dbManager = DatabaseManager.getInstance();
+  const db = dbManager.getDatabase();
+  await db.runAsync("DELETE FROM products WHERE id = ?;", [productId]);
+};
+
+// Check if product has associated purchases
+export const hasPurchasesForProduct = async (
+  productId: number
+): Promise<boolean> => {
+  const dbManager = DatabaseManager.getInstance();
+  const db = dbManager.getDatabase();
+  const count = await db.getFirstAsync<{ count: number }>(
+    "SELECT COUNT(*) as count FROM purchases WHERE product_id = ?;",
+    [productId]
+  );
+  return (count?.count || 0) > 0;
+};
+
+// Create a purchase
+export const createPurchase = async (
+  productId: number,
+  owner: number,
+  price: number,
+  quantity: number,
+  fullfilled: boolean = false, // Keep fullfilled parameter
+  createdAt: string = new Date().toISOString() // Added createdAt parameter
+): Promise<number> => {
+  const dbManager = DatabaseManager.getInstance();
+  const db = dbManager.getDatabase();
+  const result = await db.runAsync(
+    `INSERT INTO purchases (product_id, owner, price, quantity, fullfilled, createdAt, fullfilledAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?);`,
+    [
+      productId,
+      owner,
+      price,
+      quantity,
+      fullfilled ? 1 : 0,
+      createdAt,
+      fullfilled ? createdAt : null, // Set fullfilledAt if fullfilled is true
+    ]
+  );
+  return result.lastInsertRowId || 0;
+};
+
+// Get all purchases
+export const getPurchases = async (): Promise<Purchase[]> => {
+  const dbManager = DatabaseManager.getInstance();
+  const db = dbManager.getDatabase();
+  const purchases = await db.getAllAsync<Purchase>(
+    `SELECT p.order_number, p.product_id, p.owner, p.price, p.quantity, p.fullfilled, p.createdAt, p.fullfilledAt, u.name as ownerName, pr.name as productName
+     FROM purchases p
+     LEFT JOIN users u ON p.owner = u.id
+     LEFT JOIN products pr ON p.product_id = pr.id;`
+  );
+  return purchases;
+};
+
+// Get purchase by order number
+export const getPurchaseByOrderNumber = async (
+  orderNumber: number
+): Promise<Purchase | null> => {
+  const dbManager = DatabaseManager.getInstance();
+  const db = dbManager.getDatabase();
+  const purchase = await db.getFirstAsync<Purchase>(
+    `SELECT p.order_number, p.product_id, p.owner, p.price, p.quantity, p.fullfilled, p.createdAt, p.fullfilledAt, u.name as ownerName, pr.name as productName
+     FROM purchases p
+     LEFT JOIN users u ON p.owner = u.id
+     LEFT JOIN products pr ON p.product_id = pr.id
+     WHERE p.order_number = ?;`,
+    [orderNumber]
+  );
+  return purchase || null;
+};
+
+// Update a purchase
+export const updatePurchase = async (
+  orderNumber: number,
+  productId?: number,
+  owner?: number,
+  price?: number,
+  quantity?: number
+): Promise<void> => {
+  const dbManager = DatabaseManager.getInstance();
+  const db = dbManager.getDatabase();
+
+  // Check if purchase exists and is not fulfilled
+  const purchase = await db.getFirstAsync<{ fullfilled: number }>(
+    `SELECT fullfilled FROM purchases WHERE order_number = ?;`,
+    [orderNumber]
+  );
+
+  if (!purchase) {
+    throw new Error(`Purchase with order_number ${orderNumber} not found`);
+  }
+
+  if (purchase.fullfilled === 1) {
+    throw new Error(
+      `Cannot update purchase with order_number ${orderNumber} because it is fullfilled`
+    );
+  }
+
+  const setClauses: string[] = [];
+  const values: (number | undefined)[] = [];
+
+  if (productId !== undefined) {
+    setClauses.push("product_id = ?");
+    values.push(productId);
+  }
+  if (owner !== undefined) {
+    setClauses.push("owner = ?");
+    values.push(owner);
+  }
+  if (price !== undefined) {
+    setClauses.push("price = ?");
+    values.push(price);
+  }
+  if (quantity !== undefined) {
+    setClauses.push("quantity = ?");
+    values.push(quantity);
+  }
+
+  if (setClauses.length === 0) {
+    return; // No updates to perform
+  }
+
+  const query = `UPDATE purchases SET ${setClauses.join(
+    ", "
+  )} WHERE order_number = ?;`;
+  values.push(orderNumber);
+
+  await db.runAsync(query, values);
+};
+
+// Fulfill a purchase
+export const fulfillPurchase = async (
+  orderNumber: number,
+  fullfilledAt: string = new Date().toISOString()
+): Promise<void> => {
+  const dbManager = DatabaseManager.getInstance();
+  const db = dbManager.getDatabase();
+
+  // Check if purchase exists
+  const purchase = await db.getFirstAsync<{ fullfilled: number }>(
+    `SELECT fullfilled FROM purchases WHERE order_number = ?;`,
+    [orderNumber]
+  );
+
+  if (!purchase) {
+    throw new Error(`Purchase with order_number ${orderNumber} not found`);
+  }
+
+  if (purchase.fullfilled === 1) {
+    throw new Error(
+      `Purchase with order_number ${orderNumber} is already fullfilled`
+    );
+  }
+
+  await db.runAsync(
+    `UPDATE purchases SET fullfilled = ?, fullfilledAt = ? WHERE order_number = ?;`,
+    [1, fullfilledAt, orderNumber]
+  );
+};
+
+// Delete a purchase
+export const deletePurchase = async (orderNumber: number): Promise<void> => {
+  const dbManager = DatabaseManager.getInstance();
+  const db = dbManager.getDatabase();
+  const purchase = await db.getFirstAsync<{ fullfilled: number }>(
+    `SELECT fullfilled FROM purchases WHERE order_number = ?;`,
+    [orderNumber]
+  );
+
+  if (!purchase) {
+    throw new Error(`Purchase with order_number ${orderNumber} not found`);
+  }
+
+  if (purchase.fullfilled === 1) {
+    throw new Error(
+      `Cannot delete purchase with order_number ${orderNumber} because it is fullfilled`
+    );
+  }
+
+  await db.runAsync("DELETE FROM purchases WHERE order_number = ?;", [
+    orderNumber,
+  ]);
 };

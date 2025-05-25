@@ -13,7 +13,7 @@ export const CustomButton: React.FC<CustomButtonProps> = ({
   disabled,
 }) => (
   <Button
-    w="66.67%"
+    w="80%"
     alignSelf="center"
     my="$3" // ~12px, slightly adjusted from 10px to align with token scale
     bg={disabled ? "$lightGray" : "$secondary"} // #6A5ACD mapped to $secondary

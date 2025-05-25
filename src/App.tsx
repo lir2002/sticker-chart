@@ -6,22 +6,32 @@ import {
   DarkTheme,
 } from "@react-navigation/native";
 import { createStackNavigator } from "@react-navigation/stack";
-import { TamaguiProvider, View, useTheme } from "tamagui";
+import { TamaguiProvider, View, YStack, useTheme, Text } from "tamagui";
 import { Appearance, useColorScheme } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import HomeScreen from "./screens/HomeScreen";
 import CalendarView from "./screens/CalendarView";
 import CalendarViewAll from "./screens/CalendarViewAll";
 import TransactionHistory from "./screens/TransactionHistory";
+import EditItemScreen from "./screens/EditItemScreen";
+import ManageProductsScreen from "./screens/ManageProductsScreen";
 import { RootStackParamList } from "./types";
 import { LanguageProvider, useLanguage } from "./contexts/LanguageContext";
 import { UserProvider } from "./contexts/UserContext";
 import { initDatabase } from "./db/database";
 import tamaguiConfig from "./config/tamagui.config";
 import { ThemeContext } from "./contexts/ThemeContext";
+import ProductPreviewScreen from "./screens/ProductPreviewScreen";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 
 const Stack = createStackNavigator<RootStackParamList>();
 
+const BrowseStoreScreen = () => (
+  <YStack f={1} jc="center" ai="center">
+    <Text>Browse Store Screen (To be implemented)</Text>
+  </YStack>
+);
 const AppContent: React.FC = () => {
   const { t } = useLanguage();
   const tamaguiTheme = useTheme();
@@ -57,6 +67,7 @@ const AppContent: React.FC = () => {
             },
             headerTintColor:
               tamaguiTheme.text?.val || (isDarkMode ? "#FFFFFF" : "#000000"),
+            headerBackTitle: "",
           }}
         >
           <Stack.Screen
@@ -80,6 +91,17 @@ const AppContent: React.FC = () => {
             name="TransactionHistory"
             component={TransactionHistory}
             options={{ title: "Transaction History" }}
+          />
+          <Stack.Screen name="EditItem" component={EditItemScreen} />
+          <Stack.Screen name="BrowseStore" component={BrowseStoreScreen} />
+          <Stack.Screen
+            name="ManageProducts"
+            component={ManageProductsScreen}
+          />
+          <Stack.Screen
+            name="ProductPreview"
+            component={ProductPreviewScreen}
+            options={{ title: t("previewProduct") }}
           />
         </Stack.Navigator>
         <StatusBar
@@ -128,7 +150,6 @@ export default function App() {
     saveTheme();
 
     const subscription = Appearance.addChangeListener(({ colorScheme }) => {
-      console.log("Appearance changed to:", colorScheme);
       if (themeMode === "auto") {
         // Trigger re-render by relying on useColorScheme
       }
@@ -153,16 +174,20 @@ export default function App() {
   }
 
   return (
-    <TamaguiProvider config={tamaguiConfig} defaultTheme={effectiveTheme}>
-      <LanguageProvider>
-        <UserProvider>
-          <ThemeContext.Provider
-            value={{ themeMode, setThemeMode, effectiveTheme }}
-          >
-            <AppContent />
-          </ThemeContext.Provider>
-        </UserProvider>
-      </LanguageProvider>
-    </TamaguiProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <TamaguiProvider config={tamaguiConfig} defaultTheme={effectiveTheme}>
+          <LanguageProvider>
+            <UserProvider>
+              <ThemeContext.Provider
+                value={{ themeMode, setThemeMode, effectiveTheme }}
+              >
+                <AppContent />
+              </ThemeContext.Provider>
+            </UserProvider>
+          </LanguageProvider>
+        </TamaguiProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }

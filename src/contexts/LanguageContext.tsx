@@ -189,7 +189,6 @@ const translations: Translations = {
   yes: { en: "Yes", zh: "是" },
   no: { en: "No", zh: "否" },
   delete: { en: "Delete", zh: "删除" },
-  verifyDelete: { en: "Verify to Delete Achievement", zh: "认证以删除成就" },
   verifyEvent: { en: "Verify Achievement", zh: "认证成就" },
   eventDeleted: { en: "Achievement deleted successfully", zh: "成就删除成功" },
   eventVerified: {
@@ -201,7 +200,7 @@ const translations: Translations = {
   noCurrentUser: { en: "No current user", zh: "无当前用户" },
   verified: { en: "Verified", zh: "已认证" },
   verifyDeleteEvent: {
-    en: "Verify to Delete Achievement",
+    en: "Verify to Delete",
     zh: "认证以删除成就",
   },
   unknown: { en: "Unknown", zh: "未知" },
@@ -217,7 +216,7 @@ const translations: Translations = {
   faceValue: { en: "Face Value", zh: "面值" },
   giveSticker: { en: "Give a Sticker", zh: "给一个贴纸" },
   maxAchievements: {
-    en: "Maximum achievements for one day: {availability}",
+    en: "Maximum achievements per day: {availability}",
     zh: "每日可得最大成就数: {availability}",
   },
   unlimited: { en: "Unlimited", zh: "无限制" },
@@ -391,7 +390,7 @@ const translations: Translations = {
   },
   activityNotStarted: { en: "Activity has not started", zh: "活动尚未开始" },
   activityEnded: { en: "Activity has ended", zh: "活动已结束" },
-  filterAchievements: { en: "Filter achievements", zh: "过滤成就" },
+  filterTypes: { en: "Filter", zh: "过滤" },
   noMatchingAchievements: {
     en: "No matching achievements",
     zh: "没有匹配的成就",
@@ -415,6 +414,110 @@ const translations: Translations = {
   selectImageSource: { en: "Select an image source", zh: "选择图片来源" },
   chooseFromGallery: { en: "Choose from Gallery", zh: "从图库选择" },
   iconUpdated: { en: "Profile icon updated successfully", zh: "头像更新成功" },
+  tools: { en: "Tools", zh: "工具" },
+  services: { en: "Services", zh: "服务" },
+  createItem: { en: "Create Item", zh: "创建商品" },
+  updateItem: { en: "Update Item", zh: "更新商品" },
+  price: { en: "Price", zh: "价格" },
+  manageProducts: { en: "Manage Products", zh: "管理商品" },
+  browseStore: { en: "Browse Store", zh: "逛商店" },
+  publish: { en: "Publish", zh: "发布" },
+  status: { en: "Status", zh: "状态" },
+  published: { en: "Published", zh: "已发布" },
+  unpublished: { en: "Unpublished", zh: "未发布" },
+  searchProducts: { en: "Search products", zh: "搜索商品" },
+  sortBy: { en: "Sort by", zh: "排序方式" },
+  nameAsc: { en: "Name (A-Z)", zh: "名称 (A-Z)" },
+  nameDesc: { en: "Name (Z-A)", zh: "名称 (Z-A)" },
+  priceAsc: { en: "Price (Low to High)", zh: "价格 (低到高)" },
+  priceDesc: { en: "Price (High to Low)", zh: "价格 (高到低)" },
+  createdAsc: { en: "Created (Oldest First)", zh: "创建时间 (最早优先)" },
+  createdDesc: { en: "Created (Newest First)", zh: "创建时间 (最新优先)" },
+  creator: { en: "Creator", zh: "创建者" },
+  allCreators: { en: "All Creators", zh: "所有创建者" },
+  noProducts: { en: "No products found", zh: "未找到商品" },
+  errorFetchProducts: { en: "Failed to fetch products", zh: "获取商品失败" },
+  preview: { en: "Preview", zh: "预览" },
+  previewProduct: { en: "Preview Item", zh: "预览商品" },
+  noDescription: { en: "No description", zh: "无描述" },
+  noImages: { en: "No images", zh: "无图片" },
+  buy: { en: "Buy", zh: "购买" },
+  buyNotImplemented: {
+    en: "Buy functionality not implemented yet",
+    zh: "购买功能尚未实现",
+  },
+  closeImage: { en: "Close image", zh: "关闭图片" },
+  imageLoadFailed: { en: "Failed to load image", zh: "图片加载失败" },
+  fullScreenProductImage: {
+    en: "Product image {index}",
+    zh: "商品图片 {index}",
+  },
+  errorDeleteImage: {
+    en: "Failed to delete image",
+    zh: "删除图片失败",
+  },
+  errorCleanupImages: {
+    en: "Failed to clean up unsaved images",
+    zh: "清理未保存图片失败",
+  },
+  unsavedChanges: {
+    en: "Unsaved Changes",
+    zh: "未保存的更改",
+  },
+  saveBeforeExit: {
+    en: "Do you want to save your changes before exiting?",
+    zh: "您想在退出前保存更改吗？",
+  },
+  discard: { en: "Discard", zh: "丢弃" },
+  addImage: { en: "Add Image", zh: "添加图片" },
+  productNamePlaceholder: { en: "Enter product name", zh: "输入商品名称" },
+  productDescriptionPlaceholder: {
+    en: "Enter product description",
+    zh: "输入商品描述",
+  },
+  errorEmptyName: {
+    en: "Product name cannot be empty",
+    zh: "商品名称不能为空",
+  },
+  errorNameTooLong: {
+    en: "Product name must not exceed 20 characters",
+    zh: "商品名称不得超过20个字符",
+  },
+  errorDescriptionTooLong: {
+    en: "Description must not exceed 200 characters",
+    zh: "描述不得超过200个字符",
+  },
+  errorInvalidPrice: {
+    en: "Price must be between 1 and 100",
+    zh: "价格必须在1到100之间",
+  },
+  errorInvalidQuantity: {
+    en: "Quantity must be a non-negative number",
+    zh: "数量必须是非负数",
+  },
+  errorZeroQuantityForPublish: {
+    en: "Quantity must be greater than 0 to publish",
+    zh: "发布时数量必须大于0",
+  },
+  errorSaveProduct: { en: "Failed to save product", zh: "保存商品失败" },
+  errorFetchProduct: { en: "Failed to fetch product", zh: "获取商品失败" },
+  maxImagesReached: { en: "Maximum 4 images allowed", zh: "最多允许4张图片" },
+  imageSizeExceeds200KB: {
+    en: "Image size must not exceed 200KB",
+    zh: "图片大小不得超过200KB",
+  },
+  notLoggedIn: {
+    en: "You must be logged in to save a product",
+    zh: "您必须登录才能保存商品",
+  },
+  successCreateProduct: {
+    en: "Product created successfully",
+    zh: "商品创建成功",
+  },
+  successUpdateProduct: {
+    en: "Product updated successfully",
+    zh: "商品更新成功",
+  },
 };
 
 const LanguageContext = createContext<LanguageContextType | undefined>(

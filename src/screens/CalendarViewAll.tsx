@@ -182,8 +182,10 @@ const CloseButton = styled(Button, {
   top: 40,
   right: 20,
   bg: "$overlay",
-  br: 20,
-  p: "$1",
+  br: 10,
+  p: "$1", // Increase padding
+  width: 50, // Set explicit width
+  height: 50, // Set explicit height
 });
 
 const CalendarViewAll: React.FC = () => {
@@ -196,10 +198,13 @@ const CalendarViewAll: React.FC = () => {
   const [users, setUsers] = useState<{ id: number; name: string }[]>([]);
   const [selectedFilters, setSelectedFilters] = useState<string[]>(["All"]);
   const [tempFilters, setTempFilters] = useState<string[]>(["All"]);
-  const [selectedOwnerFilters, setSelectedOwnerFilters] = useState<string[]>([
+  type OwnerFilter = number | "All";
+  const [selectedOwnerFilters, setSelectedOwnerFilters] = useState<
+    OwnerFilter[]
+  >(["All"]);
+  const [tempOwnerFilters, setTempOwnerFilters] = useState<OwnerFilter[]>([
     "All",
   ]);
-  const [tempOwnerFilters, setTempOwnerFilters] = useState<string[]>(["All"]);
   const [verifiedFilter, setVerifiedFilter] = useState<string>("All");
   const [tempVerifiedFilter, setTempVerifiedFilter] = useState<string>("All");
   const [filterModalVisible, setFilterModalVisible] = useState(false);
@@ -262,7 +267,7 @@ const CalendarViewAll: React.FC = () => {
         const ownerUsers = loadedUsers
           .filter((u) => ownerIds.includes(u.id))
           .map((u) => ({ id: u.id, name: u.name }));
-        setUsers([{ id: 0, name: "All" }, ...ownerUsers]); // Add "All" option
+        setUsers([{ id: 0, name: "All" }, ...ownerUsers]); // "All" option with id: 0
         updateMarkedDates(loadedEvents, types);
       } catch (error) {
         console.error("Initialization error:", error);
@@ -301,6 +306,19 @@ const CalendarViewAll: React.FC = () => {
         marked[event.date].dots.push({ key: dotKey, color: dotColor });
       }
     });
+    // Preserve selected date styling
+    if (selectedDate && marked[selectedDate]) {
+      marked[selectedDate] = {
+        ...marked[selectedDate],
+        selected: true,
+        selectedColor: theme.primary.val,
+      };
+    } else if (selectedDate) {
+      marked[selectedDate] = {
+        selected: true,
+        selectedColor: theme.primary.val,
+      };
+    }
     setMarkedDates(marked);
   };
 
@@ -320,7 +338,7 @@ const CalendarViewAll: React.FC = () => {
     });
   };
 
-  const toggleOwnerFilter = (ownerId: string) => {
+  const toggleOwnerFilter = (ownerId: OwnerFilter) => {
     setTempOwnerFilters((prev) => {
       if (ownerId === "All") {
         return ["All"];
@@ -359,7 +377,8 @@ const CalendarViewAll: React.FC = () => {
         );
         return (
           eventType &&
-          tempOwnerFilters.includes(eventType.owner?.toString() || "null")
+          eventType.owner !== null &&
+          tempOwnerFilters.includes(eventType.owner)
         );
       });
     }
@@ -386,6 +405,23 @@ const CalendarViewAll: React.FC = () => {
     setSelectedDate(date);
     const dateEvents = filteredEvents.filter((event) => event.date === date);
     setSelectedDateEvents(dateEvents);
+
+    // Update markedDates to highlight selected date
+    const updatedMarkedDates = { ...markedDates };
+    // Clear previous selected styles
+    Object.keys(updatedMarkedDates).forEach((key) => {
+      if (updatedMarkedDates[key].selected) {
+        delete updatedMarkedDates[key].selected;
+        delete updatedMarkedDates[key].selectedColor;
+      }
+    });
+    // Add selected style for the pressed date
+    updatedMarkedDates[date] = {
+      ...updatedMarkedDates[date],
+      selected: true,
+      selectedColor: theme.primary.val, // Blue circle background
+    };
+    setMarkedDates(updatedMarkedDates);
   };
 
   const handleMonthChange = (month: { year: number; month: number }) => {
@@ -409,10 +445,10 @@ const CalendarViewAll: React.FC = () => {
   }) => (
     <FilterItem
       key={item.id.toString()}
-      onPress={() => toggleOwnerFilter(item.id.toString())}
+      onPress={() => toggleOwnerFilter(item.id === 0 ? "All" : item.id)}
     >
       <FilterText>{item.name}</FilterText>
-      {tempOwnerFilters.includes(item.id.toString()) && (
+      {tempOwnerFilters.includes(item.id === 0 ? "All" : item.id) && (
         <MaterialIcons name="check" size={16} color={theme.primary.val} />
       )}
     </FilterItem>
@@ -439,8 +475,8 @@ const CalendarViewAll: React.FC = () => {
     } else {
       const ownerNames = selectedOwnerFilters
         .map((id) => {
-          if (id === "0") return t("allOwners");
-          return users.find((u) => u.id.toString() === id)?.name || id;
+          if (id === "All") return t("allOwners");
+          return users.find((u) => u.id === id)?.name || id.toString();
         })
         .join(", ");
       parts.push(ownerNames || t("none"));
