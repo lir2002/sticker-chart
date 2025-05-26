@@ -419,6 +419,7 @@ const translations: Translations = {
   createItem: { en: "Create Item", zh: "创建商品" },
   updateItem: { en: "Update Item", zh: "更新商品" },
   price: { en: "Price", zh: "价格" },
+  quantity: { en: "Quantity", zh: "数量" },
   manageProducts: { en: "Manage Products", zh: "管理商品" },
   browseStore: { en: "Browse Store", zh: "逛商店" },
   publish: { en: "Publish", zh: "发布" },
@@ -501,6 +502,10 @@ const translations: Translations = {
   },
   errorSaveProduct: { en: "Failed to save product", zh: "保存商品失败" },
   errorFetchProduct: { en: "Failed to fetch product", zh: "获取商品失败" },
+  quantityExceedsAvailable: {
+    en: "Quantity exceeds available stock",
+    zh: "数量超过可用库存",
+  },
   maxImagesReached: { en: "Maximum 4 images allowed", zh: "最多允许4张图片" },
   imageSizeExceeds200KB: {
     en: "Image size must not exceed 200KB",

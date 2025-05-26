@@ -97,6 +97,7 @@ const AppContent: React.FC = () => {
           <Stack.Screen
             name="ManageProducts"
             component={ManageProductsScreen}
+            options={{ title: t("manageProducts") }}
           />
           <Stack.Screen
             name="ProductPreview"

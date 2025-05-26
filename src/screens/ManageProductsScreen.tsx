@@ -274,6 +274,9 @@ const ManageProductsScreen: React.FC<ManageProductsScreenProps> = ({
             <Text fontSize="$4" color={theme.text.val}>
               {t("status")}: {item.online ? t("published") : t("unpublished")}
             </Text>
+            <Text fontSize="$4" color={theme.text.val}>
+              {t("creator")}: {item.creatorName}
+            </Text>
           </YStack>
         </XStack>
       </TouchableOpacity>
@@ -284,6 +287,7 @@ const ManageProductsScreen: React.FC<ManageProductsScreenProps> = ({
     <YStack flex={1} bg={theme.background.val} p="$4">
       <XStack mb="$1">
         <StyledInput
+          my="$0"
           flex={1}
           placeholder={t("searchProducts")}
           value={searchQuery}

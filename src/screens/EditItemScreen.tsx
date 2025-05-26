@@ -19,7 +19,7 @@ import DraggableFlatList, {
   ScaleDecorator,
 } from "react-native-draggable-flatlist";
 import { FlatList } from "react-native-gesture-handler";
-import PagerView from "react-native-pager-view"; // Import PagerViewrenderGalleryImage
+import PagerView from "react-native-pager-view";
 import { createProduct, updateProduct, getProductById } from "../db/database";
 import { UserContext } from "../contexts/UserContext";
 import { useLanguage } from "../contexts/LanguageContext";
@@ -33,7 +33,7 @@ const ITEM_WIDTH = 100; // Image width
 const MARGIN = 8; // Margin between items
 const ITEMS_PER_ROW = Math.floor(
   (screenWidth - 2 * 16) / (ITEM_WIDTH + MARGIN)
-); // Dynamic columns (16px padding)
+);
 
 type ImageItem = { type: "image"; path: string } | { type: "add" };
 
@@ -61,12 +61,12 @@ const EditItemScreen: React.FC<EditItemScreenProps> = ({
     null
   );
   const [isLoading, setIsLoading] = useState(false);
-  // Track initial state for change detection
   const [initialName, setInitialName] = useState("");
   const [initialDescription, setInitialDescription] = useState("");
   const [initialPrice, setInitialPrice] = useState("1");
   const [initialQuantity, setInitialQuantity] = useState("0");
   const [initialImages, setInitialImages] = useState<string[]>([]);
+  const [isPublished, setIsPublished] = useState(false);
 
   const getData = () =>
     [
@@ -85,7 +85,6 @@ const EditItemScreen: React.FC<EditItemScreenProps> = ({
     );
   };
 
-  // Separate useEffect for fetching product
   useEffect(() => {
     const fetchProduct = async () => {
       if (productId) {
@@ -106,6 +105,7 @@ const EditItemScreen: React.FC<EditItemScreenProps> = ({
             setInitialPrice(product.price.toString());
             setInitialQuantity(product.quantity.toString());
             setInitialImages(loadedImages);
+            setIsPublished(product.online === 1); // Set published status
           }
         } catch (error) {
           Alert.alert(t("error"), `${t("errorFetchProduct")}: ${error}`);
@@ -118,6 +118,7 @@ const EditItemScreen: React.FC<EditItemScreenProps> = ({
         setInitialPrice("1");
         setInitialQuantity("0");
         setInitialImages([]);
+        setIsPublished(false); // New product is not published
       }
     };
     fetchProduct();
@@ -172,7 +173,6 @@ const EditItemScreen: React.FC<EditItemScreenProps> = ({
       const imagesString = images.join(",");
 
       if (productId) {
-        // Update existing product
         await updateProduct(
           productId,
           productName,
@@ -187,7 +187,6 @@ const EditItemScreen: React.FC<EditItemScreenProps> = ({
           `${t("successUpdateProduct")}: ${productName}`
         );
       } else {
-        // Create new product
         await createProduct(
           productName,
           priceNum,
@@ -200,12 +199,12 @@ const EditItemScreen: React.FC<EditItemScreenProps> = ({
         Alert.alert(t("success"), t("successCreateProduct"));
       }
 
-      // NEW: Move initial state updates outside to avoid loop
       setInitialName(productName);
       setInitialDescription(description || "");
       setInitialPrice(price.toString());
       setInitialQuantity(quantity.toString());
       setInitialImages(images);
+      setIsPublished(online); // Update published status
       online && navigation.goBack();
     } catch (error) {
       Alert.alert(t("error"), `${t("errorSaveProduct")}: ${error}`);
@@ -213,7 +212,7 @@ const EditItemScreen: React.FC<EditItemScreenProps> = ({
       setIsLoading(false);
     }
   };
-  // Separate useEffect for navigation prompt
+
   useEffect(() => {
     const unsubscribe = navigation.addListener("beforeRemove", (e) => {
       if (!hasUnsavedChanges() || isLoading) {
@@ -264,7 +263,6 @@ const EditItemScreen: React.FC<EditItemScreenProps> = ({
     cleanupUnsavedImages,
   ]);
 
-  // Handle image picking
   const pickImage = async () => {
     if (images.length >= 4) {
       Alert.alert(t("error"), t("maxImagesReached"));
@@ -329,7 +327,6 @@ const EditItemScreen: React.FC<EditItemScreenProps> = ({
     );
   };
 
-  // Process and save image
   const processImage = async (uri: string) => {
     try {
       const fileName = `product_${Date.now()}.jpg`;
@@ -345,7 +342,6 @@ const EditItemScreen: React.FC<EditItemScreenProps> = ({
       let quality = 0.5;
       let fileInfo = await FileSystem.getInfoAsync(currentUri);
 
-      // Compress until size is <= 1MB or quality too low
       while (
         fileInfo.exists &&
         fileInfo.size &&
@@ -359,7 +355,7 @@ const EditItemScreen: React.FC<EditItemScreenProps> = ({
         );
         currentUri = manipulated.uri;
         fileInfo = await FileSystem.getInfoAsync(currentUri);
-        quality -= 0.1; // Decrease quality by 10%
+        quality -= 0.1;
       }
 
       if (fileInfo.exists && fileInfo.size && fileInfo.size > 1_048_576) {
@@ -367,7 +363,6 @@ const EditItemScreen: React.FC<EditItemScreenProps> = ({
         return;
       }
 
-      // Copy final image to destination
       await FileSystem.copyAsync({ from: currentUri, to: destPath });
 
       const relativePath = `products/${fileName}`;
@@ -377,22 +372,17 @@ const EditItemScreen: React.FC<EditItemScreenProps> = ({
     }
   };
 
-  // Remove image
   const removeImage = async (image: string) => {
     try {
-      // Construct full file path
       const filePath = `${FileSystem.documentDirectory}${image}`;
-      // Check if file exists
       const fileInfo = await FileSystem.getInfoAsync(filePath);
       if (fileInfo.exists) {
-        // Delete the file from filesystem
         await FileSystem.deleteAsync(filePath);
-        console.log(`Deleted image file: ${filePath}`); // Debug log
+        console.log(`Deleted image file: ${filePath}`);
       } else {
-        console.warn(`Image file not found: ${filePath}`); // Debug log
+        console.warn(`Image file not found: ${filePath}`);
       }
 
-      // Update images array and currentImageIndex
       const index = images.indexOf(image);
       setImages(images.filter((img) => img !== image));
       if (
@@ -404,10 +394,7 @@ const EditItemScreen: React.FC<EditItemScreenProps> = ({
       }
     } catch (error) {
       console.error(`Error deleting image ${image}:`, error);
-      // Optionally show user-friendly error
       Alert.alert(t("error"), t("errorDeleteImage"));
-      // Still remove from images array to maintain UI consistency
-      const index = images.indexOf(image);
       setImages(images.filter((img) => img !== image));
       if (
         currentImageIndex !== null &&
@@ -419,7 +406,6 @@ const EditItemScreen: React.FC<EditItemScreenProps> = ({
     }
   };
 
-  // Validate inputs
   const validateInputs = () => {
     if (!productName.trim()) {
       Alert.alert(t("error"), t("errorEmptyName"));
@@ -446,7 +432,6 @@ const EditItemScreen: React.FC<EditItemScreenProps> = ({
     return true;
   };
 
-  // Increment/decrement price
   const adjustPrice = (increment: boolean) => {
     const currentPrice = parseInt(price) || 1;
     const newPrice = increment
@@ -455,7 +440,6 @@ const EditItemScreen: React.FC<EditItemScreenProps> = ({
     setPrice(newPrice.toString());
   };
 
-  // Increment/decrement quantity
   const adjustQuantity = (increment: boolean) => {
     const currentQuantity = parseInt(quantity) || 0;
     const newQuantity = increment
@@ -464,69 +448,12 @@ const EditItemScreen: React.FC<EditItemScreenProps> = ({
     setQuantity(newQuantity.toString());
   };
 
-  // Set navigation options
   useEffect(() => {
     navigation.setOptions({
       title: productId ? t("updateItem") : t("createItem"),
-      headerRight: () => (
-        <XStack gap="$2" mr="$3">
-          <Button
-            size="$3"
-            height={40}
-            onPress={() => {
-              if (!validateInputs()) return;
-              navigation.navigate("ProductPreview", {
-                productName,
-                description,
-                price: parseInt(price),
-                quantity: parseInt(quantity),
-                images,
-                online: 0, // Default to unpublished for preview
-              });
-            }}
-            disabled={isLoading}
-            backgroundColor={theme.primary.val}
-            color="$background"
-          >
-            {t("preview")}
-          </Button>
-          <Button
-            size="$3"
-            height={40} // Explicit height
-            paddingVertical="$2" // Adjust vertical padding
-            onPress={() => handleSaveOrPublish(false)}
-            disabled={isLoading}
-            backgroundColor={theme.primary.val}
-            color="$background"
-          >
-            {t("save")}
-          </Button>
-          <Button
-            size="$3"
-            height={40} // Explicit height
-            paddingVertical="$2" // Adjust vertical padding
-            onPress={() => handleSaveOrPublish(true)}
-            disabled={isLoading}
-            backgroundColor={theme.primary.val}
-            color="$background"
-          >
-            {t("publish")}
-          </Button>
-        </XStack>
-      ),
     });
-  }, [
-    navigation,
-    productName,
-    description,
-    price,
-    quantity,
-    images,
-    isLoading,
-    t,
-  ]);
+  }, [navigation, productId, t]);
 
-  // Render draggable item
   const renderImageItem = ({
     item,
     drag,
@@ -602,38 +529,32 @@ const EditItemScreen: React.FC<EditItemScreenProps> = ({
     );
   };
 
-  // Render form as a single FlatList item
   const renderForm = () => (
     <YStack p="$4" gap="$4">
-      {/* Image Selection */}
-      <YStack>
-        <DraggableFlatList
-          data={getData()}
-          onDragEnd={({ data }) => {
-            const newImages = data
-              .filter((item) => item.type === "image")
-              .map((item) => (item as { type: "image"; path: string }).path);
-            setImages(newImages);
-            if (currentImageIndex !== null) {
-              setCurrentImageIndex((prev) =>
-                Math.min(prev, newImages.length - 1)
-              );
-            }
-          }}
-          keyExtractor={(item, index) =>
-            item.type === "add" ? "add" : `image-${index}`
+      <DraggableFlatList
+        data={getData()}
+        onDragEnd={({ data }) => {
+          const newImages = data
+            .filter((item) => item.type === "image")
+            .map((item) => (item as { type: "image"; path: string }).path);
+          setImages(newImages);
+          if (currentImageIndex !== null) {
+            setCurrentImageIndex((prev) =>
+              Math.min(prev, newImages.length - 1)
+            );
           }
-          renderItem={renderImageItem}
-          numColumns={ITEMS_PER_ROW}
-          contentContainerStyle={{
-            paddingHorizontal: 8,
-            flexDirection: "row",
-            flexWrap: "wrap",
-          }}
-        />
-      </YStack>
-
-      {/* Name Input */}
+        }}
+        keyExtractor={(item, index) =>
+          item.type === "add" ? "add" : `image-${index}`
+        }
+        renderItem={renderImageItem}
+        numColumns={ITEMS_PER_ROW}
+        contentContainerStyle={{
+          paddingHorizontal: 8,
+          flexDirection: "row",
+          flexWrap: "wrap",
+        }}
+      />
       <StyledInput
         placeholder={t("productNamePlaceholder")}
         value={productName}
@@ -641,8 +562,6 @@ const EditItemScreen: React.FC<EditItemScreenProps> = ({
         maxLength={20}
         autoCapitalize="none"
       />
-
-      {/* Description Input */}
       <StyledInput
         placeholder={t("productDescriptionPlaceholder")}
         value={description}
@@ -652,8 +571,6 @@ const EditItemScreen: React.FC<EditItemScreenProps> = ({
         numberOfLines={4}
         style={{ height: 100, textAlignVertical: "top" }}
       />
-
-      {/* Price Input */}
       <XStack ai="center" gap="$2">
         <Text fontSize="$4" color={theme.text.val} width={80}>
           {t("price")}:
@@ -694,8 +611,6 @@ const EditItemScreen: React.FC<EditItemScreenProps> = ({
           <MaterialIcons name="add" size={24} color={theme.icon.val} />
         </TouchableOpacity>
       </XStack>
-
-      {/* Quantity Input */}
       <XStack ai="center" gap="$2">
         <Text fontSize="$4" color={theme.text.val} width={80}>
           {t("quantity")}:
@@ -747,14 +662,82 @@ const EditItemScreen: React.FC<EditItemScreenProps> = ({
         keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
       >
         <FlatList
-          data={[1]} // Single item to render the form
+          data={[1]}
           renderItem={() => renderForm()}
           keyExtractor={() => "form"}
-          contentContainerStyle={{ flexGrow: 1 }}
+          contentContainerStyle={{
+            flexGrow: 1,
+            paddingBottom: insets.bottom + 60,
+          }}
         />
       </KeyboardAvoidingView>
 
-      {/* Full-Screen Image Modal */}
+      {/* Button Bar at Bottom */}
+      <XStack
+        position="absolute"
+        bottom={insets.bottom}
+        left={0}
+        right={0}
+        zIndex={1000}
+        backgroundColor={theme.background.val}
+        padding="$3"
+        gap="$2"
+        justifyContent="flex-end"
+        borderTopWidth={1}
+        borderTopColor={theme.border.val}
+      >
+        <Button
+          size="$3"
+          height={40}
+          onPress={() => {
+            if (!validateInputs()) return;
+            navigation.navigate("ProductPreview", {
+              productName,
+              description,
+              price: parseInt(price),
+              quantity: parseInt(quantity),
+              images,
+              online: 0,
+            });
+          }}
+          disabled={isLoading}
+          backgroundColor={isLoading ? theme.disabled.val : theme.primary.val}
+          color="$background"
+        >
+          {t("preview")}
+        </Button>
+        <Button
+          size="$3"
+          height={40}
+          paddingVertical="$2"
+          onPress={() => handleSaveOrPublish(false)}
+          disabled={isLoading || !hasUnsavedChanges()}
+          backgroundColor={
+            isLoading || !hasUnsavedChanges()
+              ? theme.disabled.val
+              : theme.primary.val
+          }
+          color="$background"
+        >
+          {t("save")}
+        </Button>
+        <Button
+          size="$3"
+          height={40}
+          paddingVertical="$2"
+          onPress={() => handleSaveOrPublish(true)}
+          disabled={isLoading || ((isPublished||!productId) && !hasUnsavedChanges())}
+          backgroundColor={
+            isLoading || ((isPublished||!productId) && !hasUnsavedChanges())
+              ? theme.disabled.val
+              : theme.primary.val
+          }
+          color="$background"
+        >
+          {t("publish")}
+        </Button>
+      </XStack>
+
       <Modal
         visible={currentImageIndex !== null && images.length > 0}
         transparent={false}
@@ -771,7 +754,7 @@ const EditItemScreen: React.FC<EditItemScreenProps> = ({
             left: 0,
             width: screenWidth,
             height: screenHeight,
-            pointerEvents: "box-none", // Allow touch events to pass through
+            pointerEvents: "box-none",
           }}
         >
           <TouchableOpacity
@@ -803,13 +786,13 @@ const EditItemScreen: React.FC<EditItemScreenProps> = ({
             </Text>
           ) : (
             <PagerView
-              style={{ flex: 1, zIndex: 1 }} // Lower zIndex than close button
+              style={{ flex: 1, zIndex: 1 }}
               initialPage={currentImageIndex ?? 0}
               onPageSelected={(e) => {
                 const index = e.nativeEvent.position;
                 setCurrentImageIndex(index);
               }}
-              scrollEnabled={images.length > 1} // Disable for single image
+              scrollEnabled={images.length > 1}
             >
               {images.map((item, index) => (
                 <View
@@ -844,7 +827,6 @@ const EditItemScreen: React.FC<EditItemScreenProps> = ({
               ))}
             </PagerView>
           )}
-          {/* Optional image counter */}
           {images.length > 1 && (
             <View
               style={{
@@ -853,7 +835,7 @@ const EditItemScreen: React.FC<EditItemScreenProps> = ({
                 left: 0,
                 right: 0,
                 alignItems: "center",
-                zIndex: 10, // Ensure counter is above FlatList
+                zIndex: 10,
               }}
             >
               <Text style={{ color: "#fff", fontSize: 16 }}>
