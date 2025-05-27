@@ -1223,7 +1223,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             <Separator borderColor={theme.border.val} marginVertical="$2" />
             <TouchableOpacity
               onPress={() => {
-                navigation.navigate("BrowseStore");
+                navigation.navigate("ManageProducts", {shopMode: true});
                 setServicesMenuVisible(false);
               }}
               style={{ paddingVertical: 8 }}

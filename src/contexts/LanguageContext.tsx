@@ -523,6 +523,7 @@ const translations: Translations = {
     en: "Product updated successfully",
     zh: "商品更新成功",
   },
+  productDetails: { en: "Product Details", zh: "商品详情" },
 };
 
 const LanguageContext = createContext<LanguageContextType | undefined>(

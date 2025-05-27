@@ -66,9 +66,10 @@ export type RootStackParamList = {
   ChangeCode: { userId: number }; // Updated to pass user ID
   TransactionHistory: { userId: number };
   EditItem: { productId?: number } | undefined;
-  ManageProducts: undefined;
+  ManageProducts: { shopMode?: boolean };
   BrowseStore: undefined;
   ProductPreview: {
+    productId?: string; // Absent in Preview Mode
     productName: string;
     description?: string;
     price: number;

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import {
   ScrollView,
   SafeAreaView,
@@ -13,7 +13,8 @@ import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 import { RootStackParamList } from "../types";
 import { useLanguage } from "../contexts/LanguageContext";
 import { YStack, XStack, Text, useTheme } from "tamagui";
-import { StyledInput } from "../components/SharedComponents"; // Import StyledInput
+import { StyledInput } from "../components/SharedComponents";
+import { UserContext } from "../contexts/UserContext";
 
 type ProductPreviewScreenProps = NativeStackScreenProps<
   RootStackParamList,
@@ -24,14 +25,30 @@ const { width: screenWidth } = Dimensions.get("window");
 
 const ProductPreviewScreen: React.FC<ProductPreviewScreenProps> = ({
   route,
+  navigation,
 }) => {
   const { t } = useLanguage();
   const theme = useTheme();
-  const { productName, description, price, images, quantity, online } =
-    route.params;
+  const {
+    productId,
+    productName,
+    description,
+    price,
+    images,
+    quantity,
+    online,
+  } = route.params;
+
+  // Set navigation title to "Product Details"
+  useEffect(() => {
+    navigation.setOptions({
+      title: productId ? t("productDetails") : t("previewProduct"),
+    });
+  }, [navigation, t]);
 
   // State for purchase quantity
   const [purchaseQuantity, setPurchaseQuantity] = useState("1");
+  const { currentUser } = useContext(UserContext);
 
   // Adjust purchase quantity with increment/decrement
   const adjustPurchaseQuantity = (increment: boolean) => {
@@ -120,7 +137,7 @@ const ProductPreviewScreen: React.FC<ProductPreviewScreenProps> = ({
         borderTopColor={theme.border.val}
       >
         {/* Quantity Input with Increment/Decrement */}
-        <XStack ai="center" gap="$1" jc="center" >
+        <XStack ai="center" gap="$1" jc="center">
           <Text fontSize="$4" color={theme.text.val} width={70}>
             {t("quantity")}:
           </Text>
@@ -175,8 +192,12 @@ const ProductPreviewScreen: React.FC<ProductPreviewScreenProps> = ({
         {/* Buy Button */}
         <TouchableOpacity
           onPress={() => Alert.alert(t("info"), t("buyNotImplemented"))}
+          disabled={parseInt(purchaseQuantity) === 0  || !currentUser || currentUser.id===2}
           style={{
-            backgroundColor: theme.primary.val,
+            backgroundColor:
+              parseInt(purchaseQuantity) === 0  || !currentUser || currentUser.id===2
+                ? theme.disabled.val
+                : theme.primary.val,
             paddingHorizontal: 16,
             paddingVertical: 8,
             borderRadius: 20,

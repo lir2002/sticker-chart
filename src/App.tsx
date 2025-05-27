@@ -27,11 +27,6 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 
 const Stack = createStackNavigator<RootStackParamList>();
 
-const BrowseStoreScreen = () => (
-  <YStack f={1} jc="center" ai="center">
-    <Text>Browse Store Screen (To be implemented)</Text>
-  </YStack>
-);
 const AppContent: React.FC = () => {
   const { t } = useLanguage();
   const tamaguiTheme = useTheme();
@@ -93,7 +88,6 @@ const AppContent: React.FC = () => {
             options={{ title: "Transaction History" }}
           />
           <Stack.Screen name="EditItem" component={EditItemScreen} />
-          <Stack.Screen name="BrowseStore" component={BrowseStoreScreen} />
           <Stack.Screen
             name="ManageProducts"
             component={ManageProductsScreen}

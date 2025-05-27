@@ -9,7 +9,7 @@ import { useLanguage } from "../contexts/LanguageContext";
 import { YStack, XStack, Text, useTheme, Select, Input, Button } from "tamagui";
 import { StyledInput } from "../components/SharedComponents";
 
-// New Dropdown Component
+// Dropdown Component
 const Dropdown = ({
   value,
   onValueChange,
@@ -110,9 +110,11 @@ type ManageProductsScreenProps = NativeStackScreenProps<
 
 const ManageProductsScreen: React.FC<ManageProductsScreenProps> = ({
   navigation,
+  route,
 }) => {
   const { t } = useLanguage();
   const theme = useTheme();
+  const shopMode = route.params?.shopMode || false; // Check if in shop mode
 
   const [products, setProducts] = useState<Product[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
@@ -143,8 +145,14 @@ const ManageProductsScreen: React.FC<ManageProductsScreenProps> = ({
   const fetchProducts = useCallback(async () => {
     try {
       setIsLoading(true);
-      const fetchedProducts = await getProducts();
-      const fetchedUsers = await getUsers(); // Fetch users to get creator names
+      let fetchedProducts = await getProducts();
+
+      // Filter for published products in shop mode
+      if (shopMode) {
+        fetchedProducts = fetchedProducts.filter((p) => p.online === 1);
+      }
+
+      const fetchedUsers = await getUsers();
       setProducts(fetchedProducts);
 
       // Create a map of user IDs to names
@@ -167,7 +175,7 @@ const ManageProductsScreen: React.FC<ManageProductsScreenProps> = ({
     } finally {
       setIsLoading(false);
     }
-  }, [t]);
+  }, [t, shopMode]);
 
   // Fetch products and users on mount
   useEffect(() => {
@@ -177,6 +185,13 @@ const ManageProductsScreen: React.FC<ManageProductsScreenProps> = ({
     });
     return unsubscribe;
   }, [navigation, fetchProducts]);
+
+  // Set navigation title
+  useEffect(() => {
+    navigation.setOptions({
+      title: shopMode ? t("browseStore") : t("manageProducts"),
+    });
+  }, [navigation, shopMode, t]);
 
   // Filter and sort products
   useEffect(() => {
@@ -225,7 +240,19 @@ const ManageProductsScreen: React.FC<ManageProductsScreenProps> = ({
     const firstImage = item.images ? item.images.split(",")[0] : null;
     return (
       <TouchableOpacity
-        onPress={() => navigation.navigate("EditItem", { productId: item.id })}
+        onPress={() =>
+          shopMode
+            ? navigation.navigate("ProductPreview", {
+                productId: item.id,
+                productName: item.name,
+                description: item.description || "",
+                price: item.price,
+                images: item.images ? item.images.split(",") : [],
+                quantity: item.quantity,
+                online: item.online,
+              })
+            : navigation.navigate("EditItem", { productId: item.id })
+        }
         style={{
           backgroundColor: theme.background.val,
           borderRadius: 5,
@@ -271,9 +298,11 @@ const ManageProductsScreen: React.FC<ManageProductsScreenProps> = ({
             <Text fontSize="$4" color={theme.text.val}>
               {t("price")}: ${item.price.toFixed(2)}
             </Text>
-            <Text fontSize="$4" color={theme.text.val}>
-              {t("status")}: {item.online ? t("published") : t("unpublished")}
-            </Text>
+            {!shopMode && (
+              <Text fontSize="$4" color={theme.text.val}>
+                {t("status")}: {item.online ? t("published") : t("unpublished")}
+              </Text>
+            )}
             <Text fontSize="$4" color={theme.text.val}>
               {t("creator")}: {item.creatorName}
             </Text>
