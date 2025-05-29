@@ -180,7 +180,22 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # Step 18: Create GitHub Release
+      # Step 18: Generate commit list
+      - name: Generate commit list
+        id: get-commits
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.check-version.outputs.SKIP_RELEASE == 'false'
+        run: |
+          # Get commits between the latest tag and HEAD
+          if [ -n "${{ steps.check-version.outputs.LATEST_TAG }}" ]; then
+            COMMIT_LIST=$(git log ${{ steps.check-version.outputs.LATEST_TAG }}..HEAD --pretty=format:"%h %s" --no-merges | sed 's/^/- /')
+          else
+            COMMIT_LIST=$(git log --pretty=format:"%h %s" --no-merges | sed 's/^/- /')
+          fi
+          # Escape newlines for GitHub Actions output
+          COMMIT_LIST=$(echo "$COMMIT_LIST" | sed ':a;N;$!ba;s/\n/\\n/g')
+          echo "commit_list=$COMMIT_LIST" >> $GITHUB_OUTPUT
+
+      # Step 19: Create GitHub Release
       - name: Create GitHub Release
         if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.check-version.outputs.SKIP_RELEASE == 'false'
         id: create-release
@@ -193,11 +208,16 @@ jobs:
           body: |
             Automated release for version ${{ steps.check-version.outputs.CURRENT_VERSION }}.
             - Built Android APK and AAB.
-            - Commit: ${{ github.sha }}
+
+            ### Changes since last release
+            ${{ steps.check-version.outputs.LATEST_TAG }}..HEAD:
+            ```bash
+            ${{ steps.get-commits.outputs.commit_list }}
+            ```
           draft: false
           prerelease: false
 
-      # Step 19: Upload Release APK
+      # Step 20: Upload Release APK
       - name: Upload Release APK
         if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.check-version.outputs.SKIP_RELEASE == 'false'
         uses: actions/upload-release-asset@v1
@@ -209,7 +229,7 @@ jobs:
           asset_name: ${{ steps.app-info.outputs.APP_NAME }}-${{ steps.app-info.outputs.VERSION }}.apk
           asset_content_type: application/vnd.android.package-archive
 
-      # Step 20: Upload Release AAB
+      # Step 21: Upload Release AAB
       - name: Upload Release AAB
         if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.check-version.outputs.SKIP_RELEASE == 'false'
         uses: actions/upload-release-asset@v1
