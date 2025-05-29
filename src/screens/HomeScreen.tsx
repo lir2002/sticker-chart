@@ -15,7 +15,6 @@ import {
 import { Picker } from "@react-native-picker/picker";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
-import * as ImagePicker from "expo-image-picker";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { RootStackParamList, EventType, User, Wallet } from "../types";
 import {
@@ -24,7 +23,6 @@ import {
   forceAdminPasswordSetup,
   getUsers,
   getUserByName,
-  verifyUserCode,
   createUser,
   updateUserIcon,
   resetUserCode,
@@ -45,8 +43,10 @@ import { UserContext } from "../contexts/UserContext";
 import { CustomButton, StyledInput } from "../components/SharedComponents";
 import BackupData from "../components/BackupData";
 import RestoreData from "../components/RestoreData";
+import VerifyCodeModal from "../components/VerifyCodeModal";
 import { YStack, XStack, Text, useTheme, Separator } from "tamagui";
-import { processUserIcon, resolvePhotoUri } from "../utils/fileUtils";
+import { resolvePhotoUri } from "../utils/fileUtils";
+import { captureImage, pickImage, processUserIcon } from "../utils/imageUtils";
 import { useThemeContext } from "../contexts/ThemeContext";
 
 type HomeScreenNavigationProp = NativeStackNavigationProp<
@@ -176,7 +176,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const { currentUser, setCurrentUser } = useContext(UserContext);
   const [addTypeModalVisible, setAddTypeModalVisible] = useState(false);
   const [verifyCodeModalVisible, setVerifyCodeModalVisible] = useState(false);
-  const [inputCode, setInputCode] = useState("");
   const [userProfileModalVisible, setUserProfileModalVisible] = useState(false);
   const [switchUserModalVisible, setSwitchUserModalVisible] = useState(false);
   const [editUserModalVisible, setEditUserModalVisible] = useState(false);
@@ -199,7 +198,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const [phone, setPhone] = useState(currentUser?.phone || "");
   const [wallet, setWallet] = useState<Wallet | null>(null);
   const [needsInitial, setNeedsInitial] = useState<true | false>(false);
-  const [cacheBuster, setCacheBuster] = useState(Date.now());
   const [contextMenuVisible, setContextMenuVisible] = useState(false);
   const [selectedEventType, setSelectedEventType] = useState<EventType | null>(
     null
@@ -468,33 +466,22 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
   const handleVerifyCode = async () => {
     if (!currentUser) return;
-    const isValid = await verifyUserCode(currentUser.id, inputCode);
-    if (isValid) {
+    try {
       if (isAddingEventType) {
         setAddTypeModalVisible(true);
         setIsAddingEventType(false);
       } else if (isDeletingEventType && selectedEventType) {
-        try {
-          if (selectedEventType.owner === null) {
-            Alert.alert("Error", t("errorInvalidOwner"));
-            return;
-          }
-          await deleteEventType(
-            selectedEventType.name,
-            selectedEventType.owner
-          );
-          const updatedTypes = await getEventTypesWithOwner();
-          setEventTypes(updatedTypes);
-          setContextMenuVisible(false);
-          setSelectedEventType(null);
-          setIsDeletingEventType(false);
-          Alert.alert(t("success"), t("successDeleteEventType"));
-        } catch (error: any) {
-          Alert.alert(
-            "Error",
-            `${t("errorDeleteEventType")}: ${error.message}`
-          );
+        if (selectedEventType.owner === null) {
+          Alert.alert("Error", t("errorInvalidOwner"));
+          return;
         }
+        await deleteEventType(selectedEventType.name, selectedEventType.owner);
+        const updatedTypes = await getEventTypesWithOwner();
+        setEventTypes(updatedTypes);
+        setContextMenuVisible(false);
+        setSelectedEventType(null);
+        setIsDeletingEventType(false);
+        Alert.alert(t("success"), t("successDeleteEventType"));
       } else if (isEditingEventType && selectedEventType) {
         setNewTypeName(selectedEventType.name);
         setSelectedIcon(selectedEventType.icon);
@@ -516,13 +503,19 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         setSwitchUserModalVisible(false);
       }
       setVerifyCodeModalVisible(false);
-      setInputCode("");
-    } else {
-      Alert.alert("Error", t("invalidPassword"));
-      setInputCode("");
+    } catch (error: any) {
+      Alert.alert(
+        "Error",
+        `${
+          isDeletingEventType
+            ? t("errorDeleteEventType")
+            : isEditingEventType
+            ? t("errorUpdateEventType")
+            : t("errorVerifyCode")
+        }: ${error.message}`
+      );
     }
   };
-
   const handleLongPressEventType = (item: EventType) => {
     if (!currentUser || currentUser.role_id !== 1) return;
     setSelectedEventType(item);
@@ -554,24 +547,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     setVerifyCodeModalVisible(true);
   };
 
-  const handleCodeInputChange = (text: string) => {
-    if (text.match(/^\d*$/)) {
-      setInputCode(text);
-    }
-  };
-
   const handleChangeIcon = async (user: User) => {
-    // Request permissions for both media library and camera
-    const mediaPermission =
-      await ImagePicker.requestMediaLibraryPermissionsAsync();
-    const cameraPermission = await ImagePicker.requestCameraPermissionsAsync();
-
-    if (!mediaPermission.granted && !cameraPermission.granted) {
-      Alert.alert("Error", t("selectImageAndCameraPermission"));
-      return;
-    }
-
-    // Show action sheet to choose between camera and gallery
+    const MAX_ICON_SIZE = 262_144; // 32KB
     Alert.alert(
       t("changeIcon"),
       t("selectImageSource"),
@@ -579,25 +556,14 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         {
           text: t("takePhoto"),
           onPress: async () => {
-            if (!cameraPermission.granted) {
-              Alert.alert("Error", t("cameraPermission"));
-              return;
-            }
-            const result = await ImagePicker.launchCameraAsync({
-              mediaTypes: "images",
-              allowsEditing: true,
-              aspect: [1, 1],
-              quality: 1,
-            });
-
-            if (!result.canceled && result.assets[0].uri) {
+            const result = await captureImage(MAX_ICON_SIZE);
+            if (result) {
               try {
                 const relativePath = await processUserIcon(
-                  result.assets[0].uri,
+                  result.uri,
                   user.id,
-                  user.icon
+                  user.icon,
                 );
-
                 await updateUserIcon(user.id, relativePath);
                 const updatedUser = { ...user, icon: relativePath };
 
@@ -614,41 +580,28 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                 setUsers(updatedUsers);
                 setPlaintUsers(updatedUsers.filter((u) => u.role_id === 3));
 
-                setCacheBuster(Date.now());
                 Alert.alert(t("success"), t("iconUpdated"));
               } catch (error: any) {
                 console.error("Error updating icon from camera:", error);
                 Alert.alert(
-                  "Error",
+                  t("error"),
                   `${t("errorUpdateIcon")}: ${error.message}`
                 );
               }
             }
           },
-          isDisabled: !cameraPermission.granted,
         },
         {
           text: t("chooseFromGallery"),
           onPress: async () => {
-            if (!mediaPermission.granted) {
-              Alert.alert("Error", t("selectImagePermission"));
-              return;
-            }
-            const result = await ImagePicker.launchImageLibraryAsync({
-              mediaTypes: "images",
-              allowsEditing: true,
-              aspect: [1, 1],
-              quality: 1,
-            });
-
-            if (!result.canceled && result.assets[0].uri) {
+            const result = await pickImage(MAX_ICON_SIZE);
+            if (result) {
               try {
                 const relativePath = await processUserIcon(
-                  result.assets[0].uri,
+                  result.uri,
                   user.id,
-                  user.icon
+                  user.icon,
                 );
-
                 await updateUserIcon(user.id, relativePath);
                 const updatedUser = { ...user, icon: relativePath };
 
@@ -665,18 +618,16 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                 setUsers(updatedUsers);
                 setPlaintUsers(updatedUsers.filter((u) => u.role_id === 3));
 
-                setCacheBuster(Date.now());
                 Alert.alert(t("success"), t("iconUpdated"));
               } catch (error: any) {
                 console.error("Error updating icon from gallery:", error);
                 Alert.alert(
-                  "Error",
+                  t("error"),
                   `${t("errorUpdateIcon")}: ${error.message}`
                 );
               }
             }
           },
-          isDisabled: !mediaPermission.granted,
         },
         {
           text: t("cancel"),
@@ -700,16 +651,13 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
   const handleVerifySwitchUser = async () => {
     if (!selectedUser) return;
-    const isValid = await verifyUserCode(selectedUser.id, inputCode);
-    if (isValid) {
+    try {
       setCurrentUser(selectedUser);
       setSwitchUserModalVisible(false);
       setVerifyCodeModalVisible(false);
-      setInputCode("");
       setSelectedUser(null);
-    } else {
-      Alert.alert("Error", t("invalidPassword"));
-      setInputCode("");
+    } catch (error: any) {
+      Alert.alert("Error", `${t("errorVerifyCode")}: ${error.message}`);
     }
   };
 
@@ -861,7 +809,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       >
         {item.icon ? (
           <Image
-            source={{ uri: `${resolvePhotoUri(item.icon)}?t=${cacheBuster}` }}
+            source={{ uri: `${resolvePhotoUri(item.icon)}` }}
             style={{ width: 30, height: 30, borderRadius: 15 }}
           />
         ) : (
@@ -967,7 +915,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                   source={{
                     uri: `${resolvePhotoUri(
                       currentUser.icon
-                    )}?t=${cacheBuster}`,
+                    )}`,
                   }}
                   style={{ width: 30, height: 30, borderRadius: 15 }}
                 />
@@ -1223,7 +1171,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             <Separator borderColor={theme.border.val} marginVertical="$2" />
             <TouchableOpacity
               onPress={() => {
-                navigation.navigate("ManageProducts", {shopMode: true});
+                navigation.navigate("ManageProducts", { shopMode: true });
                 setServicesMenuVisible(false);
               }}
               style={{ paddingVertical: 8 }}
@@ -1570,20 +1518,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         </ModalContainer>
 
         {/* VerifyCode Modal */}
-        <ModalContainer
+        <VerifyCodeModal
           visible={verifyCodeModalVisible}
-          onClose={() => {
-            setVerifyCodeModalVisible(false);
-            setInputCode("");
-            setPendingEditUser(null);
-            setSelectedUser(null);
-            setIsAddingEventType(false);
-            setIsDeletingEventType(false);
-            setIsEditingEventType(false);
-          }}
-        >
-          <Text {...modalTitleProps}>
-            {isDeletingEventType
+          title={
+            isDeletingEventType
               ? t("verifyAdminForDeleteEventType")
               : isEditingEventType
               ? t("verifyAdminForUpdateEventType")
@@ -1591,41 +1529,31 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               ? t("verifyAdminForEdit")
               : isAddingEventType
               ? t("verifyAdminForAddEventType")
-              : t("enterVerificationCode")}
-          </Text>
-          <StyledInput
-            placeholder={t("codePlaceholder")}
-            value={inputCode}
-            onChangeText={handleCodeInputChange}
-            keyboardType="numeric"
-            maxLength={4}
-            secureTextEntry
-            autoFocus
-          />
-          <XStack jc="space-between" w="100%" mt="$2">
-            <Button
-              title={t("cancel")}
-              onPress={() => {
-                setVerifyCodeModalVisible(false);
-                setInputCode("");
-                setPendingEditUser(null);
-                setSelectedUser(null);
-                setIsAddingEventType(false);
-                setIsDeletingEventType(false);
-                setIsEditingEventType(false);
-              }}
-            />
-            <Button
-              title={t("verify")}
-              onPress={
-                switchUserModalVisible && !isEditingUsers
-                  ? handleVerifySwitchUser
-                  : handleVerifyCode
-              }
-              disabled={inputCode.trim() === ""}
-            />
-          </XStack>
-        </ModalContainer>
+              : switchUserModalVisible && !isEditingUsers
+              ? t("enterVerificationCode", {
+                  name: selectedUser?.name || "",
+                })
+              : t("enterVerificationCode")
+          }
+          userId={
+            switchUserModalVisible && !isEditingUsers && selectedUser
+              ? selectedUser.id
+              : currentUser?.id || null
+          }
+          onVerify={
+            switchUserModalVisible && !isEditingUsers
+              ? handleVerifySwitchUser
+              : handleVerifyCode
+          }
+          onCancel={() => {
+            setVerifyCodeModalVisible(false);
+            setPendingEditUser(null);
+            setSelectedUser(null);
+            setIsAddingEventType(false);
+            setIsDeletingEventType(false);
+            setIsEditingEventType(false);
+          }}
+        />
 
         {/* UserProfile Modal */}
         <ModalContainer
@@ -1642,7 +1570,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             {currentUser.icon ? (
               <Image
                 source={{
-                  uri: `${resolvePhotoUri(currentUser.icon)}?t=${cacheBuster}`,
+                  uri: `${resolvePhotoUri(currentUser.icon)}`,
                 }}
                 style={{
                   width: 100,
@@ -1801,7 +1729,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           {selectedUser?.icon ? (
             <Image
               source={{
-                uri: `${resolvePhotoUri(selectedUser.icon)}?t=${cacheBuster}`,
+                uri: `${resolvePhotoUri(selectedUser.icon)}`,
               }}
               style={{
                 width: 100,

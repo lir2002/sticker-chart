@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext, useRef } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import {
   Alert,
   Dimensions,
@@ -10,9 +10,7 @@ import {
   KeyboardAvoidingView,
   View,
 } from "react-native";
-import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system";
-import * as ImageManipulator from "expo-image-manipulator";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 import DraggableFlatList, {
@@ -26,7 +24,12 @@ import { useLanguage } from "../contexts/LanguageContext";
 import { YStack, XStack, Text, useTheme, Button } from "tamagui";
 import { StyledInput } from "../components/SharedComponents";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { RootStackParamList, Product } from "../types";
+import { RootStackParamList } from "../types";
+import {
+  captureImage,
+  pickImage,
+  processProductImage,
+} from "../utils/imageUtils";
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
 const ITEM_WIDTH = 100; // Image width
@@ -263,18 +266,10 @@ const EditItemScreen: React.FC<EditItemScreenProps> = ({
     cleanupUnsavedImages,
   ]);
 
-  const pickImage = async () => {
+  // Add image (replaces pickImage)
+  const addImage = async () => {
     if (images.length >= 4) {
       Alert.alert(t("error"), t("maxImagesReached"));
-      return;
-    }
-
-    const mediaPermission =
-      await ImagePicker.requestMediaLibraryPermissionsAsync();
-    const cameraPermission = await ImagePicker.requestCameraPermissionsAsync();
-
-    if (!mediaPermission.granted && !cameraPermission.granted) {
-      Alert.alert(t("error"), t("selectImageAndCameraPermission"));
       return;
     }
 
@@ -285,91 +280,55 @@ const EditItemScreen: React.FC<EditItemScreenProps> = ({
         {
           text: t("takePhoto"),
           onPress: async () => {
-            if (!cameraPermission.granted) {
-              Alert.alert(t("error"), t("cameraPermission"));
-              return;
-            }
-            const result = await ImagePicker.launchCameraAsync({
-              mediaTypes: ImagePicker.MediaTypeOptions.Images,
-              allowsEditing: true,
-              aspect: [1, 1],
-              quality: 0.5,
-            });
-            if (!result.canceled && result.assets[0].uri) {
-              await processImage(result.assets[0].uri);
+            try {
+              const result = await captureImage(1_048_576); // 1MB
+              if (result) {
+                const relativePath = await processProductImage(result.uri);
+                setImages([...images, relativePath]);
+              }
+            } catch (error) {
+              console.error("Error capturing product image:", error);
+              const message =
+                error instanceof Error ? error.message : String(error);
+              if (message.includes("Camera permission denied")) {
+                Alert.alert(t("error"), t("cameraPermission"));
+              } else {
+                Alert.alert(
+                  t("error"),
+                  `${t("errorProcessImage")}: ${message}`
+                );
+              }
             }
           },
         },
         {
           text: t("chooseFromGallery"),
           onPress: async () => {
-            if (!mediaPermission.granted) {
-              Alert.alert(t("error"), t("selectImagePermission"));
-              return;
-            }
-            const result = await ImagePicker.launchImageLibraryAsync({
-              mediaTypes: ImagePicker.MediaTypeOptions.Images,
-              allowsEditing: true,
-              aspect: [1, 1],
-              quality: 0.5,
-            });
-            if (!result.canceled && result.assets[0].uri) {
-              await processImage(result.assets[0].uri);
+            try {
+              const result = await pickImage(1_048_576); // 1MB
+              if (result) {
+                const relativePath = await processProductImage(result.uri);
+                setImages([...images, relativePath]);
+              }
+            } catch (error) {
+              console.error("Error picking product image:", error);
+              const message =
+                error instanceof Error ? error.message : String(error);
+              if (message.includes("Gallery permission denied")) {
+                Alert.alert(t("error"), t("selectImagePermission"));
+              } else {
+                Alert.alert(
+                  t("error"),
+                  `${t("errorProcessImage")}: ${message}`
+                );
+              }
             }
           },
         },
-        {
-          text: t("cancel"),
-          style: "cancel",
-        },
+        { text: t("cancel"), style: "cancel" },
       ],
       { cancelable: true }
     );
-  };
-
-  const processImage = async (uri: string) => {
-    try {
-      const fileName = `product_${Date.now()}.jpg`;
-      const destPath = `${FileSystem.documentDirectory}products/${fileName}`;
-      await FileSystem.makeDirectoryAsync(
-        `${FileSystem.documentDirectory}products/`,
-        {
-          intermediates: true,
-        }
-      );
-
-      let currentUri = uri;
-      let quality = 0.5;
-      let fileInfo = await FileSystem.getInfoAsync(currentUri);
-
-      while (
-        fileInfo.exists &&
-        fileInfo.size &&
-        fileInfo.size > 1_048_576 &&
-        quality > 0.1
-      ) {
-        const manipulated = await ImageManipulator.manipulateAsync(
-          currentUri,
-          [],
-          { compress: quality, format: ImageManipulator.SaveFormat.JPEG }
-        );
-        currentUri = manipulated.uri;
-        fileInfo = await FileSystem.getInfoAsync(currentUri);
-        quality -= 0.1;
-      }
-
-      if (fileInfo.exists && fileInfo.size && fileInfo.size > 1_048_576) {
-        Alert.alert(t("error"), t("imageSizeExceeds200KB"));
-        return;
-      }
-
-      await FileSystem.copyAsync({ from: currentUri, to: destPath });
-
-      const relativePath = `products/${fileName}`;
-      setImages([...images, relativePath]);
-    } catch (error) {
-      Alert.alert(t("error"), `${t("errorProcessImage")}: ${error}`);
-    }
   };
 
   const removeImage = async (image: string) => {
@@ -466,7 +425,7 @@ const EditItemScreen: React.FC<EditItemScreenProps> = ({
     if (item.type === "add") {
       return (
         <TouchableOpacity
-          onPress={pickImage}
+          onPress={addImage}
           style={{
             width: ITEM_WIDTH,
             height: ITEM_WIDTH,
@@ -672,7 +631,6 @@ const EditItemScreen: React.FC<EditItemScreenProps> = ({
         />
       </KeyboardAvoidingView>
 
-      {/* Button Bar at Bottom */}
       <XStack
         position="absolute"
         bottom={insets.bottom}
@@ -726,9 +684,11 @@ const EditItemScreen: React.FC<EditItemScreenProps> = ({
           height={40}
           paddingVertical="$2"
           onPress={() => handleSaveOrPublish(true)}
-          disabled={isLoading || ((isPublished||!productId) && !hasUnsavedChanges())}
+          disabled={
+            isLoading || ((isPublished || !productId) && !hasUnsavedChanges())
+          }
           backgroundColor={
-            isLoading || ((isPublished||!productId) && !hasUnsavedChanges())
+            isLoading || ((isPublished || !productId) && !hasUnsavedChanges())
               ? theme.disabled.val
               : theme.primary.val
           }

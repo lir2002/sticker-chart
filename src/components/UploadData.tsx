@@ -9,7 +9,7 @@ import * as FileSystem from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import { useLanguage } from "../contexts/LanguageContext";
 import { CustomButton } from "./SharedComponents";
-import { YStack, Text } from "tamagui";
+import { YStack, Text, XStack } from "tamagui";
 
 interface UploadDataProps {
   onClose: () => void;
@@ -118,6 +118,7 @@ const UploadData: React.FC<UploadDataProps> = ({ onClose }) => {
           {t("noBackups")}
         </Text>
       )}
+      <XStack jc="space-between" width="60%" gap="$3">
       <CustomButton
         title={t("upload")}
         onPress={handleUpload}
@@ -127,7 +128,7 @@ const UploadData: React.FC<UploadDataProps> = ({ onClose }) => {
         title={t("cancel")}
         onPress={onClose}
         disabled={isUploading}
-      />
+      /></XStack>
     </YStack>
   );
 };

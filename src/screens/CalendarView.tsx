@@ -9,8 +9,6 @@ import {
 } from "react-native";
 import { Calendar } from "react-native-calendars";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
-import * as ImagePicker from "expo-image-picker";
-import * as ImageManipulator from "expo-image-manipulator";
 import * as FileSystem from "expo-file-system";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
@@ -32,18 +30,19 @@ import { RouteProp } from "@react-navigation/native";
 import { useLanguage } from "../contexts/LanguageContext";
 import { UserContext } from "../contexts/UserContext";
 import { StyledInput, CustomButton } from "../components/SharedComponents";
+import VerifyCodeModal from "../components/VerifyCodeModal";
 import { RootStackParamList, Event } from "../types";
 import {
   insertEvent,
   fetchEventsWithCreator,
   getEventTypes,
   updateEventType,
-  verifyUserCode,
   deleteEvent,
   verifyEventWithTransaction,
 } from "../db/database";
 import { availableColors } from "../icons";
 import { resolvePhotoUri } from "../utils/fileUtils";
+import { captureImage, pickImage } from "../utils/imageUtils";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -52,7 +51,6 @@ interface CalendarViewProps {
 }
 
 const MAX_NOTE_LENGTH = 200;
-const MAX_PHOTO_SIZE = 1_048_576;
 
 // Styled components (unchanged)
 const Container = styled(YStack, {
@@ -314,7 +312,6 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
   const [verifyModalVisible, setVerifyModalVisible] = useState(false);
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [verifyEventModalVisible, setVerifyEventModalVisible] = useState(false);
-  const [inputCode, setInputCode] = useState("");
   const [pendingDate, setPendingDate] = useState<string | null>(null);
   const [note, setNote] = useState("");
   const [filterIcon, setFilterIcon] = useState("");
@@ -493,84 +490,6 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
     }
   };
 
-  const pickImage = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== "granted") {
-      Alert.alert("Permission Denied", t("permissionDeniedGallery"));
-      return;
-    }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      quality: 1,
-    });
-
-    if (!result.canceled && result.assets[0].uri) {
-      await processImage(result.assets[0].uri);
-    }
-  };
-
-  const captureImage = async () => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== "granted") {
-      Alert.alert("Permission Denied", t("permissionDeniedCamera"));
-      return;
-    }
-
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      quality: 1,
-    });
-
-    if (!result.canceled && result.assets[0].uri) {
-      await processImage(result.assets[0].uri);
-    }
-  };
-
-  const processImage = async (uri: string) => {
-    try {
-      const fileInfo = await FileSystem.getInfoAsync(uri, { size: true });
-      let finalUri = uri;
-
-      if (fileInfo.exists && fileInfo.size > MAX_PHOTO_SIZE) {
-        const manipulatedImage = await ImageManipulator.manipulateAsync(
-          uri,
-          [{ resize: { width: 1024 } }],
-          { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
-        );
-        finalUri = manipulatedImage.uri;
-
-        const newFileInfo = await FileSystem.getInfoAsync(finalUri, {
-          size: true,
-        });
-        if (newFileInfo.exists && newFileInfo.size > MAX_PHOTO_SIZE) {
-          const compressMore = await ImageManipulator.manipulateAsync(
-            finalUri,
-            [],
-            { compress: 0.5, format: ImageManipulator.SaveFormat.JPEG }
-          );
-          finalUri = compressMore.uri;
-        }
-      }
-
-      const photoDir = `${FileSystem.documentDirectory}photos/`;
-      const fileName = `${Date.now()}.jpg`;
-      const relativePath = `photos/${fileName}`;
-      const permanentPath = `${photoDir}${fileName}`;
-
-      await FileSystem.makeDirectoryAsync(photoDir, {
-        intermediates: true,
-      });
-      await FileSystem.moveAsync({ from: finalUri, to: permanentPath });
-      setPhotoUri(relativePath);
-    } catch (error) {
-      console.error("Error processing image:", error);
-      Alert.alert("Error", t("errorProcessImage"));
-    }
-  };
-
   const handleVerifyCode = async () => {
     if (!currentUser) {
       Alert.alert("Error", t("noCurrentUser"));
@@ -608,7 +527,6 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
         updateMarkedDates(updatedEvents, iconColor);
       }
       setVerifyModalVisible(false);
-      setInputCode("");
       setNote("");
       setPhotoUri(null);
       setPendingDate(null);
@@ -626,21 +544,19 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
   const handleVerifyDelete = async () => {
     if (!currentUser || !pendingEventId) return;
     try {
-      const isValid = await verifyUserCode(currentUser.id, inputCode);
-      if (isValid) {
-        await deleteEvent(pendingEventId);
-        const updatedEvents = events.filter((e) => e.id !== pendingEventId);
-        setEvents(updatedEvents);
-        calculateMonthlyAchievements(updatedEvents, currentYear, currentMonth);
-        updateMarkedDates(updatedEvents, iconColor);
-        setDeleteModalVisible(false);
-        setInputCode("");
-        setPendingEventId(null);
-        Alert.alert(t("success"), t("eventDeleted"));
-      } else {
-        Alert.alert("Error", t("errorIncorrectCode"));
-        setInputCode("");
-      }
+      await deleteEvent(pendingEventId);
+      events.map((e) => {
+        if (e.id === pendingEventId && e.photoPath && e.photoPath.length!==0) {
+          FileSystem.deleteAsync(resolvePhotoUri(e.photoPath)!);
+        }
+      });
+      const updatedEvents = events.filter((e) => e.id !== pendingEventId);
+      setEvents(updatedEvents);
+      calculateMonthlyAchievements(updatedEvents, currentYear, currentMonth);
+      updateMarkedDates(updatedEvents, iconColor);
+      setDeleteModalVisible(false);
+      setPendingEventId(null);
+      Alert.alert(t("success"), t("eventDeleted"));
     } catch (error) {
       console.error("Error deleting event:", error);
       Alert.alert("Error", t("errorDeleteEvent"));
@@ -660,39 +576,31 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
   const handleConfirmVerifyEvent = async () => {
     if (!currentUser || !pendingEventId) return;
     try {
-      const isValid = await verifyUserCode(currentUser.id, inputCode);
-      if (isValid) {
-        const event = events.find((e) => e.id === pendingEventId);
-        if (!event) {
-          throw new Error("Event not found");
-        }
-        await verifyEventWithTransaction(
-          pendingEventId,
-          currentUser.id,
-          event.eventType,
-          eventTypeOwnerId,
-          t("transactionReasonVerify", {
-            eventType: event.eventType,
-            createdAt: new Date(event.markedAt).toLocaleString(),
-          }),
-          t("transactionReasonReceive", {
-            eventType: event.eventType,
-            createdAt: new Date(event.markedAt).toLocaleString(),
-          })
-        );
-        // Updated to pass owner
-        const updatedEvents = await fetchEventsWithCreator(eventType, owner);
-        setEvents(updatedEvents);
-        calculateMonthlyAchievements(updatedEvents, currentYear, currentMonth);
-        updateMarkedDates(updatedEvents, iconColor);
-        setVerifyEventModalVisible(false);
-        setInputCode("");
-        setPendingEventId(null);
-        Alert.alert(t("success"), t("eventVerified"));
-      } else {
-        Alert.alert("Error", t("errorIncorrectCode"));
-        setInputCode("");
+      const event = events.find((e) => e.id === pendingEventId);
+      if (!event) {
+        throw new Error("Event not found");
       }
+      await verifyEventWithTransaction(
+        pendingEventId,
+        currentUser.id,
+        event.eventType,
+        eventTypeOwnerId,
+        t("transactionReasonVerify", {
+          eventType: event.eventType,
+          createdAt: new Date(event.markedAt).toLocaleString(),
+        }),
+        t("transactionReasonReceive", {
+          eventType: event.eventType,
+          createdAt: new Date(event.markedAt).toLocaleString(),
+        })
+      );
+      const updatedEvents = await fetchEventsWithCreator(eventType, owner);
+      setEvents(updatedEvents);
+      calculateMonthlyAchievements(updatedEvents, currentYear, currentMonth);
+      updateMarkedDates(updatedEvents, iconColor);
+      setVerifyEventModalVisible(false);
+      setPendingEventId(null);
+      Alert.alert(t("success"), t("eventVerified"));
     } catch (error: any) {
       console.error("Error verifying event:", error);
       Alert.alert("Error", `${t("errorVerifyEvent")}: ${error.message}`);
@@ -1005,10 +913,24 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
               {note.length}/{MAX_NOTE_LENGTH}
             </CharCount>
             <PhotoButtonContainer>
-              <PhotoButton onPress={captureImage}>
+              <PhotoButton
+                onPress={async () => {
+                  const result = await captureImage(262_144); // 200KB
+                  if (result) {
+                    setPhotoUri(result.relativePath);
+                  }
+                }}
+              >
                 <PhotoButtonText>{t("takePhoto")}</PhotoButtonText>
               </PhotoButton>
-              <PhotoButton onPress={pickImage}>
+              <PhotoButton
+                onPress={async () => {
+                  const result = await pickImage(262_144); // 200KB
+                  if (result) {
+                    setPhotoUri(result.relativePath);
+                  }
+                }}
+              >
                 <PhotoButtonText>{t("uploadPhoto")}</PhotoButtonText>
               </PhotoButton>
             </PhotoButtonContainer>
@@ -1031,74 +953,27 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
         </ModalContainer>
       </RNModal>
       {/* Delete Event Verification Modal */}
-      <RNModal
+      <VerifyCodeModal
         visible={deleteModalVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setDeleteModalVisible(false)}
-      >
-        <ModalContainer>
-          <ModalContent>
-            <ModalTitle>{t("verifyDeleteEvent")}</ModalTitle>
-            <StyledInput
-              placeholder={t("codePlaceholder")}
-              keyboardType="numeric"
-              maxLength={4}
-              value={inputCode}
-              onChangeText={setInputCode}
-              secureTextEntry
-              autoFocus
-            />
-            <XStack jc="center" w="60%" gap="$3">
-              <CustomButton
-                title={t("cancel")}
-                onPress={() => {
-                  setDeleteModalVisible(false);
-                  setInputCode("");
-                  setPendingEventId(null);
-                }}
-              />
-              <CustomButton title={t("confirm")} onPress={handleVerifyDelete} />
-            </XStack>
-          </ModalContent>
-        </ModalContainer>
-      </RNModal>
+        title={t("verifyDeleteEvent")}
+        userId={currentUser?.id || null}
+        onVerify={handleVerifyDelete}
+        onCancel={() => {
+          setDeleteModalVisible(false);
+          setPendingEventId(null);
+        }}
+      />
       {/* Verify Event Verification Modal */}
-      <RNModal
+      <VerifyCodeModal
         visible={verifyEventModalVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setVerifyEventModalVisible(false)}
-      >
-        <ModalContainer>
-          <ModalContent>
-            <ModalTitle>{t("verifyEvent")}</ModalTitle>
-            <StyledInput
-              placeholder={t("codePlaceholder")}
-              keyboardType="numeric"
-              maxLength={4}
-              value={inputCode}
-              onChangeText={setInputCode}
-              secureTextEntry
-              autoFocus
-            />
-            <XStack jc="center" w="60%" gap="$3">
-              <CustomButton
-                title={t("cancel")}
-                onPress={() => {
-                  setVerifyEventModalVisible(false);
-                  setInputCode("");
-                  setPendingEventId(null);
-                }}
-              />
-              <CustomButton
-                title={t("confirm")}
-                onPress={handleConfirmVerifyEvent}
-              />
-            </XStack>
-          </ModalContent>
-        </ModalContainer>
-      </RNModal>
+        title={t("verifyEvent")}
+        userId={currentUser?.id || null}
+        onVerify={handleConfirmVerifyEvent}
+        onCancel={() => {
+          setVerifyEventModalVisible(false);
+          setPendingEventId(null);
+        }}
+      />
       {/* Photo Modal */}
       <RNModal
         visible={photoModalVisible}
