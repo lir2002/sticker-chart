@@ -1,7 +1,8 @@
 import React, { createContext, useState, useEffect, useContext } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { getSystemLanguage } from "../utils/langUtils";
 
-type Language = "en" | "zh";
+type Language = "en" | "zh" | "auto";
 type Translations = {
   [key: string]: { en: string; zh: string };
 };
@@ -512,8 +513,8 @@ const translations: Translations = {
     zh: "图片大小不得超过200KB",
   },
   notLoggedIn: {
-    en: "You must be logged in to save a product",
-    zh: "您必须登录才能保存商品",
+    en: "You must be logged in first",
+    zh: "您必须先登录",
   },
   successCreateProduct: {
     en: "Product created successfully",
@@ -524,6 +525,34 @@ const translations: Translations = {
     zh: "商品更新成功",
   },
   productDetails: { en: "Product Details", zh: "商品详情" },
+  confirmDeleteMessage: {
+    en: "Are you sure you want to delete '{productName}'?",
+    zh: "您确定要删除[{productName}]吗？",
+  },
+  deleteSuccessful: { en: "Product deleted successfully", zh: "产品删除成功" },
+  deleteFailed: { en: "Failed to delete product", zh: "删除产品失败" },
+
+  verifyCode: { en: "Verify Your Code", zh: "验证您的代码" },
+  confirmPurchase: { en: "Confirm Purchase", zh: "确认购买" },
+  confirmPurchaseMessage: {
+    en: "You will pay ${total} for {quantity} x {productName}",
+    zh: "您将为{quantity}个{productName}支付${total}",
+  },
+  invalidProduct: { en: "Invalid product", zh: "无效商品" },
+  productNotFound: { en: "Product not found", zh: "找不到商品" },
+  cannotPurchaseOwnProduct: {
+    en: "Cannot purchase your own product",
+    zh: "不能购买自己的产品",
+  },
+  creatorWalletNotFound: {
+    en: "Creator's wallet not found",
+    zh: "找不到创建者的钱包",
+  },
+  purchaseFailed: { en: "Purchase failed", zh: "购买失败" },
+  purchaseSuccessful: {
+    en: "Successfully purchased {productName}",
+    zh: "成功购买{productName}",
+  },
 };
 
 const LanguageContext = createContext<LanguageContextType | undefined>(
@@ -539,7 +568,11 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({
     const loadLanguage = async () => {
       try {
         const savedLanguage = await AsyncStorage.getItem("appLanguage");
-        if (savedLanguage === "en" || savedLanguage === "zh") {
+        if (
+          savedLanguage === "en" ||
+          savedLanguage === "zh" ||
+          savedLanguage === "auto"
+        ) {
           setLanguage(savedLanguage);
         }
       } catch (error) {
@@ -559,7 +592,9 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   const t = (key: string, params: Record<string, any> = {}): string => {
-    let translation = translations[key]?.[language] || key;
+    const effectiveLanguage =
+      language === "auto" ? getSystemLanguage() : language;
+    let translation = translations[key]?.[effectiveLanguage] || key;
     Object.keys(params).forEach((param) => {
       translation = translation.replace(`{${param}}`, params[param]);
     });

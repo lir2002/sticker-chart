@@ -48,6 +48,7 @@ import { YStack, XStack, Text, useTheme, Separator } from "tamagui";
 import { resolvePhotoUri } from "../utils/fileUtils";
 import { captureImage, pickImage, processUserIcon } from "../utils/imageUtils";
 import { useThemeContext } from "../contexts/ThemeContext";
+import { getSystemLanguage } from "../utils/langUtils";
 
 type HomeScreenNavigationProp = NativeStackNavigationProp<
   RootStackParamList,
@@ -356,6 +357,19 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     setThemeMode("auto");
   };
 
+  const handleLangToggle = () => {
+    // Only toggle between en/zh if not in auto mode
+    const newLang =
+      language === "en" || (language === "auto" && getSystemLanguage() === "en")
+        ? "zh"
+        : "en";
+    setLanguage(newLang);
+  };
+
+  const handleLangAuto = () => {
+    setLanguage("auto");
+  };
+
   const handleAddEventType = async () => {
     if (!currentUser || currentUser.role_id !== 1) {
       Alert.alert("Error", t("adminOnly"));
@@ -562,7 +576,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                 const relativePath = await processUserIcon(
                   result.uri,
                   user.id,
-                  user.icon,
+                  user.icon
                 );
                 await updateUserIcon(user.id, relativePath);
                 const updatedUser = { ...user, icon: relativePath };
@@ -600,7 +614,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                 const relativePath = await processUserIcon(
                   result.uri,
                   user.id,
-                  user.icon,
+                  user.icon
                 );
                 await updateUserIcon(user.id, relativePath);
                 const updatedUser = { ...user, icon: relativePath };
@@ -854,24 +868,31 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         <YStack f={1} p={paddingHo} bg="$background">
           <XStack jc="space-between" ai="center" mb="$4">
             <TouchableOpacity
-              onPress={() => setLanguage(language === "en" ? "zh" : "en")}
+              onPress={handleLangToggle}
+              onLongPress={handleLangAuto}
               style={{
-                backgroundColor: theme.primary.val,
+                backgroundColor: theme.background.val,
                 borderRadius: 12,
                 paddingVertical: 4,
                 width: 40,
                 alignItems: "center",
                 justifyContent: "center",
+                borderColor: theme.border.val,
+                borderWidth: 1,
               }}
             >
-              <Text
-                fontSize="$4"
-                fontWeight="bold"
-                color="$background"
-                textAlign="center"
-              >
-                {language === "zh" ? "En" : "中文"}
-              </Text>
+              {language === "auto" ? (
+                <MaterialIcons name="language" size={20} color={theme.icon.val}/>
+              ) : (
+                <Text
+                  fontSize="$4"
+                  fontWeight="bold"
+                  color="$primary"
+                  textAlign="center"
+                >
+                  {language === "zh" ? "En" : "中文"}
+                </Text>
+              )}
             </TouchableOpacity>
 
             {/* Day/Night Toggle Icon */}
@@ -913,9 +934,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               {currentUser.icon ? (
                 <Image
                   source={{
-                    uri: `${resolvePhotoUri(
-                      currentUser.icon
-                    )}`,
+                    uri: `${resolvePhotoUri(currentUser.icon)}`,
                   }}
                   style={{ width: 30, height: 30, borderRadius: 15 }}
                 />
