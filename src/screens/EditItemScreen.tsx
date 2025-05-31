@@ -18,7 +18,12 @@ import DraggableFlatList, {
 } from "react-native-draggable-flatlist";
 import { FlatList } from "react-native-gesture-handler";
 import PagerView from "react-native-pager-view";
-import { createProduct, updateProduct, getProductById } from "../db/database";
+import {
+  createProduct,
+  updateProduct,
+  getProductById,
+  deleteProduct,
+} from "../db/database";
 import { UserContext } from "../contexts/UserContext";
 import { useLanguage } from "../contexts/LanguageContext";
 import { YStack, XStack, Text, useTheme, Button } from "tamagui";
@@ -60,6 +65,8 @@ const EditItemScreen: React.FC<EditItemScreenProps> = ({
   const [price, setPrice] = useState("1");
   const [quantity, setQuantity] = useState("0");
   const [images, setImages] = useState<string[]>([]);
+  const [removedImages, setRemovedImages] = useState<string[]>([]);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState<number | null>(
     null
   );
@@ -146,6 +153,7 @@ const EditItemScreen: React.FC<EditItemScreenProps> = ({
       }
       // Reset state
       setImages(initialImages);
+      setRemovedImages([]);
       setProductName(initialName);
       setDescription(initialDescription);
       setPrice(initialPrice);
@@ -175,12 +183,29 @@ const EditItemScreen: React.FC<EditItemScreenProps> = ({
       const quantityNum = parseInt(quantity);
       const imagesString = images.join(",");
 
+      // Delete removed images from filesystem
+      const imagesToDelete = removedImages;
+      for (const image of imagesToDelete) {
+        const filePath = `${FileSystem.documentDirectory}${image}`;
+        const fileInfo = await FileSystem.getInfoAsync(filePath);
+        if (fileInfo.exists) {
+          try {
+            await FileSystem.deleteAsync(filePath, { idempotent: true });
+            console.log(`Deleted image: ${filePath}`);
+          } catch (fileError) {
+            console.warn(`Failed to delete image ${filePath}:`, fileError);
+          }
+        } else {
+          console.warn(`Unsaved image not found: ${filePath}`);
+        }
+      }
+
       if (productId) {
         await updateProduct(
           productId,
           productName,
           description,
-          imagesString || undefined,
+          imagesString,
           priceNum,
           online,
           quantityNum
@@ -207,7 +232,8 @@ const EditItemScreen: React.FC<EditItemScreenProps> = ({
       setInitialPrice(price.toString());
       setInitialQuantity(quantity.toString());
       setInitialImages(images);
-      setIsPublished(online); // Update published status
+      setRemovedImages([]); // Clear removed images after saving
+      setIsPublished(online);
       online && navigation.goBack();
     } catch (error) {
       Alert.alert(t("error"), `${t("errorSaveProduct")}: ${error}`);
@@ -216,9 +242,87 @@ const EditItemScreen: React.FC<EditItemScreenProps> = ({
     }
   };
 
+  const handleDelete = () => {
+    Alert.alert(
+      t("confirmDelete"),
+      t("confirmDeleteMessage", { productName: productName }),
+      [
+        { text: t("cancel"), style: "cancel" },
+        {
+          text: t("delete"),
+          style: "destructive",
+          onPress: async () => {
+            try {
+              setIsDeleting(true);
+              if (productId) {
+                // Existing product: delete initialImages and added images
+                // Delete images from initialImages (database images)
+                for (const path of initialImages) {
+                  const fullPath = `${FileSystem.documentDirectory}${path}`;
+                  try {
+                    await FileSystem.deleteAsync(fullPath, {
+                      idempotent: true,
+                    });
+                    console.log(`Deleted database image: ${fullPath}`);
+                  } catch (fileError) {
+                    console.warn(
+                      `Failed to delete image ${fullPath}:`,
+                      fileError
+                    );
+                  }
+                }
+                // Delete images added during editing
+                const addedImages = images.filter(
+                  (img) => !initialImages.includes(img)
+                );
+                for (const path of addedImages) {
+                  const fullPath = `${FileSystem.documentDirectory}${path}`;
+                  try {
+                    await FileSystem.deleteAsync(fullPath, {
+                      idempotent: true,
+                    });
+                    console.log(`Deleted added image: ${fullPath}`);
+                  } catch (fileError) {
+                    console.warn(
+                      `Failed to delete image ${fullPath}:`,
+                      fileError
+                    );
+                  }
+                }
+                // Delete product from database
+                await deleteProduct(productId);
+              } else {
+                // New product: delete images added during editing
+                for (const path of images) {
+                  const fullPath = `${FileSystem.documentDirectory}${path}`;
+                  try {
+                    await FileSystem.deleteAsync(fullPath, {
+                      idempotent: true,
+                    });
+                    console.log(`Deleted new product image: ${fullPath}`);
+                  } catch (fileError) {
+                    console.warn(
+                      `Failed to delete image ${fullPath}:`,
+                      fileError
+                    );
+                  }
+                }
+              }
+              Alert.alert(t("success"), t("deleteSuccessful"));
+              navigation.goBack();
+            } catch (error) {
+              Alert.alert(t("error"), t("deleteFailed"));
+              console.error("Delete error:", error);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   useEffect(() => {
     const unsubscribe = navigation.addListener("beforeRemove", (e) => {
-      if (!hasUnsavedChanges() || isLoading) {
+      if (!hasUnsavedChanges() || isLoading || isDeleting) {
         console.log("No unsaved changes or loading, allowing navigation");
         return;
       }
@@ -264,6 +368,7 @@ const EditItemScreen: React.FC<EditItemScreenProps> = ({
     t,
     handleSaveOrPublish,
     cleanupUnsavedImages,
+    isDeleting,
   ]);
 
   // Add image (replaces pickImage)
@@ -332,36 +437,27 @@ const EditItemScreen: React.FC<EditItemScreenProps> = ({
   };
 
   const removeImage = async (image: string) => {
-    try {
+    // Delete file if image is not in initialImages (newly added)
+    if (!initialImages.includes(image)) {
       const filePath = `${FileSystem.documentDirectory}${image}`;
-      const fileInfo = await FileSystem.getInfoAsync(filePath);
-      if (fileInfo.exists) {
-        await FileSystem.deleteAsync(filePath);
-        console.log(`Deleted image file: ${filePath}`);
-      } else {
-        console.warn(`Image file not found: ${filePath}`);
+      try {
+        await FileSystem.deleteAsync(filePath, { idempotent: true });
+        console.log(`Deleted added image: ${filePath}`);
+      } catch (fileError) {
+        console.warn(`Failed to delete image ${filePath}:`, fileError);
       }
-
-      const index = images.indexOf(image);
-      setImages(images.filter((img) => img !== image));
-      if (
-        currentImageIndex !== null &&
-        index <= currentImageIndex &&
-        images.length > 1
-      ) {
-        setCurrentImageIndex(Math.max(0, currentImageIndex - 1));
-      }
-    } catch (error) {
-      console.error(`Error deleting image ${image}:`, error);
-      Alert.alert(t("error"), t("errorDeleteImage"));
-      setImages(images.filter((img) => img !== image));
-      if (
-        currentImageIndex !== null &&
-        index <= currentImageIndex &&
-        images.length > 1
-      ) {
-        setCurrentImageIndex(Math.max(0, currentImageIndex - 1));
-      }
+    } else {
+      // Track database images in removedImages
+      setRemovedImages([...removedImages, image]);
+    }
+    const index = images.indexOf(image);
+    setImages(images.filter((img) => img !== image));
+    if (
+      currentImageIndex !== null &&
+      index <= currentImageIndex &&
+      images.length > 1
+    ) {
+      setCurrentImageIndex(Math.max(0, currentImageIndex - 1));
     }
   };
 
@@ -695,6 +791,18 @@ const EditItemScreen: React.FC<EditItemScreenProps> = ({
           color="$background"
         >
           {t("publish")}
+        </Button>
+        {/* Add Delete button */}
+        <Button
+          size="$3"
+          height={40}
+          paddingVertical="$2"
+          onPress={handleDelete}
+          disabled={!productId}
+          backgroundColor={!productId ? theme.disabled.val : theme.primary.val}
+          color="$background"
+        >
+          {t("delete")}
         </Button>
       </XStack>
 
