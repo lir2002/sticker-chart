@@ -15,6 +15,9 @@ import { useLanguage } from "../contexts/LanguageContext";
 import { YStack, XStack, Text, useTheme } from "tamagui";
 import { StyledInput } from "../components/SharedComponents";
 import { UserContext } from "../contexts/UserContext";
+import { processPurchase } from "../db/database";
+import VerifyCodeModal from "../components/VerifyCodeModal";
+import { getSystemLanguage } from "../utils/langUtils";
 
 type ProductPreviewScreenProps = NativeStackScreenProps<
   RootStackParamList,
@@ -27,7 +30,7 @@ const ProductPreviewScreen: React.FC<ProductPreviewScreenProps> = ({
   route,
   navigation,
 }) => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const theme = useTheme();
   const {
     productId,
@@ -38,6 +41,15 @@ const ProductPreviewScreen: React.FC<ProductPreviewScreenProps> = ({
     quantity,
     online,
   } = route.params;
+  const { currentUser } = useContext(UserContext);
+
+  const [purchaseQuantity, setPurchaseQuantity] = useState("1");
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [showCodeModal, setShowCodeModal] = useState(false);
+  const [pendingPurchase, setPendingPurchase] = useState<{
+    quantity: number;
+    total: number;
+  } | null>(null);
 
   // Set navigation title to "Product Details"
   useEffect(() => {
@@ -45,10 +57,6 @@ const ProductPreviewScreen: React.FC<ProductPreviewScreenProps> = ({
       title: productId ? t("productDetails") : t("previewProduct"),
     });
   }, [navigation, t]);
-
-  // State for purchase quantity
-  const [purchaseQuantity, setPurchaseQuantity] = useState("1");
-  const { currentUser } = useContext(UserContext);
 
   // Adjust purchase quantity with increment/decrement
   const adjustPurchaseQuantity = (increment: boolean) => {
@@ -75,6 +83,105 @@ const ProductPreviewScreen: React.FC<ProductPreviewScreenProps> = ({
         Alert.alert(t("error"), t("quantityExceedsAvailable"));
       }
     }
+  };
+
+  // Handle purchase initiation
+  const handlePurchase = () => {
+    if (!currentUser) {
+      Alert.alert(t("error"), t("notLoggedIn"));
+      return;
+    }
+
+    const qty = parseInt(purchaseQuantity) || 1;
+    const totalCost = price * qty;
+
+    // Step 1: Confirm purchase
+    Alert.alert(
+      t("confirmPurchase"),
+      t("confirmPurchaseMessage", {
+        quantity: qty,
+        total: totalCost.toFixed(2),
+        productName,
+      }),
+      [
+        { text: t("cancel"), style: "cancel" },
+        {
+          text: t("confirm"),
+          onPress: () => {
+            setPendingPurchase({ quantity: qty, total: totalCost });
+            setShowCodeModal(true); // Show VerifyCodeModal
+          },
+        },
+      ]
+    );
+  };
+
+  // Step 2: Handle code verification and purchase
+  const handleVerifyPurchase = async () => {
+    if (!pendingPurchase) {
+      return; // Safety check
+    }
+
+    const { quantity: qty } = pendingPurchase;
+
+    if (!productId) {
+      Alert.alert(t("error"), t("invalidProduct"));
+      setShowCodeModal(false);
+      setPendingPurchase(null);
+      return;
+    }
+
+    setIsProcessing(true);
+
+    try {
+      const newQuantity = await processPurchase(
+        currentUser!.id,
+        productId,
+        qty,
+        price,
+        productName,
+        description || null,
+        images,
+        language === "en" ||
+          (language === "auto" && getSystemLanguage() === "en")
+          ? "en"
+          : "zh"
+      );
+
+      // Update local quantity
+      navigation.setParams({ quantity: newQuantity });
+
+      Alert.alert(t("success"), t("purchaseSuccessful", { productName }), [
+        { text: t("confirm"), onPress: navigation.goBack },
+      ]);
+      setShowCodeModal(false);
+      setPendingPurchase(null);
+    } catch (error: any) {
+      let errorMessage = t("purchaseFailed");
+      if (error.message.includes("Product not found")) {
+        errorMessage = t("productNotFound");
+      } else if (error.message.includes("Cannot purchase own product")) {
+        errorMessage = t("cannotPurchaseOwnProduct");
+      } else if (error.message.includes("Insufficient credit")) {
+        errorMessage = t("insufficientCredit");
+      } else if (error.message.includes("Creator wallet not found")) {
+        errorMessage = t("creatorWalletNotFound");
+      } else if (error.message.includes("Insufficient product quantity")) {
+        errorMessage = t("quantityExceedsAvailable");
+      }
+      console.log("error debug:", error);
+      Alert.alert(t("error"), errorMessage);
+      setShowCodeModal(false);
+      setPendingPurchase(null);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Handle cancel verification
+  const handleCancelVerification = () => {
+    setShowCodeModal(false);
+    setPendingPurchase(null);
   };
 
   return (
@@ -120,6 +227,9 @@ const ProductPreviewScreen: React.FC<ProductPreviewScreenProps> = ({
               </Text>
             </YStack>
           )}
+          <XStack>
+            <Text>{t("productNumber")}:{" "} {productId}</Text>
+          </XStack>
         </YStack>
       </ScrollView>
       {/* Status Bar with Quantity Input, Total Quantity, and Buy Button */}
@@ -191,11 +301,19 @@ const ProductPreviewScreen: React.FC<ProductPreviewScreenProps> = ({
         </XStack>
         {/* Buy Button */}
         <TouchableOpacity
-          onPress={() => Alert.alert(t("info"), t("buyNotImplemented"))}
-          disabled={parseInt(purchaseQuantity) === 0  || !currentUser || currentUser.id===2}
+          onPress={handlePurchase}
+          disabled={
+            parseInt(purchaseQuantity) === 0 ||
+            !currentUser ||
+            currentUser.id === 2 || // Guest user
+            isProcessing
+          }
           style={{
             backgroundColor:
-              parseInt(purchaseQuantity) === 0  || !currentUser || currentUser.id===2
+              parseInt(purchaseQuantity) === 0 ||
+              !currentUser ||
+              currentUser.id === 2 ||
+              isProcessing
                 ? theme.disabled.val
                 : theme.primary.val,
             paddingHorizontal: 16,
@@ -210,6 +328,14 @@ const ProductPreviewScreen: React.FC<ProductPreviewScreenProps> = ({
           </Text>
         </TouchableOpacity>
       </XStack>
+      {/* Verify Code Modal */}
+      <VerifyCodeModal
+        visible={showCodeModal}
+        title={t("verifyCode")}
+        userId={currentUser?.id || null}
+        onVerify={handleVerifyPurchase}
+        onCancel={handleCancelVerification}
+      />
     </SafeAreaView>
   );
 };

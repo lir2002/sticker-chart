@@ -36,10 +36,12 @@ export const tokens = createTokens({
     border: "#CCCCCC",
     icon: "#000000",
     modalBackground: "#FFFFFF",
-    selectedBackground: "#E0F0FF", // New color for selected items
+    selectedBackground: "#E0F0FF",
     photoBackground: "#000000",
     verified: "#34C759",
     disabled: "#B0B0B0",
+    canceled: "#6c757d",
+    faded: "#dc3545",
   },
 });
 
@@ -59,6 +61,8 @@ const themes = {
     photoBackground: tokens.color.photoBackground,
     verified: tokens.color.verified,
     disabled: tokens.color.disabled,
+    canceled: tokens.color.canceled,
+    faded: tokens.color.faded,
   },
   dark: {
     background: "#1C1C1E",

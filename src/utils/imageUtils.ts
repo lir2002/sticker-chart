@@ -2,6 +2,13 @@ import * as ImagePicker from "expo-image-picker";
 import * as ImageManipulator from "expo-image-manipulator";
 import * as FileSystem from "expo-file-system";
 import { Alert } from "react-native";
+import {
+  createProductImage,
+  deleteProductImage,
+  getProductImageById,
+  updateProductImage,
+} from "../db/database";
+import { ProductImage } from "../types";
 
 interface ImageResult {
   uri: string;
@@ -189,3 +196,64 @@ export async function processProductImage(uri: string): Promise<string> {
     );
   }
 }
+
+// Refer Images
+export const getImageRefer = async (
+  imagePath: string
+): Promise<ProductImage | null> => {
+  const imageId = generateImageId(imagePath);
+  if (imageId) {
+    const referImage = await getProductImageById(imageId);
+    return referImage;
+  }
+  return null;
+};
+
+export const generateImageId = (imagePath: string): number | null => {
+  const match = imagePath.match(/product_(\d+)\.jpg/);
+  if (match && match[1]) {
+    const imageId = parseInt(match[1], 10);
+    return imageId || null;
+  }
+  return null;
+};
+
+export const removeImageFromRefer = async (
+  imagePath: string
+): Promise<void> => {
+  const referImage = await getImageRefer(imagePath);
+  if (!referImage || referImage.referred < 2) {
+    // Delete removed images from filesystem
+    const filePath = `${FileSystem.documentDirectory}${imagePath}`;
+    const fileInfo = await FileSystem.getInfoAsync(filePath);
+    if (fileInfo.exists) {
+      try {
+        await FileSystem.deleteAsync(filePath, { idempotent: true });
+        console.log(`Deleted image: ${filePath}`);
+      } catch (fileError) {
+        console.warn(`Failed to delete image ${filePath}:`, fileError);
+      }
+    } else {
+      console.warn(`Unsaved image not found: ${filePath}`);
+    }
+    if (referImage) {
+      deleteProductImage(referImage.id);
+    }
+  } else {
+    await updateProductImage(referImage.id, referImage.referred - 1);
+  }
+};
+
+export const addImageToRefer = async (imagePath: string): Promise<void> => {
+  const referImage = await getImageRefer(imagePath);
+  if (referImage) {
+    updateProductImage(referImage.id, referImage.referred + 1);
+  } else {
+    const imageId = generateImageId(imagePath);
+    if (imageId) {
+      createProductImage(imageId);
+    } else {
+      console.warn(`Failed to add ${imagePath} to productImages`)
+    }
+  }
+};

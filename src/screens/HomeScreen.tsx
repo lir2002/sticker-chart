@@ -124,7 +124,7 @@ const MenuModal: React.FC<{
           position="absolute"
           bottom={tabBarHeight}
           {...(tab === "tools" ? { left: 0 } : { right: 0 })}
-          width={modalWidth}
+          minWidth={modalWidth}
           bg="$modalBackground"
           p="$4"
           borderRadius={0}
@@ -759,8 +759,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       onPress={() =>
         navigation.navigate("Calendar", {
           eventType: item.name,
-          owner: item.owner,
-          ownerName: item.ownerName,
+          owner: item.owner || null,
+          ownerName: item.ownerName!,
           icon: item.icon,
           iconColor: item.iconColor,
         })
@@ -882,7 +882,11 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               }}
             >
               {language === "auto" ? (
-                <MaterialIcons name="language" size={20} color={theme.icon.val}/>
+                <MaterialIcons
+                  name="language"
+                  size={20}
+                  color={theme.icon.val}
+                />
               ) : (
                 <Text
                   fontSize="$4"
@@ -1094,8 +1098,18 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                     setBackupModalVisible(true);
                     setToolsMenuVisible(false);
                   }}
-                  style={{ paddingVertical: 8 }}
+                  style={{
+                    paddingVertical: 8,
+                    flexDirection: "row",
+                    alignItems: "center",
+                  }}
                 >
+                  <MaterialIcons
+                    name="backup"
+                    size={24}
+                    color={theme.text.val}
+                    style={{ marginRight: 8 }}
+                  />
                   <Text fontSize="$4" color="$text">
                     {t("backupData")}
                   </Text>
@@ -1106,8 +1120,18 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                     setRestoreModalVisible(true);
                     setToolsMenuVisible(false);
                   }}
-                  style={{ paddingVertical: 8 }}
+                  style={{
+                    paddingVertical: 8,
+                    flexDirection: "row",
+                    alignItems: "center",
+                  }}
                 >
+                  <MaterialIcons
+                    name="cloud-download"
+                    size={24}
+                    color={theme.text.val}
+                    style={{ marginRight: 8 }}
+                  />
                   <Text fontSize="$4" color="$text">
                     {t("restoreData")}
                   </Text>
@@ -1118,8 +1142,18 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                     handleAddEventType();
                     setToolsMenuVisible(false);
                   }}
-                  style={{ paddingVertical: 8 }}
+                  style={{
+                    paddingVertical: 8,
+                    flexDirection: "row",
+                    alignItems: "center",
+                  }}
                 >
+                  <MaterialIcons
+                    name="add-circle"
+                    size={24}
+                    color={theme.text.val}
+                    style={{ marginRight: 8 }}
+                  />
                   <Text fontSize="$4" color="$text">
                     {t("newAchievementType")}
                   </Text>
@@ -1130,8 +1164,18 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                     navigation.navigate("ManageProducts");
                     setToolsMenuVisible(false);
                   }}
-                  style={{ paddingVertical: 8 }}
+                  style={{
+                    paddingVertical: 8,
+                    flexDirection: "row",
+                    alignItems: "center",
+                  }}
                 >
+                  <MaterialIcons
+                    name="inventory"
+                    size={24}
+                    color={theme.text.val}
+                    style={{ marginRight: 8 }}
+                  />
                   <Text fontSize="$4" color={theme.text.val}>
                     {t("manageProducts")}
                   </Text>
@@ -1142,10 +1186,42 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                     navigation.navigate("EditItem");
                     setToolsMenuVisible(false);
                   }}
-                  style={{ paddingVertical: 8 }}
+                  style={{
+                    paddingVertical: 8,
+                    flexDirection: "row",
+                    alignItems: "center",
+                  }}
                 >
+                  <MaterialIcons
+                    name="factory"
+                    size={24}
+                    color={theme.text.val}
+                    style={{ marginRight: 8 }}
+                  />
                   <Text fontSize="$4" color="$text">
                     {t("createItem")}
+                  </Text>
+                </TouchableOpacity>
+                <Separator borderColor={theme.border.val} marginVertical="$2" />
+                <TouchableOpacity
+                  onPress={() => {
+                    navigation.navigate("ManageOrders");
+                    setToolsMenuVisible(false);
+                  }}
+                  style={{
+                    paddingVertical: 8,
+                    flexDirection: "row",
+                    alignItems: "center",
+                  }}
+                >
+                  <MaterialIcons
+                    name="gavel"
+                    size={24}
+                    color={theme.text.val}
+                    style={{ marginRight: 8 }}
+                  />
+                  <Text fontSize="$4" color="$text">
+                    {t("manageOrders")}
                   </Text>
                 </TouchableOpacity>
               </>
@@ -1163,8 +1239,18 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                 navigation.navigate("CalendarViewAll");
                 setServicesMenuVisible(false);
               }}
-              style={{ paddingVertical: 8 }}
+              style={{
+                paddingVertical: 8,
+                flexDirection: "row",
+                alignItems: "center",
+              }}
             >
+              <MaterialIcons
+                name="diamond"
+                size={24}
+                color={theme.text.val}
+                style={{ marginRight: 8 }}
+              />
               <Text fontSize="$4" color="$text">
                 {t("viewAllStickers")}
               </Text>
@@ -1174,13 +1260,21 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                 <Separator borderColor={theme.border.val} marginVertical="$2" />
                 <TouchableOpacity
                   onPress={() => {
-                    navigation.navigate("TransactionHistory", {
-                      userId: currentUser.id,
-                    });
+                    navigation.navigate("TransactionHistory");
                     setServicesMenuVisible(false);
                   }}
-                  style={{ paddingVertical: 8 }}
+                  style={{
+                    paddingVertical: 8,
+                    flexDirection: "row",
+                    alignItems: "center",
+                  }}
                 >
+                  <MaterialIcons
+                    name="history"
+                    size={24}
+                    color={theme.text.val}
+                    style={{ marginRight: 8 }}
+                  />
                   <Text fontSize="$4" color="$text">
                     {t("transactionHistory")}
                   </Text>
@@ -1193,12 +1287,48 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                 navigation.navigate("ManageProducts", { shopMode: true });
                 setServicesMenuVisible(false);
               }}
-              style={{ paddingVertical: 8 }}
+              style={{
+                paddingVertical: 8,
+                flexDirection: "row",
+                alignItems: "center",
+              }}
             >
+              <MaterialIcons
+                name="add-shopping-cart"
+                size={24}
+                color={theme.text.val}
+                style={{ marginRight: 8 }}
+              />
               <Text fontSize="$4" color="$text">
                 {t("browseStore")}
               </Text>
             </TouchableOpacity>
+            {currentUser && (
+              <>
+                <Separator borderColor={theme.border.val} marginVertical="$2" />
+                <TouchableOpacity
+                  onPress={() => {
+                    navigation.navigate("MyOrders");
+                    setServicesMenuVisible(false);
+                  }}
+                  style={{
+                    paddingVertical: 8,
+                    flexDirection: "row",
+                    alignItems: "center",
+                  }}
+                >
+                  <MaterialIcons
+                    name="receipt"
+                    size={24}
+                    color={theme.text.val}
+                    style={{ marginRight: 8 }}
+                  />
+                  <Text fontSize="$4" color="$text">
+                    {t("myOrders")}
+                  </Text>
+                </TouchableOpacity>
+              </>
+            )}
           </YStack>
         </MenuModal>
 

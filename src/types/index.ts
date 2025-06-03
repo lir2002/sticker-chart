@@ -64,12 +64,12 @@ export type RootStackParamList = {
   CalendarViewAll: undefined;
   CodeSetup: undefined;
   ChangeCode: { userId: number }; // Updated to pass user ID
-  TransactionHistory: { userId: number };
+  TransactionHistory: undefined;
   EditItem: { productId?: number } | undefined;
   ManageProducts: { shopMode?: boolean };
   BrowseStore: undefined;
   ProductPreview: {
-    productId?: string; // Absent in Preview Mode
+    productId?: number; // Absent in Preview Mode
     productName: string;
     description?: string;
     price: number;
@@ -77,6 +77,9 @@ export type RootStackParamList = {
     images: string[];
     online: number;
   };
+  MyOrders: undefined;
+  OrderDetails: { orderNumber: number };
+  ManageOrders: undefined;
 };
 
 export interface Wallet {
@@ -114,9 +117,13 @@ export interface Product {
   creator: number;
   online: number; // 0 or 1
   quantity: number;
-  creatorName?: string;
   createdAt?: string;
   updated_at?: string;
+}
+
+export interface ProductImage {
+  id: number;
+  referred: number;
 }
 
 export interface Purchase {
@@ -125,9 +132,14 @@ export interface Purchase {
   owner: number;
   price: number;
   quantity: number;
-  fullfilled: number; // 0 or 1
-  ownerName: string;
+  createdAt: string;
+  fulfilledAt?: string;
   productName?: string;
-  created_at?: string;
-  fullfilled_at?: string;
+  description?: string;
+  images?: string;
+  ownerName?: string;
+  fulfilledBy?: number;
+  fulfilledByName?: string;
+  ownerIcon?: string;
+  fulfilledByIcon?: string;
 }

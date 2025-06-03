@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { FlatList, TouchableOpacity, Image, Alert, Modal } from "react-native";
 import * as FileSystem from "expo-file-system";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
@@ -6,102 +6,10 @@ import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 import { RootStackParamList, Product, User } from "../types";
 import { getProducts, getUsers } from "../db/database";
 import { useLanguage } from "../contexts/LanguageContext";
-import { YStack, XStack, Text, useTheme, Select, Input, Button } from "tamagui";
+import { YStack, XStack, Text, useTheme } from "tamagui";
 import { StyledInput } from "../components/SharedComponents";
-
-// Dropdown Component
-const Dropdown = ({
-  value,
-  onValueChange,
-  items,
-  placeholder,
-}: {
-  value: string;
-  onValueChange: (value: string) => void;
-  items: { label: string; value: string }[];
-  placeholder: string;
-}) => {
-  const theme = useTheme();
-  const [isModalVisible, setModalVisible] = useState(false);
-
-  const selectedItem = items.find((item) => item.value === value);
-
-  return (
-    <>
-      <TouchableOpacity
-        onPress={() => setModalVisible(true)}
-        style={{
-          flex: 1,
-          flexDirection: "row",
-          alignItems: "center",
-          backgroundColor: theme.background.val,
-          borderWidth: 1,
-          borderColor: theme.border?.val,
-          borderRadius: 5,
-          padding: 10,
-          height: 40,
-        }}
-      >
-        <Text
-          flex={1}
-          color={selectedItem ? theme.text.val : theme.text.val + "80"}
-        >
-          {selectedItem ? selectedItem.label : placeholder}
-        </Text>
-        <MaterialIcons
-          name="arrow-drop-down"
-          size={24}
-          color={theme.icon.val}
-        />
-      </TouchableOpacity>
-
-      <Modal
-        visible={isModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <TouchableOpacity
-          style={{
-            flex: 1,
-            backgroundColor: "rgba(0,0,0,0.5)",
-            justifyContent: "center",
-            alignItems: "center",
-          }}
-          onPress={() => setModalVisible(false)}
-        >
-          <YStack
-            backgroundColor={theme.background.val}
-            borderRadius={10}
-            width="80%"
-            maxHeight="50%"
-            padding={10}
-          >
-            <FlatList
-              data={items}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  onPress={() => {
-                    onValueChange(item.value);
-                    setModalVisible(false);
-                  }}
-                  style={{
-                    padding: 12,
-                    borderBottomWidth: 1,
-                    borderBottomColor: theme.border?.val + "20",
-                  }}
-                >
-                  <Text color={theme.text.val}>{item.label}</Text>
-                </TouchableOpacity>
-              )}
-              keyExtractor={(item) => item.value}
-            />
-          </YStack>
-        </TouchableOpacity>
-      </Modal>
-    </>
-  );
-};
+import { filterAndSortData } from "../utils/filterAndSort";
+import { Dropdown } from "../components/Dropdown";
 
 type ManageProductsScreenProps = NativeStackScreenProps<
   RootStackParamList,
@@ -118,11 +26,10 @@ const ManageProductsScreen: React.FC<ManageProductsScreenProps> = ({
 
   const [products, setProducts] = useState<Product[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("name_asc");
-  const [creatorFilter, setCreatorFilter] = useState("all");
-  const [creators, setCreators] = useState<{ id: string; name: string }[]>([]);
+  const [creatorFilter, setCreatorFilter] = useState("0");
+  const [creators, setCreators] = useState<{ id: number; name: string }[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // Sort options
@@ -138,7 +45,7 @@ const ManageProductsScreen: React.FC<ManageProductsScreenProps> = ({
   // Creator options for Dropdown
   const creatorOptions = creators.map((creator) => ({
     label: creator.name,
-    value: creator.id,
+    value: creator.id.toString(),
   }));
 
   // Fetch products and users
@@ -149,7 +56,7 @@ const ManageProductsScreen: React.FC<ManageProductsScreenProps> = ({
 
       // Filter for published products in shop mode
       if (shopMode) {
-        fetchedProducts = fetchedProducts.filter((p) => p.online === 1);
+        fetchedProducts = fetchedProducts.filter((p) => p.online === 1 && p.quantity !== 0);
       }
 
       const fetchedUsers = await getUsers();
@@ -164,12 +71,12 @@ const ManageProductsScreen: React.FC<ManageProductsScreenProps> = ({
         new Set(fetchedProducts.map((p) => p.creator))
       )
         .map((id) => ({
-          id: id.toString(),
+          id: id,
           name: userMap.get(id) || `Creator ${id}`,
         }))
         .sort((a, b) => a.name.localeCompare(b.name));
 
-      setCreators([{ id: "all", name: t("allCreators") }, ...uniqueCreators]);
+      setCreators([{ id: 0, name: t("allCreators") }, ...uniqueCreators]);
     } catch (error) {
       Alert.alert(t("error"), `${t("errorFetchProducts")}: ${error}`);
     } finally {
@@ -197,43 +104,20 @@ const ManageProductsScreen: React.FC<ManageProductsScreenProps> = ({
   useEffect(() => {
     let result = [...products];
 
-    // Apply search filter
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      result = result.filter(
-        (p) =>
-          p.name.toLowerCase().includes(query) ||
-          (p.description && p.description.toLowerCase().includes(query))
-      );
+    // Apply shop mode filter
+    if (shopMode) {
+      result = result.filter((p) => p.online === 1);
     }
 
-    // Apply creator filter
-    if (creatorFilter !== "all") {
-      result = result.filter((p) => p.creator.toString() === creatorFilter);
-    }
-
-    // Apply sorting
-    result.sort((a, b) => {
-      switch (sortBy) {
-        case "name_asc":
-          return a.name.localeCompare(b.name);
-        case "name_desc":
-          return b.name.localeCompare(a.name);
-        case "price_asc":
-          return a.price - b.price;
-        case "price_desc":
-          return b.price - a.price;
-        case "created_asc":
-          return a.createdAt?.localeCompare(b.createdAt!);
-        case "created_desc":
-          return b.createdAt?.localeCompare(a.createdAt!);
-        default:
-          return 0;
-      }
+    // Apply filtering and sorting
+    const filtered = filterAndSortData<Product>({
+      data: result,
+      searchQuery,
+      sortBy,
+      creatorFilter,
     });
-
-    setFilteredProducts(result);
-  }, [products, searchQuery, creatorFilter, sortBy]);
+    setFilteredProducts(filtered);
+  }, [products, searchQuery, creatorFilter, sortBy, shopMode]);
 
   // Render product card
   const renderProduct = ({ item }: { item: Product }) => {
@@ -285,7 +169,7 @@ const ManageProductsScreen: React.FC<ManageProductsScreenProps> = ({
             )}
           </YStack>
           {/* Text Area */}
-          <YStack flex={1} gap="$2">
+          <YStack flex={1} gap="$1">
             <Text
               fontSize="$4"
               fontWeight="bold"
@@ -296,7 +180,10 @@ const ManageProductsScreen: React.FC<ManageProductsScreenProps> = ({
               {item.name}
             </Text>
             <Text fontSize="$4" color={theme.text.val}>
-              {t("price")}: ${item.price.toFixed(2)}
+              {t("price")}: {item.price.toFixed(2)}
+            </Text>
+            <Text fontSize="$4" color={theme.text.val}>
+              {t("quantity")}: {item.quantity}
             </Text>
             {!shopMode && (
               <Text fontSize="$4" color={theme.text.val}>
@@ -304,7 +191,8 @@ const ManageProductsScreen: React.FC<ManageProductsScreenProps> = ({
               </Text>
             )}
             <Text fontSize="$4" color={theme.text.val}>
-              {t("creator")}: {item.creatorName}
+              {t("creator")}:{" "}
+              {creators.find((creator) => creator.id === item.creator)?.name}
             </Text>
           </YStack>
         </XStack>
@@ -314,6 +202,26 @@ const ManageProductsScreen: React.FC<ManageProductsScreenProps> = ({
 
   return (
     <YStack flex={1} bg={theme.background.val} p="$4">
+      {shopMode && (
+        <XStack mb="$2" jc="space-between" ai="center" mx="$2">
+          <TouchableOpacity
+            onPress={() => navigation.navigate("TransactionHistory")}
+          >
+            <MaterialIcons
+              name="history"
+              size={24}
+              color={theme.primary.val}
+            />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => navigation.navigate("MyOrders")}>
+            <MaterialIcons
+              name="shopping-cart"
+              size={24}
+              color={theme.primary.val}
+            />
+          </TouchableOpacity>
+        </XStack>
+      )}
       <XStack mb="$1">
         <StyledInput
           my="$0"

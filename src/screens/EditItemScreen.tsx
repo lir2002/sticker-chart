@@ -23,6 +23,7 @@ import {
   updateProduct,
   getProductById,
   deleteProduct,
+  createProductImage,
 } from "../db/database";
 import { UserContext } from "../contexts/UserContext";
 import { useLanguage } from "../contexts/LanguageContext";
@@ -32,8 +33,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { RootStackParamList } from "../types";
 import {
   captureImage,
+  generateImageId,
+  getImageRefer,
   pickImage,
   processProductImage,
+  removeImageFromRefer,
 } from "../utils/imageUtils";
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
@@ -57,9 +61,11 @@ const EditItemScreen: React.FC<EditItemScreenProps> = ({
   const { t } = useLanguage();
   const theme = useTheme();
   const { currentUser } = useContext(UserContext);
-  const productId = route.params?.productId;
   const insets = useSafeAreaInsets();
 
+  const [productId, setProductId] = useState<number | null>(
+    route.params?.productId || null
+  );
   const [productName, setProductName] = useState("");
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState("1");
@@ -183,21 +189,21 @@ const EditItemScreen: React.FC<EditItemScreenProps> = ({
       const quantityNum = parseInt(quantity);
       const imagesString = images.join(",");
 
-      // Delete removed images from filesystem
+      // Create image reference in productImages
+      for (const image of images) {
+        const referImage = await getImageRefer(image);
+        if (!referImage) {
+          const imageId = generateImageId(image);
+          if (imageId) {
+            createProductImage(imageId);
+          }
+        }
+      }
+
+      // Remove an image reference
       const imagesToDelete = removedImages;
       for (const image of imagesToDelete) {
-        const filePath = `${FileSystem.documentDirectory}${image}`;
-        const fileInfo = await FileSystem.getInfoAsync(filePath);
-        if (fileInfo.exists) {
-          try {
-            await FileSystem.deleteAsync(filePath, { idempotent: true });
-            console.log(`Deleted image: ${filePath}`);
-          } catch (fileError) {
-            console.warn(`Failed to delete image ${filePath}:`, fileError);
-          }
-        } else {
-          console.warn(`Unsaved image not found: ${filePath}`);
-        }
+        removeImageFromRefer(image);
       }
 
       if (productId) {
@@ -215,7 +221,7 @@ const EditItemScreen: React.FC<EditItemScreenProps> = ({
           `${t("successUpdateProduct")}: ${productName}`
         );
       } else {
-        await createProduct(
+        const id = await createProduct(
           productName,
           priceNum,
           currentUser.id,
@@ -224,6 +230,7 @@ const EditItemScreen: React.FC<EditItemScreenProps> = ({
           online,
           quantityNum
         );
+        setProductId(id);
         Alert.alert(t("success"), t("successCreateProduct"));
       }
 
@@ -255,21 +262,9 @@ const EditItemScreen: React.FC<EditItemScreenProps> = ({
             try {
               setIsDeleting(true);
               if (productId) {
-                // Existing product: delete initialImages and added images
                 // Delete images from initialImages (database images)
                 for (const path of initialImages) {
-                  const fullPath = `${FileSystem.documentDirectory}${path}`;
-                  try {
-                    await FileSystem.deleteAsync(fullPath, {
-                      idempotent: true,
-                    });
-                    console.log(`Deleted database image: ${fullPath}`);
-                  } catch (fileError) {
-                    console.warn(
-                      `Failed to delete image ${fullPath}:`,
-                      fileError
-                    );
-                  }
+                  removeImageFromRefer(path);
                 }
                 // Delete images added during editing
                 const addedImages = images.filter(

@@ -51,6 +51,7 @@ const RestoreData: React.FC<RestoreDataProps> = ({ onClose }) => {
       const tempDir = `${FileSystem.cacheDirectory}restore_temp/`;
       const photosDir = `${FileSystem.documentDirectory}photos/`;
       const iconsDir = `${FileSystem.documentDirectory}icons/`;
+      const productsDir = `${FileSystem.documentDirectory}products/`;
 
       // Read ZIP file
       const zipContent = await FileSystem.readAsStringAsync(zipPath, {
@@ -135,8 +136,17 @@ const RestoreData: React.FC<RestoreDataProps> = ({ onClose }) => {
         }
       }
 
-      // Set dbVersion to current version (8)
-      dbData.dbVersion = { version: 8 };
+      // Migrate for products, purchases, productImages if version < 10
+      if (backupVersion < 10) {
+        // Ensure data structures exist, even if empty
+        dbData.products = dbData.products || [];
+        dbData.purchases = dbData.purchases || [];
+        dbData.productImages = dbData.productImages || [];
+        // No field migrations needed since these tables were introduced in version 10
+      }
+
+      // Set dbVersion to current version (10)
+      dbData.dbVersion = { version: 10 };
 
       const dbManager = DatabaseManager.getInstance();
       const db = dbManager.getDatabase();
@@ -149,6 +159,9 @@ const RestoreData: React.FC<RestoreDataProps> = ({ onClose }) => {
             DELETE FROM users;
             DELETE FROM roles;
             DELETE FROM wallets;
+            DELETE FROM products;
+            DELETE FROM purchases;
+            DELETE FROM productImages;
             DELETE FROM db_version;
           `);
 
@@ -188,7 +201,7 @@ const RestoreData: React.FC<RestoreDataProps> = ({ onClose }) => {
             );
           }
 
-          // Insert event_types (updated to include expiration_date and created_at)
+          // Insert event_types
           for (const type of dbData.eventTypes || []) {
             await db.runAsync(
               `INSERT INTO event_types (name, icon, iconColor, availability, owner, weight, expiration_date, created_at)
@@ -230,11 +243,11 @@ const RestoreData: React.FC<RestoreDataProps> = ({ onClose }) => {
           // Insert wallets
           if (dbData.wallets) {
             for (const wallet of dbData.wallets) {
-              await db.runAsync(
-                `INSERT INTO wallets (owner, assets, credit) VALUES (?, ?, ?);`,
+            await db.runAsync(
+              `INSERT INTO wallets (owner, assets, credit) VALUES (?, ?, ?);`,
                 [wallet.owner, wallet.assets || 5, wallet.credit || 100]
-              );
-            }
+            );
+          }
           }
 
           // Restore transactions_<userId> tables for non-Guest users
@@ -272,10 +285,59 @@ const RestoreData: React.FC<RestoreDataProps> = ({ onClose }) => {
             }
           }
 
-          // Insert db_version (set to 8)
+          // Insert products (after users for creator foreign key)
+          for (const product of dbData.products || []) {
+            await db.runAsync(
+              `INSERT INTO products (id, name, description, images, price, creator, online, quantity, createdAt, updatedAt)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+               [
+                product.id || null,
+                product.name,
+                product.description || null,
+                product.images || null,
+                product.price,
+                product.creator,
+                product.online || 0,
+                product.quantity || 0,
+                product.createdAt || new Date().toISOString(),
+                product.updatedAt || null,
+              ]
+            );
+          }
+
+          // Insert purchases (after products and users for foreign keys)
+          for (const purchase of dbData.purchases || []) {
+            await db.runAsync(
+              `INSERT INTO purchases (order_number, product_id, owner, price, quantity, createdAt, fulfilledAt, productName, description, images, fulfilledBy)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+               [
+                purchase.order_number,
+                purchase.product_id,
+                purchase.owner,
+                purchase.price,
+                purchase.quantity,
+                purchase.createdAt || new Date().toISOString(),
+                purchase.fulfilledAt || null,
+                purchase.productName || null,
+                purchase.description || null,
+                purchase.images || null,
+                purchase.fulfilledBy || null,
+              ]
+            );
+          }
+
+          // Insert productImages
+          for (const image of dbData.productImages || []) {
+            await db.runAsync(
+              `INSERT INTO productImages (id, referred) VALUES (?, ?);`,
+              [image.id, image.referred]
+            );
+          }
+
+          // Insert db_version
           await db.runAsync(
             `INSERT OR REPLACE INTO db_version (version) VALUES (?);`,
-            [8]
+            [10]
           );
         });
       } catch (error: any) {
@@ -306,7 +368,21 @@ const RestoreData: React.FC<RestoreDataProps> = ({ onClose }) => {
       );
       for (const fileName of iconFiles) {
         const fileContent = await zip.file(fileName)!.async("base64");
-        const destPath = `${iconsDir}${fileName.split("/").pop()}`;
+        const destPath = `${iconsDir}${fileName.split("/")[1]}`;
+        await FileSystem.writeAsStringAsync(destPath, fileContent, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+      }
+
+      // Restore products images
+      await FileSystem.deleteAsync(productsDir, { idempotent: true });
+      await FileSystem.makeDirectoryAsync(productsDir, { intermediates: true });
+      const productFiles = Object.keys(zip.files).filter(
+        (name) => name.startsWith("products/") && !name.endsWith("/")
+      );
+      for (const fileName of productFiles) {
+        const fileContent = await zip.file(fileName)!.async("base64");
+        const destPath = `${productsDir}${fileName.split("/")[1]}`;
         await FileSystem.writeAsStringAsync(destPath, fileContent, {
           encoding: FileSystem.EncodingType.Base64,
         });

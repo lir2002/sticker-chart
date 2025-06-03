@@ -68,9 +68,6 @@ const UploadData: React.FC<UploadDataProps> = ({ onClose }) => {
         mimeType: "application/zip",
         dialogTitle: t("uploadBackup"),
       });
-      Alert.alert(t("success"), t("uploadSuccess"), [
-        { text: t("ok"), onPress: onClose },
-      ]);
     } catch (error) {
       console.error("Upload error:", error);
       Alert.alert("Error", `${t("uploadError")}: ${error.message}`);

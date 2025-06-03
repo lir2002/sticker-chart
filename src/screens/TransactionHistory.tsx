@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import {
   Alert,
   FlatList,
@@ -13,10 +13,10 @@ import {
   getWallet,
   updateWallet,
   insertTransaction,
-  getUserById,
 } from "../db/database";
 import { useLanguage } from "../contexts/LanguageContext";
 import { YStack, XStack, Text, useTheme } from "tamagui";
+import { UserContext } from "../contexts/UserContext";
 
 type TransactionHistoryProps = NativeStackScreenProps<
   RootStackParamList,
@@ -62,9 +62,8 @@ const TransactionItem: React.FC<{
 
 const TransactionHistory: React.FC<TransactionHistoryProps> = ({
   navigation,
-  route,
 }) => {
-  const { userId } = route.params;
+  const { currentUser } = useContext(UserContext);
   const { t } = useLanguage();
   const theme = useTheme();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -83,18 +82,14 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
     const loadData = async () => {
       setIsLoading(true);
       try {
-        const user = await getUserById(userId);
-        const isAdminUser = user?.role_id === 1;
+        const isAdminUser = currentUser?.role_id === 1;
         setIsAdmin(isAdminUser);
 
-        const userTransactions = await fetchTransactions(userId);
+        const userTransactions = await fetchTransactions(currentUser?.id || 0);
         setTransactions(userTransactions);
 
         if (isAdminUser) {
-          const hasClaimed = await checkDailyAllowanceClaimed(
-            userId,
-            userTransactions
-          );
+          const hasClaimed = await checkDailyAllowanceClaimed(userTransactions);
           setHasClaimedDaily(hasClaimed);
         }
       } catch (error) {
@@ -105,10 +100,9 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
       }
     };
     loadData();
-  }, [userId, t]);
+  }, []);
 
   const checkDailyAllowanceClaimed = async (
-    userId: number,
     transactions: Transaction[]
   ): Promise<boolean> => {
     const today = new Date();
@@ -127,38 +121,44 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
       999
     ).toISOString();
 
-    return transactions.some(
-      (tx) =>
-        tx.counterparty === userId &&
-        tx.amount === 5 &&
-        tx.timestamp &&
-        tx.timestamp >= startOfDay &&
-        tx.timestamp <= endOfDay
-    );
+    if (currentUser)
+      return transactions.some(
+        (tx) =>
+          tx.counterparty === currentUser.id &&
+          tx.amount === 5 &&
+          tx.timestamp &&
+          tx.timestamp >= startOfDay &&
+          tx.timestamp <= endOfDay
+      );
+    return false;
   };
 
   const handleClaimDailyAllowance = async () => {
+    if (!currentUser) {
+      Alert.alert(t("error"), t("notLoggedIn"));
+      return;
+    }
     setIsClaiming(true);
     try {
-      const wallet = await getWallet(userId);
+      const wallet = await getWallet(currentUser.id);
       if (!wallet) {
         throw new Error("Wallet not found");
       }
 
       const newAssets = wallet.assets + 5;
-      await updateWallet(userId, newAssets, wallet.credit);
+      await updateWallet(currentUser.id, newAssets, wallet.credit);
 
       const timestamp = new Date().toISOString();
       await insertTransaction(
-        userId,
+        currentUser.id,
         t("dailyAllowance"),
         5,
-        userId,
+        currentUser.id,
         timestamp,
         newAssets
       );
 
-      const updatedTransactions = await fetchTransactions(userId);
+      const updatedTransactions = await fetchTransactions(currentUser.id);
       setTransactions(updatedTransactions);
       setHasClaimedDaily(true);
 

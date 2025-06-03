@@ -24,6 +24,9 @@ import { ThemeContext } from "./contexts/ThemeContext";
 import ProductPreviewScreen from "./screens/ProductPreviewScreen";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import MyOrdersScreen from "./screens/MyOrdersScreen";
+import OrderDetailsScreen from "./screens/OrderDetailsScreen";
+import ManageOrdersScreen from "./screens/ManageOrdersScreen";
 
 const Stack = createStackNavigator<RootStackParamList>();
 
@@ -97,6 +100,21 @@ const AppContent: React.FC = () => {
             name="ProductPreview"
             component={ProductPreviewScreen}
             options={{ title: t("previewProduct") }}
+          />
+          <Stack.Screen
+            name="MyOrders"
+            component={MyOrdersScreen}
+            options={{ title: t("myOrders") }}
+          />
+          <Stack.Screen
+            name="OrderDetails"
+            component={OrderDetailsScreen}
+            options={{ title: t("orderDetails") }}
+          />
+          <Stack.Screen
+            name="ManageOrders"
+            component={ManageOrdersScreen}
+            options={{ title: t("manageOrders") }}
           />
         </Stack.Navigator>
         <StatusBar
