@@ -37,7 +37,6 @@ import {
 import CodeSetup from "../components/CodeSetup";
 import ChangeCode from "../components/ChangeCode";
 import { useLanguage } from "../contexts/LanguageContext";
-import LocaleConfig from "../config/calendarConfig";
 import { availableColors } from "../icons";
 import { UserContext } from "../contexts/UserContext";
 import { CustomButton, StyledInput } from "../components/SharedComponents";
@@ -306,10 +305,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     const unsubscribe = navigation.addListener("focus", refreshEventType);
     return unsubscribe;
   }, []);
-
-  useEffect(() => {
-    LocaleConfig.defaultLocale = language;
-  }, [language]);
 
   useEffect(() => {
     const ordinaryUsers = users.filter((u) => u.role_id === 3);
@@ -894,7 +889,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                   color="$primary"
                   textAlign="center"
                 >
-                  {language === "zh" ? "En" : "中文"}
+                  {language === "zh" ? "中文" : "En"}
                 </Text>
               )}
             </TouchableOpacity>
@@ -1161,6 +1156,28 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                 <Separator borderColor={theme.border.val} marginVertical="$2" />
                 <TouchableOpacity
                   onPress={() => {
+                    navigation.navigate("ManageOrders");
+                    setToolsMenuVisible(false);
+                  }}
+                  style={{
+                    paddingVertical: 8,
+                    flexDirection: "row",
+                    alignItems: "center",
+                  }}
+                >
+                  <MaterialIcons
+                    name="gavel"
+                    size={24}
+                    color={theme.text.val}
+                    style={{ marginRight: 8 }}
+                  />
+                  <Text fontSize="$4" color="$text">
+                    {t("manageOrders")}
+                  </Text>
+                </TouchableOpacity>
+                <Separator borderColor={theme.border.val} marginVertical="$2" />
+                <TouchableOpacity
+                  onPress={() => {
                     navigation.navigate("ManageProducts");
                     setToolsMenuVisible(false);
                   }}
@@ -1200,28 +1217,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                   />
                   <Text fontSize="$4" color="$text">
                     {t("createItem")}
-                  </Text>
-                </TouchableOpacity>
-                <Separator borderColor={theme.border.val} marginVertical="$2" />
-                <TouchableOpacity
-                  onPress={() => {
-                    navigation.navigate("ManageOrders");
-                    setToolsMenuVisible(false);
-                  }}
-                  style={{
-                    paddingVertical: 8,
-                    flexDirection: "row",
-                    alignItems: "center",
-                  }}
-                >
-                  <MaterialIcons
-                    name="gavel"
-                    size={24}
-                    color={theme.text.val}
-                    style={{ marginRight: 8 }}
-                  />
-                  <Text fontSize="$4" color="$text">
-                    {t("manageOrders")}
                   </Text>
                 </TouchableOpacity>
               </>

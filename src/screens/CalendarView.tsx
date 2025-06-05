@@ -1053,7 +1053,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ route }) => {
             >
               {availableColors.map(renderColorOption)}
             </ScrollView>
-            <XStack jc="space-between" w="50%" gap="$3">
+            <XStack jc="center" w="60%" gap="$3">
               <CustomButton
                 title={t("cancel")}
                 onPress={() => {

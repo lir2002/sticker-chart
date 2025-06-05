@@ -1,4 +1,5 @@
 import { LocaleConfig } from "react-native-calendars";
+import { getEffectiveLanguage } from "../utils/translation";
 
 LocaleConfig.locales["en"] = {
   monthNames: [
@@ -84,7 +85,12 @@ LocaleConfig.locales["zh"] = {
   today: "今天",
 };
 
-// Set default locale
-LocaleConfig.defaultLocale = "en";
+// Dynamically set Calendar Language
+export const setCalendarLocale = () => {
+  const effectiveLanguage = getEffectiveLanguage(); // "en" or "zh"
+  LocaleConfig.defaultLocale = effectiveLanguage;
+};
 
+// Init settings
+setCalendarLocale();
 export default LocaleConfig;

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useContext } from "react";
-import { Image, Alert, ScrollView, TouchableOpacity } from "react-native";
+import { Image, Alert, ScrollView, TouchableOpacity, Dimensions } from "react-native";
 import * as FileSystem from "expo-file-system";
-import { YStack, XStack, Text, useTheme } from "tamagui";
+import { YStack, XStack, Text, useTheme, Separator } from "tamagui";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 import {
   getPurchaseByOrderNumber,
@@ -13,7 +13,8 @@ import { UserContext } from "../contexts/UserContext";
 import { Purchase } from "../types";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../types";
-import { getSystemLanguage } from "../utils/langUtils";
+const { width: screenWidth } = Dimensions.get("window");
+
 
 type OrderDetailsScreenProps = NativeStackScreenProps<
   RootStackParamList,
@@ -92,14 +93,7 @@ const OrderDetailsScreen: React.FC<OrderDetailsScreenProps> = ({
           style: "destructive",
           onPress: async () => {
             try {
-              await cancelPurchase(
-                purchase.order_number,
-                currentUser.id,
-                language === "en" ||
-                  (language === "auto" && getSystemLanguage() === "en")
-                  ? "en"
-                  : "zh"
-              );
+              await cancelPurchase(purchase.order_number, currentUser.id);
               const updatedPurchase = await getPurchaseByOrderNumber(
                 purchase.order_number
               );
@@ -125,7 +119,7 @@ const OrderDetailsScreen: React.FC<OrderDetailsScreenProps> = ({
     );
   }
 
-  const firstImage = purchase.images?.split(",")[0];
+  const images = purchase.images?.split(",") || [];
   const isCanceled = purchase.quantity === 0;
   const isFulfilled = !!purchase.fulfilledAt && purchase.quantity !== 0;
   const isAdmin = currentUser?.role_id === 1;
@@ -138,18 +132,27 @@ const OrderDetailsScreen: React.FC<OrderDetailsScreenProps> = ({
       <ScrollView contentContainerStyle={{ padding: 16 }}>
         {/* Image */}
         <YStack ai="center" mb="$4">
-          {firstImage ? (
-            <Image
-              source={{ uri: `${FileSystem.documentDirectory}${firstImage}` }}
-              style={{
-                width: 300,
-                height: 300,
-                borderRadius: 10,
-              }}
-              resizeMode="contain"
-            />
+          {images.length > 0 ? (
+            images.map((image, index) => (
+              <Image
+                key={index}
+                source={{ uri: `${FileSystem.documentDirectory}${image}` }}
+                style={{
+                  width: screenWidth - 32, // Full width minus padding (16 left + 16 right)
+                  height: screenWidth - 32, // Square aspect ratio
+                  borderRadius: 10,
+                  marginVertical: 8,
+                }}
+                resizeMode="cover"
+              />
+            ))
           ) : (
-            <MaterialIcons name="image" size={300} color={theme.icon.val} />
+            <YStack jc="center" ai="center" height={200}>
+              <MaterialIcons name="image" size={100} color={theme.icon.val} />
+              <Text fontSize="$4" color={theme.text.val}>
+                {t("noImages")}
+              </Text>
+            </YStack>
           )}
         </YStack>
 
@@ -158,6 +161,10 @@ const OrderDetailsScreen: React.FC<OrderDetailsScreenProps> = ({
           <Text fontSize="$5" fontWeight="bold" color={theme.text.val}>
             {purchase.productName || t("unknownProduct")}
           </Text>
+          <Text fontSize="$4" color={theme.text.val}>
+            {purchase.description || t("noDescription")}
+          </Text>
+          <Separator borderColor={theme.border.val} marginVertical="$2" />
           <XStack jc="space-between">
             <Text fontSize="$4" color={theme.text.val}>
               {t("orderNumber")}: {purchase.order_number}
@@ -247,16 +254,6 @@ const OrderDetailsScreen: React.FC<OrderDetailsScreenProps> = ({
                 {purchase.fulfilledByName}
               </Text>
             </XStack>
-          )}
-          {purchase.description && (
-            <YStack mt="$2">
-              <Text fontSize="$4" fontWeight="600" color={theme.text.val}>
-                {t("description")}
-              </Text>
-              <Text fontSize="$4" color={theme.text.val}>
-                {purchase.description}
-              </Text>
-            </YStack>
           )}
         </YStack>
       </ScrollView>

@@ -11,6 +11,7 @@ import {
   ProductImage,
 } from "../types"; // Updated import to include Product and Purchase
 import { addImageToRefer } from "../utils/imageUtils";
+import { t } from "../utils/translation";
 
 // Current database version
 const CURRENT_DB_VERSION = 10; // Incremented from 9 to 10 for productImages table and purchases table changes
@@ -1392,7 +1393,7 @@ export const createPurchase = async (
 ): Promise<number> => {
   const dbManager = DatabaseManager.getInstance();
   const db = dbManager.getDatabase();
-  
+
   const imagesString = images.join(",");
 
   const result = await db.runAsync(
@@ -1443,7 +1444,6 @@ export const getAllPurchases = async (): Promise<Purchase[]> => {
 };
 
 // Get purchase by order number
-// TO update...
 export const getPurchaseByOrderNumber = async (
   orderNumber: number
 ): Promise<Purchase | null> => {
@@ -1463,7 +1463,9 @@ export const getPurchaseByOrderNumber = async (
   return purchase || null;
 };
 
-export const getPurchasesByUser = async (userId: number): Promise<Purchase[]> => {
+export const getPurchasesByUser = async (
+  userId: number
+): Promise<Purchase[]> => {
   const dbManager = DatabaseManager.getInstance();
   const db = dbManager.getDatabase();
   const purchases = await db.getAllAsync<Purchase>(
@@ -1485,9 +1487,9 @@ export const updatePurchase = async (
   productId?: number,
   owner?: number,
   price?: number,
-  quantity?: number,  
+  quantity?: number,
   fulfilledBy?: number,
-  fulfilledAt?: string,
+  fulfilledAt?: string
 ): Promise<void> => {
   const dbManager = DatabaseManager.getInstance();
   const db = dbManager.getDatabase();
@@ -1585,11 +1587,9 @@ export const fulfillPurchase = async (
   );
 };
 
-// database.ts
 export const cancelPurchase = async (
   orderNumber: number,
-  userId: number, // For transaction records and authorization check
-  language: "en" | "zh" = "en" // For transaction descriptions
+  userId: number // For transaction records and authorization check
 ): Promise<void> => {
   const dbManager = DatabaseManager.getInstance();
   const db = dbManager.getDatabase();
@@ -1602,7 +1602,9 @@ export const cancelPurchase = async (
 
   // Check if already canceled
   if (purchase.quantity === 0) {
-    throw new Error(`Purchase with order_number ${orderNumber} is already canceled`);
+    throw new Error(
+      `Purchase with order_number ${orderNumber} is already canceled`
+    );
   }
 
   // Fetch product
@@ -1646,12 +1648,26 @@ export const cancelPurchase = async (
 
     // Update purchase quantity to 0
     const timestamp = new Date().toISOString();
-    await updatePurchase(purchase.order_number, undefined, undefined, undefined, 0, userId, timestamp);
+    await updatePurchase(
+      purchase.order_number,
+      undefined,
+      undefined,
+      undefined,
+      0,
+      userId,
+      timestamp
+    );
 
     // Insert transaction records
     await insertTransaction(
       buyerId,
-      `${language === "zh" ? "退款" : "Refund for"} ${purchase.quantity} x ${purchase.productName}`,
+      t("refundFor", {
+        quantity: purchase.quantity,
+        productName: purchase.productName,
+        productId: purchase.product_id,
+        oid: purchase.order_number,
+        unitPrice: purchase.price,
+      }),
       totalCost,
       creatorId,
       timestamp,
@@ -1659,7 +1675,13 @@ export const cancelPurchase = async (
     );
     await insertTransaction(
       creatorId,
-      `${language === "zh" ? "退款扣除" : "Deduction for refund"} ${purchase.quantity} x ${purchase.productName}`,
+      t("deductionForRefund", {
+        quantity: purchase.quantity,
+        productName: purchase.productName,
+        productId: purchase.product_id,
+        oid: purchase.order_number,
+        unitPrice: purchase.price,
+      }),
       -totalCost,
       buyerId,
       timestamp,
@@ -1699,8 +1721,7 @@ export const processPurchase = async (
   unitPrice: number,
   productName: string,
   description: string | null,
-  images: string[],
-  language: "en" | "zh"
+  images: string[]
 ): Promise<number> => {
   const dbManager = DatabaseManager.getInstance();
   const db = dbManager.getDatabase();
@@ -1775,9 +1796,13 @@ export const processPurchase = async (
     // Add transaction records
     await insertTransaction(
       userId,
-      `${
-        language === "zh" ? "购得" : "Purchased"
-      } ${purchaseQuantity} x ${productName}. Order Number: ${oid}`,
+      t("purchased", {
+        quantity: purchaseQuantity,
+        productName,
+        oid,
+        productId,
+        unitPrice,
+      }),
       -totalCost,
       product.creator,
       timestamp,
@@ -1785,9 +1810,13 @@ export const processPurchase = async (
     );
     await insertTransaction(
       product.creator,
-      `${
-        language === "zh" ? "卖出" : "Sold"
-      } ${purchaseQuantity} x ${productName}. Order Number: ${oid}`,
+      t("sold", {
+        quantity: purchaseQuantity,
+        productName,
+        oid,
+        productId,
+        unitPrice,
+      }),
       totalCost,
       userId,
       timestamp,

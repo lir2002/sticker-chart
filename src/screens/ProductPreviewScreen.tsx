@@ -17,7 +17,6 @@ import { StyledInput } from "../components/SharedComponents";
 import { UserContext } from "../contexts/UserContext";
 import { processPurchase } from "../db/database";
 import VerifyCodeModal from "../components/VerifyCodeModal";
-import { getSystemLanguage } from "../utils/langUtils";
 
 type ProductPreviewScreenProps = NativeStackScreenProps<
   RootStackParamList,
@@ -141,11 +140,7 @@ const ProductPreviewScreen: React.FC<ProductPreviewScreenProps> = ({
         price,
         productName,
         description || null,
-        images,
-        language === "en" ||
-          (language === "auto" && getSystemLanguage() === "en")
-          ? "en"
-          : "zh"
+        images
       );
 
       // Update local quantity
@@ -228,7 +223,9 @@ const ProductPreviewScreen: React.FC<ProductPreviewScreenProps> = ({
             </YStack>
           )}
           <XStack>
-            <Text>{t("productNumber")}:{" "} {productId}</Text>
+            <Text>
+              {t("productNumber")}: {productId}
+            </Text>
           </XStack>
         </YStack>
       </ScrollView>
