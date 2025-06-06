@@ -6,7 +6,7 @@ import JSZip from "jszip";
 import { useLanguage } from "../contexts/LanguageContext";
 import { CustomButton } from "./SharedComponents";
 import DownloadData from "./DownloadData";
-import { DatabaseManager } from "../db/database";
+import { DatabaseManager } from "../db";
 
 interface RestoreDataProps {
   onClose: () => void;

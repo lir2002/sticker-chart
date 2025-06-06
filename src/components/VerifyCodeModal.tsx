@@ -4,7 +4,7 @@ import { YStack, XStack, Text, useTheme } from "tamagui";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 import { StyledInput } from "./SharedComponents";
 import { useLanguage } from "../contexts/LanguageContext";
-import { verifyUserCode } from "../db/database";
+import { verifyUserCode } from "../db";
 
 interface VerifyCodeModalProps {
   visible: boolean;

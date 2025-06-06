@@ -5,7 +5,7 @@ import * as FileSystem from "expo-file-system";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 import { YStack, XStack, Text, useTheme } from "tamagui";
 import { StyledInput } from "../components/SharedComponents";
-import { getPurchasesByUser, getUsers } from "../db/database";
+import { getPurchasesByUser, getUsers } from "../db";
 import { filterAndSortData } from "../utils/filterAndSort";
 import { Purchase, RootStackParamList, User } from "../types";
 import { useLanguage } from "../contexts/LanguageContext";
@@ -56,10 +56,12 @@ const MyOrdersScreen: React.FC<MyOrdersScreenProp> = ({ navigation }) => {
   // Fulfiller options
   const fulfillerOptions = [
     { label: t("allFulfillers"), value: "0" },
-    ...users.map((user) => ({
-      label: user.name,
-      value: user.id.toString(),
-    })),
+    ...users
+      .filter((user) => user.role_id === 1)
+      .map((user) => ({
+        label: user.name,
+        value: user.id.toString(),
+      })),
   ];
 
   // Fetch purchases and users
@@ -81,6 +83,7 @@ const MyOrdersScreen: React.FC<MyOrdersScreenProp> = ({ navigation }) => {
   useEffect(() => {
     fetchData();
     const unsubscribe = navigation.addListener("focus", () => fetchData());
+    return unsubscribe;
   }, [fetchData]);
 
   // Filter and sort purchases
@@ -98,8 +101,6 @@ const MyOrdersScreen: React.FC<MyOrdersScreenProp> = ({ navigation }) => {
   // Render purchase card
   const renderPurchase = ({ item }: { item: Purchase }) => {
     const firstImage = item.images ? item.images.split(",")[0] : null;
-    const isCanceled = item.quantity === 0;
-    const isFulfilled = !!item.fulfilledAt && item.quantity !== 0;
     return (
       <TouchableOpacity
         onPress={() =>

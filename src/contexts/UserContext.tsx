@@ -1,7 +1,7 @@
 import React, { createContext, useState, useEffect, ReactNode } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { User } from "../types";
-import { getUserByName, forceAdminPasswordSetup } from "../db/database";
+import { getUserByName, forceAdminPasswordSetup } from "../db";
 
 // Define the shape of the UserContext
 interface UserContextType {

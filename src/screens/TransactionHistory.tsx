@@ -13,7 +13,7 @@ import {
   getWallet,
   updateWallet,
   insertTransaction,
-} from "../db/database";
+} from "../db";
 import { useLanguage } from "../contexts/LanguageContext";
 import { YStack, XStack, Text, useTheme } from "tamagui";
 import { UserContext } from "../contexts/UserContext";

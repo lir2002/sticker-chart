@@ -39,7 +39,7 @@ import {
   updateEventType,
   deleteEvent,
   verifyEventWithTransaction,
-} from "../db/database";
+} from "../db";
 import { availableColors } from "../icons";
 import { resolvePhotoUri } from "../utils/fileUtils";
 import { captureImage, pickImage } from "../utils/imageUtils";

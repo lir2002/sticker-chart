@@ -1,5 +1,4 @@
 import * as FileSystem from "expo-file-system";
-import * as ImageManipulator from "expo-image-manipulator";
 
 export const resolvePhotoUri = (path: string | null): string | null => {
   if (!path || path.length===0) return null;

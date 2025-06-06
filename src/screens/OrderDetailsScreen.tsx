@@ -7,7 +7,7 @@ import {
   getPurchaseByOrderNumber,
   fulfillPurchase,
   cancelPurchase,
-} from "../db/database";
+} from "../db";
 import { useLanguage } from "../contexts/LanguageContext";
 import { UserContext } from "../contexts/UserContext";
 import { Purchase } from "../types";
@@ -157,13 +157,16 @@ const OrderDetailsScreen: React.FC<OrderDetailsScreenProps> = ({
         </YStack>
 
         {/* Order Details */}
-        <YStack gap="$5">
+        <YStack gap="$5" mb="$5" paddingBottom="$5">
           <Text fontSize="$5" fontWeight="bold" color={theme.text.val}>
             {purchase.productName || t("unknownProduct")}
           </Text>
           <Text fontSize="$4" color={theme.text.val}>
             {purchase.description || t("noDescription")}
           </Text>
+          <Text fontSize="$4" color={theme.text.val}>
+            {t("productNumber")}: {purchase.product_id}
+          </Text>          
           <Separator borderColor={theme.border.val} marginVertical="$2" />
           <XStack jc="space-between">
             <Text fontSize="$4" color={theme.text.val}>
@@ -230,7 +233,7 @@ const OrderDetailsScreen: React.FC<OrderDetailsScreenProps> = ({
               {new Date(purchase.fulfilledAt!).toLocaleString()}
             </Text>
           )}
-          {purchase.fulfilledAt && (
+          {purchase.fulfilledByName && (
             <XStack ai="center" gap="$2">
               <Text fontSize="$4" color={theme.text.val}>
                 {isFulfilled ? t("fulfilledBy") : t("canceledBy")}:

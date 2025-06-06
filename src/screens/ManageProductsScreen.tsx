@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { FlatList, TouchableOpacity, Image, Alert, Modal } from "react-native";
+import { FlatList, TouchableOpacity, Image, Alert } from "react-native";
 import * as FileSystem from "expo-file-system";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
-import { RootStackParamList, Product, User } from "../types";
-import { getProducts, getUsers } from "../db/database";
+import { RootStackParamList, Product } from "../types";
+import { getProducts, getUsers } from "../db";
 import { useLanguage } from "../contexts/LanguageContext";
 import { YStack, XStack, Text, useTheme } from "tamagui";
 import { StyledInput } from "../components/SharedComponents";
@@ -210,14 +210,14 @@ const ManageProductsScreen: React.FC<ManageProductsScreenProps> = ({
             <MaterialIcons
               name="history"
               size={24}
-              color={theme.primary.val}
+              color={theme.icon.val}
             />
           </TouchableOpacity>
           <TouchableOpacity onPress={() => navigation.navigate("MyOrders")}>
             <MaterialIcons
               name="shopping-cart"
               size={24}
-              color={theme.primary.val}
+              color={theme.icon.val}
             />
           </TouchableOpacity>
         </XStack>

@@ -69,7 +69,7 @@ export type RootStackParamList = {
   ManageProducts: { shopMode?: boolean };
   BrowseStore: undefined;
   ProductPreview: {
-    productId?: number; // Absent in Preview Mode
+    productId: number | null;
     productName: string;
     description?: string;
     price: number;

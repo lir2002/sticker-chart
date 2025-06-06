@@ -15,7 +15,7 @@ import { useLanguage } from "../contexts/LanguageContext";
 import { YStack, XStack, Text, useTheme } from "tamagui";
 import { StyledInput } from "../components/SharedComponents";
 import { UserContext } from "../contexts/UserContext";
-import { processPurchase } from "../db/database";
+import { processPurchase } from "../db";
 import VerifyCodeModal from "../components/VerifyCodeModal";
 
 type ProductPreviewScreenProps = NativeStackScreenProps<
@@ -29,7 +29,7 @@ const ProductPreviewScreen: React.FC<ProductPreviewScreenProps> = ({
   route,
   navigation,
 }) => {
-  const { t, language } = useLanguage();
+  const { t } = useLanguage();
   const theme = useTheme();
   const {
     productId,
@@ -53,7 +53,7 @@ const ProductPreviewScreen: React.FC<ProductPreviewScreenProps> = ({
   // Set navigation title to "Product Details"
   useEffect(() => {
     navigation.setOptions({
-      title: productId ? t("productDetails") : t("previewProduct"),
+      title: online ? t("productDetails") : t("previewProduct"),
     });
   }, [navigation, t]);
 
@@ -303,14 +303,16 @@ const ProductPreviewScreen: React.FC<ProductPreviewScreenProps> = ({
             parseInt(purchaseQuantity) === 0 ||
             !currentUser ||
             currentUser.id === 2 || // Guest user
-            isProcessing
+            isProcessing ||
+            online === 0
           }
           style={{
             backgroundColor:
               parseInt(purchaseQuantity) === 0 ||
               !currentUser ||
               currentUser.id === 2 ||
-              isProcessing
+              isProcessing ||
+              online === 0
                 ? theme.disabled.val
                 : theme.primary.val,
             paddingHorizontal: 16,

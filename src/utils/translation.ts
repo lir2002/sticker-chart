@@ -413,7 +413,7 @@ export const translations: Translations = {
   updateItem: { en: "Update Item", zh: "更新商品" },
   price: { en: "Price", zh: "价格" },
   quantity: { en: "Quantity", zh: "数量" },
-  manageProducts: { en: "Manage Products", zh: "管理商品" },
+  manageProducts: { en: "Manage Items", zh: "管理商品" },
   browseStore: { en: "Browse Store", zh: "逛商店" },
   publish: { en: "Publish", zh: "发布" },
   status: { en: "Status", zh: "状态" },
@@ -605,7 +605,7 @@ export const translations: Translations = {
     en: "Are you sure you want to cancel this order? The amount: {amount} will be refunded.",
     zh: "您确定要取消此订单吗？金额: {amount}将会退还。",
   },
-  productNumber: { en: "Product ID", zh: "产品编号" },
+  productNumber: { en: "Product ID", zh: "商品编号" },
   purchased: {
     en: "Purchased {quantity} x {productName}. Product ID: {productId}, Unit price: {unitPrice}. Order Number: {oid}",
     zh: "购得 {quantity} x {productName}。商品编号：{productId}，单价：{unitPrice}，订单号：{oid}",

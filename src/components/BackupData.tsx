@@ -20,7 +20,7 @@ import {
   getProducts,
   getPurchases,
   getProductImages,
-} from "../db/database";
+} from "../db";
 import UploadData from "./UploadData";
 import { CustomButton } from "./SharedComponents";
 import { Stack, YStack, Text, useTheme } from "tamagui";

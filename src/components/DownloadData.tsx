@@ -66,6 +66,10 @@ const DownloadData: React.FC<DownloadDataProps> = ({
             to: destPath,
           });
         } catch (copyError) {
+          console.error(
+            `Copy failed: from: ${asset.uri} to: ${destPath}`,
+            copyError
+          );
           const content = await FileSystem.readAsStringAsync(asset.uri, {
             encoding: FileSystem.EncodingType.Base64,
           });

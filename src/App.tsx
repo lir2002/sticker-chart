@@ -6,7 +6,7 @@ import {
   DarkTheme,
 } from "@react-navigation/native";
 import { createStackNavigator } from "@react-navigation/stack";
-import { TamaguiProvider, View, YStack, useTheme, Text } from "tamagui";
+import { TamaguiProvider, View, useTheme } from "tamagui";
 import { Appearance, useColorScheme } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import HomeScreen from "./screens/HomeScreen";
@@ -18,7 +18,7 @@ import ManageProductsScreen from "./screens/ManageProductsScreen";
 import { RootStackParamList } from "./types";
 import { LanguageProvider, useLanguage } from "./contexts/LanguageContext";
 import { UserProvider } from "./contexts/UserContext";
-import { initDatabase } from "./db/database";
+import { initDatabase } from "./db";
 import tamaguiConfig from "./config/tamagui.config";
 import { ThemeContext } from "./contexts/ThemeContext";
 import ProductPreviewScreen from "./screens/ProductPreviewScreen";

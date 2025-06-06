@@ -3,7 +3,7 @@ import { Alert } from "react-native";
 import { YStack, Text, XStack } from "tamagui";
 import { useLanguage } from "../contexts/LanguageContext";
 import { UserContext } from "../contexts/UserContext";
-import { verifyUserCode, updateUserCode } from "../db/database";
+import { verifyUserCode, updateUserCode } from "../db";
 import { CustomButton, StyledInput } from "./SharedComponents";
 
 interface ChangeCodeProps {

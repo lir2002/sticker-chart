@@ -26,7 +26,7 @@ import {
   fetchAllEventsWithDetails,
   getEventTypes,
   getUsers,
-} from "../db/database";
+} from "../db";
 import { resolvePhotoUri } from "../utils/fileUtils";
 import { CustomButton } from "../components/SharedComponents";
 

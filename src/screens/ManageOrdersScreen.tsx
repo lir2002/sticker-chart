@@ -7,7 +7,7 @@ import { useLanguage } from "../contexts/LanguageContext";
 import { UserContext } from "../contexts/UserContext";
 import { StyledInput } from "../components/SharedComponents";
 import { Dropdown } from "../components/Dropdown";
-import { getAllPurchases, getUsers } from "../db/database";
+import { getAllPurchases, getUsers } from "../db";
 import { filterAndSortData } from "../utils/filterAndSort";
 import { Purchase, RootStackParamList, User } from "../types";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
@@ -105,8 +105,6 @@ const ManageOrdersScreen: React.FC<ManageOrdersScreenProp> = ({
   // Render purchase card
   const renderPurchase = ({ item }: { item: Purchase }) => {
     const firstImage = item.images?.split(",")[0];
-    const isCanceled = item.quantity === 0;
-    const isFulfilled = !!item.fulfilledAt && item.quantity !== 0;
     return (
       <TouchableOpacity
         onPress={() =>
@@ -232,10 +230,12 @@ const ManageOrdersScreen: React.FC<ManageOrdersScreenProp> = ({
           onValueChange={setFulfillerFilter}
           items={[
             { label: t("allFulfillers"), value: "0" },
-            ...users.map((user) => ({
-              label: user.name,
-              value: user.id.toString(),
-            })),
+            ...users
+              .filter((user) => user.role_id === 1)
+              .map((user) => ({
+                label: user.name,
+                value: user.id.toString(),
+              })),
           ]}
           placeholder={t("allFulfillers")}
         />

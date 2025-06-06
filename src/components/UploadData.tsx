@@ -45,7 +45,7 @@ const UploadData: React.FC<UploadDataProps> = ({ onClose }) => {
     };
     
     loadBackupFiles();
-  }, []);
+  }, [t]);
 
   const handleUpload = async () => {
     if (!selectedBackup) {

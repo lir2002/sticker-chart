@@ -7,8 +7,9 @@ import {
   deleteProductImage,
   getProductImageById,
   updateProductImage,
-} from "../db/database";
+} from "../db/productImageOperations";
 import { ProductImage } from "../types";
+import { t } from "./translation";
 
 interface ImageResult {
   uri: string;
@@ -165,7 +166,7 @@ export async function processUserIcon(
 
     return relativePath;
   } catch (error) {
-    Alert.alert("Failed to process image", "无法处理图像");
+    Alert.alert(t("errorProcessImage"), "${error}");
     return "";
   }
 }
@@ -253,7 +254,7 @@ export const addImageToRefer = async (imagePath: string): Promise<void> => {
     if (imageId) {
       createProductImage(imageId);
     } else {
-      console.warn(`Failed to add ${imagePath} to productImages`)
+      console.warn(`Failed to add ${imagePath} to productImages`);
     }
   }
 };

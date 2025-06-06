@@ -24,7 +24,7 @@ import {
   getProductById,
   deleteProduct,
   createProductImage,
-} from "../db/database";
+} from "../db";
 import { UserContext } from "../contexts/UserContext";
 import { useLanguage } from "../contexts/LanguageContext";
 import { YStack, XStack, Text, useTheme, Button } from "tamagui";
@@ -729,8 +729,8 @@ const EditItemScreen: React.FC<EditItemScreenProps> = ({
         right={0}
         zIndex={1000}
         backgroundColor={theme.background.val}
-        padding="$3"
-        gap="$2"
+        padding="$2"
+        gap="$1"
         justifyContent="flex-end"
         borderTopWidth={1}
         borderTopColor={theme.border.val}
@@ -741,6 +741,7 @@ const EditItemScreen: React.FC<EditItemScreenProps> = ({
           onPress={() => {
             if (!validateInputs()) return;
             navigation.navigate("ProductPreview", {
+              productId,
               productName,
               description,
               price: parseInt(price),

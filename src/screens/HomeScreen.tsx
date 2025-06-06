@@ -33,7 +33,7 @@ import {
   getWallet,
   deleteEventType,
   updateEventType,
-} from "../db/database";
+} from "../db";
 import CodeSetup from "../components/CodeSetup";
 import ChangeCode from "../components/ChangeCode";
 import { useLanguage } from "../contexts/LanguageContext";
@@ -101,9 +101,6 @@ const MenuModal: React.FC<{
   children: React.ReactNode;
   tab: "tools" | "services";
 }> = ({ visible, onClose, children, tab }) => {
-  const theme = useTheme();
-  const screenWidth = Dimensions.get("window").width;
-  const tabWidth = screenWidth / 2;
   const modalWidth = 200;
   const tabBarHeight = 75; // Adjust based on actual tab bar height
 
@@ -162,7 +159,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const theme = useTheme();
   const { language, setLanguage, t } = useLanguage();
   const systemColorScheme = useColorScheme();
-  const { themeMode, setThemeMode, effectiveTheme } = useThemeContext();
+  const { themeMode, setThemeMode } = useThemeContext();
   const [eventTypes, setEventTypes] = useState<EventType[]>([]);
   const [filterText, setFilterText] = useState("");
   const [filterIcon, setFilterIcon] = useState("");
