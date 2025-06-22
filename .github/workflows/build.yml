@@ -211,9 +211,7 @@ jobs:
 
             ### Changes since last release
             ${{ steps.check-version.outputs.LATEST_TAG }}..HEAD:
-            ```bash
             ${{ steps.get-commits.outputs.commit_list }}
-            ```
           draft: false
           prerelease: false
 

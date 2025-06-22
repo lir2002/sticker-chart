@@ -1,5 +1,4 @@
 import * as SQLite from "expo-sqlite";
-import { t } from "../utils/translation";
 
 // Current database version
 const CURRENT_DB_VERSION = 10; // Incremented from 9 to 10 for productImages table and purchases table changes

@@ -52,7 +52,8 @@
     "react-native-vector-icons": "^10.2.0",
     "react-native-web": "^0.20.0",
     "tamagui": "^1.126.5",
-    "expo-localization": "~16.1.5"
+    "expo-localization": "~16.1.5",
+    "expo-device": "~7.1.4"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

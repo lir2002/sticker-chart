@@ -52,6 +52,9 @@ const RestoreData: React.FC<RestoreDataProps> = ({ onClose }) => {
       const photosDir = `${FileSystem.documentDirectory}photos/`;
       const iconsDir = `${FileSystem.documentDirectory}icons/`;
       const productsDir = `${FileSystem.documentDirectory}products/`;
+      const dbFilePath = `${FileSystem.documentDirectory}SQLite/eventmarker.db`;
+      const walFilePath = `${FileSystem.documentDirectory}SQLite/eventmarker.db-wal`;
+      const shmFilePath = `${FileSystem.documentDirectory}SQLite/eventmarker.db-shm`;
 
       // Read ZIP file
       const zipContent = await FileSystem.readAsStringAsync(zipPath, {
@@ -62,95 +65,136 @@ const RestoreData: React.FC<RestoreDataProps> = ({ onClose }) => {
       // Create temp directory
       await FileSystem.makeDirectoryAsync(tempDir, { intermediates: true });
 
-      // Extract database.json
-      const dbJsonFile = zip.file("database.json");
-      if (!dbJsonFile) {
-        throw new Error("Backup does not contain a valid database file");
-      }
+      const dbManager = DatabaseManager.getInstance();
 
-      const dbJsonContent = await dbJsonFile.async("string");
-      const dbData = JSON.parse(dbJsonContent);
+      // Check for eventmarker.db (new format)
+      const dbFile = zip.file("eventmarker.db");
+      if (dbFile) {
+        // Close existing database connection
+        await dbManager.close();
 
-      // Get backup version
-      const backupVersion = dbData.dbVersion?.version || 0;
+        // Extract and restore eventmarker.db
+        const dbContent = await dbFile.async("base64");
+        await FileSystem.writeAsStringAsync(dbFilePath, dbContent, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
 
-      // Migrate absolute paths to relative paths if version < 5
-      if (backupVersion < 5) {
-        if (dbData.events) {
-          dbData.events = dbData.events.map((event: any) => {
-            if (event.photoPath && event.photoPath.startsWith("file://")) {
-              const relativePath = event.photoPath.includes("photos/")
-                ? event.photoPath.substring(event.photoPath.indexOf("photos/"))
-                : null;
-              return { ...event, photoPath: relativePath };
-            }
-            return event;
+        // Handle WAL and SHM files if present
+        const walFile = zip.file("eventmarker.db-wal");
+        if (walFile) {
+          const walContent = await walFile.async("base64");
+          await FileSystem.writeAsStringAsync(walFilePath, walContent, {
+            encoding: FileSystem.EncodingType.Base64,
           });
+        } else {
+          // Remove existing WAL file if not in backup
+          await FileSystem.deleteAsync(walFilePath, { idempotent: true });
         }
-        if (dbData.users) {
-          dbData.users = dbData.users.map((user: any) => {
-            if (user.icon && user.icon.startsWith("file://")) {
-              const relativePath = user.icon.includes("icons/")
-                ? user.icon.substring(user.icon.indexOf("icons/"))
-                : null;
-              return { ...user, icon: relativePath };
-            }
-            return user;
-          });
-        }
-      }
 
-      // Migrate events to include owner if version < 6
-      if (backupVersion < 6) {
-        if (dbData.events && dbData.eventTypes) {
-          dbData.events = dbData.events.map((event: any) => {
+        const shmFile = zip.file("eventmarker.db-shm");
+        if (shmFile) {
+          const shmContent = await shmFile.async("base64");
+          await FileSystem.writeAsStringAsync(shmFilePath, shmContent, {
+            encoding: FileSystem.EncodingType.Base64,
+          });
+        } else {
+          // Remove existing SHM file if not in backup
+          await FileSystem.deleteAsync(shmFilePath, { idempotent: true });
+        }
+
+        // Reinitialize database
+        await dbManager.initialize();
+      } else {
+        // Fallback to database.json (legacy format)
+        const dbJsonFile = zip.file("database.json");
+        if (!dbJsonFile) {
+          throw new Error("Backup does not contain a valid database file");
+        }
+
+        const dbJsonContent = await dbJsonFile.async("string");
+        const dbData = JSON.parse(dbJsonContent);
+
+        // Get backup version
+        const backupVersion = dbData.dbVersion?.version || 0;
+
+        // Migrate absolute paths to relative paths if version < 5
+        if (backupVersion < 5) {
+          if (dbData.events) {
+            dbData.events = dbData.events.map((event: any) => {
+              if (event.photoPath && event.photoPath.startsWith("file://")) {
+                const relativePath = event.photoPath.includes("photos/")
+                  ? event.photoPath.substring(
+                      event.photoPath.indexOf("photos/")
+                    )
+                  : null;
+                return { ...event, photoPath: relativePath };
+              }
+              return event;
+            });
+          }
+          if (dbData.users) {
+            dbData.users = dbData.users.map((user: any) => {
+              if (user.icon && user.icon.startsWith("file://")) {
+                const relativePath = user.icon.includes("icons/")
+                  ? user.icon.substring(user.icon.indexOf("icons/"))
+                  : null;
+                return { ...user, icon: relativePath };
+              }
+              return user;
+            });
+          }
+        }
+
+        // Migrate events to include owner if version < 6
+        if (backupVersion < 6) {
+          if (dbData.events && dbData.eventTypes) {
+            dbData.events = dbData.events.map((event: any) => {
             // Find matching eventType to get owner
-            const matchingType = dbData.eventTypes.find(
-              (type: any) => type.name === event.eventType
-            );
-            return {
-              ...event,
-              owner: matchingType?.owner || null,
-            };
-          });
+              const matchingType = dbData.eventTypes.find(
+                (type: any) => type.name === event.eventType
+              );
+              return {
+                ...event,
+                owner: matchingType?.owner || null,
+              };
+            });
+          }
         }
-      }
 
-      // Migrate event_types to include expiration_date if version < 7
-      if (backupVersion < 7) {
-        if (dbData.eventTypes) {
-          dbData.eventTypes = dbData.eventTypes.map((type: any) => ({
-            ...type,
-            expiration_date: null,
-          }));
+        // Migrate event_types to include expiration_date if version < 7
+        if (backupVersion < 7) {
+          if (dbData.eventTypes) {
+            dbData.eventTypes = dbData.eventTypes.map((type: any) => ({
+              ...type,
+              expiration_date: null,
+            }));
+          }
         }
-      }
 
-      // Migrate event_types to include created_at if version < 8
-      if (backupVersion < 8) {
-        if (dbData.eventTypes) {
-          dbData.eventTypes = dbData.eventTypes.map((type: any) => ({
-            ...type,
-            created_at: null,
-          }));
+        // Migrate event_types to include created_at if version < 8
+        if (backupVersion < 8) {
+          if (dbData.eventTypes) {
+            dbData.eventTypes = dbData.eventTypes.map((type: any) => ({
+              ...type,
+              created_at: null,
+            }));
+          }
         }
-      }
 
-      // Migrate for products, purchases, productImages if version < 10
-      if (backupVersion < 10) {
+        // Migrate for products, purchases, productImages if version < 10
+        if (backupVersion < 10) {
         // Ensure data structures exist, even if empty
-        dbData.products = dbData.products || [];
-        dbData.purchases = dbData.purchases || [];
-        dbData.productImages = dbData.productImages || [];
+          dbData.products = dbData.products || [];
+          dbData.purchases = dbData.purchases || [];
+          dbData.productImages = dbData.productImages || [];
         // No field migrations needed since these tables were introduced in version 10
-      }
+        }
 
-      // Set dbVersion to current version (10)
-      dbData.dbVersion = { version: 10 };
+        // Set dbVersion to current version (10)
+        dbData.dbVersion = { version: 10 };
 
       const dbManager = DatabaseManager.getInstance();
-      const db = dbManager.getDatabase();
-      try {
+        const db = dbManager.getDatabase();
         await db.withTransactionAsync(async () => {
           // Clear existing tables
           await db.execAsync(`
@@ -243,11 +287,11 @@ const RestoreData: React.FC<RestoreDataProps> = ({ onClose }) => {
           // Insert wallets
           if (dbData.wallets) {
             for (const wallet of dbData.wallets) {
-            await db.runAsync(
-              `INSERT INTO wallets (owner, assets, credit) VALUES (?, ?, ?);`,
+              await db.runAsync(
+                `INSERT INTO wallets (owner, assets, credit) VALUES (?, ?, ?);`,
                 [wallet.owner, wallet.assets || 5, wallet.credit || 100]
-            );
-          }
+              );
+            }
           }
 
           // Restore transactions_<userId> tables for non-Guest users
@@ -290,7 +334,7 @@ const RestoreData: React.FC<RestoreDataProps> = ({ onClose }) => {
             await db.runAsync(
               `INSERT INTO products (id, name, description, images, price, creator, online, quantity, createdAt, updatedAt)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
-               [
+              [
                 product.id || null,
                 product.name,
                 product.description || null,
@@ -310,7 +354,7 @@ const RestoreData: React.FC<RestoreDataProps> = ({ onClose }) => {
             await db.runAsync(
               `INSERT INTO purchases (order_number, product_id, owner, price, quantity, createdAt, fulfilledAt, productName, description, images, fulfilledBy)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
-               [
+              [
                 purchase.order_number,
                 purchase.product_id,
                 purchase.owner,
@@ -340,10 +384,6 @@ const RestoreData: React.FC<RestoreDataProps> = ({ onClose }) => {
             [10]
           );
         });
-      } catch (error: any) {
-        console.error("Database restore error:", error);
-        Alert.alert("Error", `${t("errorRestoreDB")}: ${error.message}`);
-        throw error;
       }
 
       // Restore photos
